@@ -30,7 +30,8 @@ dotenv.config();
 // ------------------------
 const app = express();
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || "0.0.0.0";
+// FIX: Explicitly set the host to 0.0.0.0 for Fly.io compatibility
+const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 const APP_BASE_URL = process.env.APP_BASE_URL;
