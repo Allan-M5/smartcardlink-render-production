@@ -211,14 +211,14 @@ const generatePdfContent = (doc, client) => {
     doc.moveDown();
     doc.text("Social Links:");
     for (const [key, value] of Object.entries(data.socialLinks)) {
-      if (value) doc.text(`        - ${key}: ${value}`);
+      if (value) doc.text(`         - ${key}: ${value}`);
     }
   }
   if (data.workingHours && typeof data.workingHours === "object") {
     doc.moveDown();
     doc.text("Working Hours:");
     for (const [key, value] of Object.entries(data.workingHours)) {
-      if (value) doc.text(`        - ${key}: ${value}`);
+      if (value) doc.text(`         - ${key}: ${value}`);
     }
   }
 };
@@ -375,14 +375,32 @@ app.get("/api/clients/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// Upload Photo (PREVIEW ONLY): POST /api/clients/:id/photo (protected)
-app.post("/api/clients/:id/photo", authMiddleware, adminAuth, parser.single("photo"), async (req, res) => {
-  if (!req.file || !req.file.path) {
-    return res.status(400).json({ success: false, message: "Upload failed: no file provided or path found" });
-  }
-  await logAction(req.user.email, req.user.isAdmin ? "admin" : "staff", "PHOTO_UPLOADED", req.params.id, null, { tempPhotoUrl: req.file.path });
-  res.status(200).json({ success: true, message: "Photo uploaded for preview.", photoUrl: req.file.path });
+// New Photo Upload Route: POST /api/upload-photo (for general use)
+app.post("/api/upload-photo", parser.single("photo"), async (req, res) => {
+    try {
+        if (!req.file || !req.file.path) {
+            return res.status(400).json({ success: false, message: "Upload failed: no file provided or path found." });
+        }
+        // Log the action (optional, for debugging)
+        console.log("✅ Photo uploaded successfully:", req.file.path);
+        // Return the secure URL from Cloudinary
+        res.status(200).json({ success: true, message: "Photo uploaded successfully.", photoUrl: req.file.path });
+    } catch (error) {
+        console.error("❌ Error uploading photo:", error);
+        res.status(500).json({ success: false, message: "Server error uploading photo." });
+    }
 });
+
+
+// Upload Photo (PREVIEW ONLY): POST /api/clients/:id/photo (protected)
+// This route is now redundant with the new /api/upload-photo route and has been deprecated.
+// app.post("/api/clients/:id/photo", authMiddleware, adminAuth, parser.single("photo"), async (req, res) => {
+//   if (!req.file || !req.file.path) {
+//     return res.status(400).json({ success: false, message: "Upload failed: no file provided or path found" });
+//   }
+//   await logAction(req.user.email, req.user.isAdmin ? "admin" : "staff", "PHOTO_UPLOADED", req.params.id, null, { tempPhotoUrl: req.file.path });
+//   res.status(200).json({ success: true, message: "Photo uploaded for preview.", photoUrl: req.file.path });
+// });
 
 // Save/Update Info: PUT /api/clients/:id (protected)
 app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
@@ -392,7 +410,7 @@ app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
     if (!client) {
       return res.status(404).json({ success: false, message: "Client not found." });
     }
-    
+
     // Update fields directly on the client object
     Object.assign(client, adminData);
     client.photoUrl = photoUrl;
