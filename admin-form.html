@@ -308,11 +308,11 @@
                 </div>
                 <div>
                     <label for="sunStart">Sunday Start</label>
-                    <input type="time" id="sunStart" name="sunStart" value="--:--" />
+                    <input type="time" id="sunStart" name="sunStart" value="" />
                 </div>
                 <div>
                     <label for="sunEnd">Sunday End</label>
-                    <input type="time" id="sunEnd" name="sunEnd" value="--:--" />
+                    <input type="time" id="sunEnd" name="sunEnd" value="" />
                 </div>
             </div>
             <div class="section-header">Social Links</div>
@@ -412,7 +412,7 @@
             if (data.workingHours) {
                 for (const day in data.workingHours) {
                     const input = document.getElementById(day);
-                    if (input) input.value = data.workingHours[day];
+                    if (input) input.value = data.workingHours[day] || '';
                 }
             }
 
