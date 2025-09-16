@@ -351,10 +351,13 @@
         <div id="toast-message" class="toast-message"></div>
     </div>
     <script>
-        const API_BASE = window.location.origin;
+        // Update this line to point to your live backend on Fly.io
+        const API_BASE = 'https://smartcardlink-app.fly.dev';
         const API_URL = `${API_BASE}/api`;
         const params = new URLSearchParams(window.location.search);
         const clientId = params.get('id');
+        // NOTE: For security, you will eventually need to add a JWT token to authenticated requests.
+        // Example: fetch(url, { headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' } })
 
         const form = document.getElementById('adminForm');
         const viewPdfBtn = document.getElementById('view-pdf-btn');
