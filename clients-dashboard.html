@@ -6,7 +6,6 @@
     <title>SmartCardLink vCard Client Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <!-- Replaced the favicon link with a valid, inline SVG to prevent the 404 error -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
     <style>
         body {
@@ -186,16 +185,6 @@
         }
         .toast.success { background-color: #22c55e; color: white; }
         .toast.error { background-color: #ef4444; color: white; }
-        .logout-btn {
-            background-color: #ef4444;
-            color: white;
-            border-color: #ef4444;
-            font-weight: 600;
-        }
-        .logout-btn:hover {
-            background-color: #dc2626;
-            color: white;
-        }
         @media (max-width: 768px) {
             .controls-container {
                 flex-direction: column;
@@ -230,7 +219,6 @@
                     <option value="Disabled">Disabled</option>
                     <option value="Deleted">Deleted</option>
                 </select>
-                <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
         </div>
         
@@ -264,16 +252,9 @@
         const searchInput = document.getElementById('searchInput');
         const statusFilter = document.getElementById('statusFilter');
         const searchBtn = document.getElementById('searchBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
         const noResultsMessage = document.getElementById('noResults');
         const loadingMessage = document.getElementById('loadingMessage');
         let allClients = [];
-
-        // This function has been simplified to remove the token check.
-        // It now directly calls fetchClients to load the data.
-        const checkAuthAndFetch = () => {
-             fetchClients();
-        };
 
         const showToast = (message, type = 'info') => {
             const toast = document.createElement('div');
@@ -336,7 +317,6 @@
         const fetchClients = async () => {
             loadingMessage.style.display = 'block';
             try {
-                // The Authorization header has been removed since we no longer use a token.
                 const response = await fetch(`${API_BASE}/clients/all`);
                 
                 const data = await response.json();
@@ -360,12 +340,8 @@
         searchInput.addEventListener('input', filterClients);
         statusFilter.addEventListener('change', filterClients);
         searchBtn.addEventListener('click', filterClients);
-        logoutBtn.addEventListener('click', () => {
-            // No need to remove a token if we are not using one.
-            window.location.href = 'staffLogin.html';
-        });
 
-        window.addEventListener('pageshow', checkAuthAndFetch);
+        window.addEventListener('pageshow', fetchClients);
     </script>
 </body>
 </html>

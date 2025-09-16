@@ -21,6 +21,7 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("cloudinary").v2;
 const { Parser } = require("json2csv");
 const slugify = require("slugify");
+
 // Ensure environment variables are loaded from a .env file
 dotenv.config();
 
@@ -34,10 +35,7 @@ const MONGO_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 const APP_BASE_URL = process.env.APP_BASE_URL;
 const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL;
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
-const STAFF_EMAIL = process.env.STAFF_EMAIL;
-const STAFF_PASSWORD_HASH = process.env.STAFF_PASSWORD_HASH;
 
 // Email Config
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -54,10 +52,10 @@ cloudinary.config({
 
 // Required environment variables check
 const requiredEnv = [
-  "MONGODB_URI", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD_HASH",
+  "MONGODB_URI", "JWT_SECRET", "ADMIN_PASSWORD_HASH",
   "APP_BASE_URL", "APP_FALLBACK_URL", "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "SMTP_HOST", "SMTP_PORT",
-  "SMTP_USER", "SMTP_PASS", "STAFF_EMAIL", "STAFF_PASSWORD_HASH"
+  "SMTP_USER", "SMTP_PASS"
 ];
 for (const key of requiredEnv) {
   if (!process.env[key]) {
@@ -91,12 +89,7 @@ app.use(morgan("combined"));
 
 const allowedOrigins = [
   'https://smartcardlink.perfectparcelsstore.com',
-  'https://smartcardlink.perfectparcelsstore.com/client-form',
-  'https://smartcardlink.perfectparcelsstore.com/admin-dashboard',
-  'https://smartcardlink.perfectparcelsstore.com/vcard-clients-dashboard',
-  'https://smartcardlink.perfectparcelsstore.com/admin-form',
-  APP_BASE_URL,
-  APP_FALLBACK_URL,
+  'https://smartcardlink-flyio-fallback.fly.dev',
   'https://endearing-banoffee-27fd44.netlify.app',
   'https://allan-m5.github.io',
   'http://localhost:5000'
@@ -145,33 +138,24 @@ const logSchema = new mongoose.Schema({
 const Log = mongoose.model("Log", logSchema);
 
 const clientSchema = new mongoose.Schema({
-  submissionData: {
-    fullName: { type: String, required: true, trim: true },
-    title: { type: String, required: true, trim: true },
-    phone1: { type: String, required: true, trim: true },
-    phone2: { type: String, trim: true },
-    phone3: { type: String, trim: true },
-    email1: { type: String, required: true, lowercase: true, trim: true, match: [/^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"] },
-    email2: { type: String, lowercase: true, trim: true, match: [/^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"] },
-    email3: { type: String, lowercase: true, trim: true, match: [/^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"] },
-    company: { type: String, required: true, trim: true },
-    businessWebsite: { type: String, trim: true },
-    portfolioWebsite: { type: String, trim: true },
-    locationMap: { type: String, trim: true },
-    bio: { type: String, trim: true },
-    address: { type: String, trim: true },
-    socialLinks: { type: Object, default: {} },
-    workingHours: { type: Object, default: {} },
-    slug: { type: String, required: true, unique: true }
-  },
-  adminData: {
-    fullName: { type: String, default: "" },
-    title: { type: String, default: "" },
-    phone1: { type: String, default: "" },
-    email1: { type: String, default: "" },
-    company: { type: String, default: "" },
-    photoUrl: { type: String, default: "" },
-  },
+  fullName: { type: String, required: true, trim: true },
+  title: { type: String, required: true, trim: true },
+  phone1: { type: String, required: true, trim: true },
+  phone2: { type: String, trim: true },
+  phone3: { type: String, trim: true },
+  email1: { type: String, required: true, lowercase: true, trim: true, match: [/^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"] },
+  email2: { type: String, lowercase: true, trim: true, match: [/^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"] },
+  email3: { type: String, lowercase: true, trim: true, match: [/^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"] },
+  company: { type: String, required: true, trim: true },
+  businessWebsite: { type: String, trim: true },
+  portfolioWebsite: { type: String, trim: true },
+  locationMap: { type: String, trim: true },
+  bio: { type: String, trim: true },
+  address: { type: String, trim: true },
+  socialLinks: { type: Object, default: {} },
+  workingHours: { type: Object, default: {} },
+  photoUrl: { type: String, default: "" },
+  slug: { type: String, required: true, unique: true },
   vcardUrl: { type: String, default: "" },
   qrCodeUrl: { type: String, default: "" },
   status: { type: String, enum: ["Pending", "Processed", "Active", "Disabled", "Deleted"], default: "Pending" },
@@ -189,6 +173,7 @@ clientSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
+
 const Client = mongoose.model("Client", clientSchema);
 
 // ------------------------
@@ -203,7 +188,7 @@ const logAction = async (actorEmail, actorRole, action, targetClientId, notes = 
 };
 
 const generatePdfContent = (doc, client) => {
-  const data = client.submissionData;
+  const data = client.toObject(); // Use toObject() for a plain JS object
   doc.fontSize(20).text("Client Submission Form", { align: "center" });
   doc.moveDown();
   doc.fontSize(14).text(`Full Name: ${data.fullName || "N/A"}`);
@@ -226,14 +211,14 @@ const generatePdfContent = (doc, client) => {
     doc.moveDown();
     doc.text("Social Links:");
     for (const [key, value] of Object.entries(data.socialLinks)) {
-      if (value) doc.text(`         - ${key}: ${value}`);
+      if (value) doc.text(`        - ${key}: ${value}`);
     }
   }
   if (data.workingHours && typeof data.workingHours === "object") {
     doc.moveDown();
     doc.text("Working Hours:");
     for (const [key, value] of Object.entries(data.workingHours)) {
-      if (value) doc.text(`         - ${key}: ${value}`);
+      if (value) doc.text(`        - ${key}: ${value}`);
     }
   }
 };
@@ -285,11 +270,11 @@ const sendVCardEmail = async (client) => {
   const vcardUrl = client.vcardUrl;
   const mailOptions = {
     from: `SmartCardLink <${SMTP_USER}>`,
-    to: client.submissionData.email1,
-    cc: ADMIN_EMAIL,
+    to: client.email1,
+    cc: SMTP_USER,
     subject: `Your SmartCardLink vCard is ready!`,
     html: `
-        <p>Hello ${client.submissionData.fullName},</p>
+        <p>Hello ${client.fullName},</p>
         <p>Thank you for using SmartCardLink! Your digital business card is now ready.</p>
         <p>You can access your vCard here: <a href="${vcardUrl}">${vcardUrl}</a></p>
         <p>You can also use the QR code provided by the admin to share your contact details easily.</p>
@@ -298,12 +283,12 @@ const sendVCardEmail = async (client) => {
   };
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent to ${client.submissionData.email1} and ${ADMIN_EMAIL}`);
-    await logAction(ADMIN_EMAIL, "system", "EMAIL_SENT", client._id, null, { recipient: client.submissionData.email1 });
+    console.log(`✅ Email sent to ${client.email1} and ${SMTP_USER}`);
+    await logAction(SMTP_USER, "system", "EMAIL_SENT", client._id, null, { recipient: client.email1 });
     return { success: true };
   } catch (error) {
-    console.error(`❌ Error sending email to ${client.submissionData.email1}:`, error);
-    await logAction(ADMIN_EMAIL, "system", "EMAIL_FAILED", client._id, error.message, { recipient: client.submissionData.email1 });
+    console.error(`❌ Error sending email to ${client.email1}:`, error);
+    await logAction(SMTP_USER, "system", "EMAIL_FAILED", client._id, error.message, { recipient: client.email1 });
     return { success: false, error: error.message };
   }
 };
@@ -329,13 +314,14 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
     let slug = baseSlug;
     let counter = 1;
 
-    while (await Client.findOne({ 'submissionData.slug': slug })) {
+    while (await Client.findOne({ 'slug': slug })) {
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
 
     const client = new Client({
-      submissionData: { ...req.body, slug },
+      ...req.body,
+      slug,
       status: "Pending"
     });
     await client.save();
@@ -348,7 +334,23 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
   }
 });
 
-// Admin Dashboard: GET /api/clients
+// GET all clients for the public dashboard (no authentication required)
+app.get("/api/clients/all", async (req, res) => {
+  try {
+    const clients = await Client.find({}, 'fullName company email1 phone1 status createdAt photoUrl');
+    const formattedClients = clients.map(client => ({
+      ...client.toObject(),
+      vcardCreatedDate: client.createdAt.toISOString().split('T')[0],
+      activeMonths: "N/A" // This would require additional logic to calculate
+    }));
+    res.status(200).json(formattedClients);
+  } catch (error) {
+    console.error("❌ Error fetching clients for public dashboard:", error);
+    res.status(500).json({ success: false, message: "Server error fetching clients." });
+  }
+});
+
+// Admin Dashboard: GET /api/clients (protected)
 app.get("/api/clients", authMiddleware, adminAuth, async (req, res) => {
   try {
     const allClients = await Client.find({});
@@ -359,18 +361,7 @@ app.get("/api/clients", authMiddleware, adminAuth, async (req, res) => {
   }
 });
 
-// vCard Clients Dashboard: GET /api/clients/staff
-app.get("/api/clients/staff", async (req, res) => {
-  try {
-    const allClients = await Client.find({}, '_id submissionData.fullName submissionData.email1 submissionData.company status createdAt');
-    res.status(200).json(allClients);
-  } catch (error) {
-    console.error("❌ Error fetching clients for staff dashboard:", error);
-    res.status(500).json({ success: false, message: "Server error fetching clients." });
-  }
-});
-
-// Admin Form: GET /api/clients/:id
+// Admin Form: GET /api/clients/:id (protected)
 app.get("/api/clients/:id", authMiddleware, async (req, res) => {
   try {
     const client = await Client.findById(req.params.id);
@@ -384,7 +375,7 @@ app.get("/api/clients/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// Upload Photo (PREVIEW ONLY): POST /api/clients/:id/photo
+// Upload Photo (PREVIEW ONLY): POST /api/clients/:id/photo (protected)
 app.post("/api/clients/:id/photo", authMiddleware, adminAuth, parser.single("photo"), async (req, res) => {
   if (!req.file || !req.file.path) {
     return res.status(400).json({ success: false, message: "Upload failed: no file provided or path found" });
@@ -393,7 +384,7 @@ app.post("/api/clients/:id/photo", authMiddleware, adminAuth, parser.single("pho
   res.status(200).json({ success: true, message: "Photo uploaded for preview.", photoUrl: req.file.path });
 });
 
-// Save/Update Info: PUT /api/clients/:id
+// Save/Update Info: PUT /api/clients/:id (protected)
 app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
   try {
     const { photoUrl, ...adminData } = req.body;
@@ -401,9 +392,12 @@ app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
     if (!client) {
       return res.status(404).json({ success: false, message: "Client not found." });
     }
-    Object.assign(client.adminData, adminData);
-    client.adminData.photoUrl = photoUrl;
+    
+    // Update fields directly on the client object
+    Object.assign(client, adminData);
+    client.photoUrl = photoUrl;
     client.status = "Processed";
+
     client.history.push({
       action: "CLIENT_UPDATED / SAVE_INFO",
       notes: "Admin confirmed and saved client data.",
@@ -419,14 +413,14 @@ app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
   }
 });
 
-// Create vCard: POST /api/clients/:id/vcard
+// Create vCard: POST /api/clients/:id/vcard (protected)
 app.post("/api/clients/:id/vcard", authMiddleware, adminAuth, async (req, res) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ success: false, message: "Client not found." });
     if (client.status !== "Processed") return res.status(400).json({ success: false, message: "vCard can only be created for clients with 'Processed' status." });
 
-    const finalVcardUrl = `${APP_BASE_URL}/${client.submissionData.slug}`;
+    const finalVcardUrl = `${APP_BASE_URL}/${client.slug}`;
     const fallbackVcardUrl = `${APP_FALLBACK_URL}/vcard/${client._id}`;
     const qrCodeUrl = await QRCode.toDataURL(fallbackVcardUrl);
 
@@ -465,7 +459,7 @@ app.post("/api/clients/:id/vcard", authMiddleware, adminAuth, async (req, res) =
   }
 });
 
-// View Client PDF: GET /api/clients/:id/pdf
+// View Client PDF: GET /api/clients/:id/pdf (protected)
 app.get("/api/clients/:id/pdf", authMiddleware, adminAuth, async (req, res) => {
   const release = await pdfSemaphore.acquire();
   try {
@@ -474,7 +468,7 @@ app.get("/api/clients/:id/pdf", authMiddleware, adminAuth, async (req, res) => {
 
     const doc = new PDFDocument();
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=client-${client.submissionData.slug}-submission.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=client-${client.slug}-submission.pdf`);
     doc.pipe(res);
     generatePdfContent(doc, client);
     doc.end();
@@ -488,7 +482,7 @@ app.get("/api/clients/:id/pdf", authMiddleware, adminAuth, async (req, res) => {
   }
 });
 
-// Status change routes (Disable/Reactivate/Delete)
+// Status change routes (Disable/Reactivate/Delete) (protected)
 app.put("/api/clients/:id/status/:newStatus", authMiddleware, adminAuth, async (req, res) => {
   const { newStatus } = req.params;
   const { notes } = req.body;
@@ -520,17 +514,17 @@ app.put("/api/clients/:id/status/:newStatus", authMiddleware, adminAuth, async (
   }
 });
 
-// Excel Export: GET /api/clients/export
+// Excel Export: GET /api/clients/export (protected)
 app.get("/api/clients/export", authMiddleware, adminAuth, async (req, res) => {
   try {
     const clients = await Client.find({});
     const fields = [
       "_id",
-      "submissionData.fullName",
-      "submissionData.title",
-      "submissionData.company",
-      "submissionData.email1",
-      "submissionData.phone1",
+      "fullName",
+      "title",
+      "company",
+      "email1",
+      "phone1",
       "vcardUrl",
       "status",
       "createdAt",
@@ -548,7 +542,7 @@ app.get("/api/clients/export", authMiddleware, adminAuth, async (req, res) => {
   }
 });
 
-// Log Viewer: GET /api/logs
+// Log Viewer: GET /api/logs (protected)
 app.get("/api/logs", authMiddleware, adminAuth, async (req, res) => {
   try {
     const logs = await Log.find({}).sort({ timestamp: -1 });
@@ -566,7 +560,6 @@ app.get("/vcard/:id", async (req, res) => {
     if (!client || client.status !== "Active") {
       return res.status(404).send("vCard not found or not active.");
     }
-    const data = client.adminData.photoUrl ? client.adminData : client.submissionData;
 
     const htmlContent = `
         <!DOCTYPE html>
@@ -574,7 +567,7 @@ app.get("/vcard/:id", async (req, res) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${data.fullName} - SmartCardLink</title>
+          <title>${client.fullName} - SmartCardLink</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: #f0f2f5; color: #333; }
             .vcard-container { max-width: 600px; margin: 40px auto; padding: 30px; background-color: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
@@ -592,15 +585,15 @@ app.get("/vcard/:id", async (req, res) => {
         </head>
         <body>
           <div class="vcard-container">
-            ${client.adminData.photoUrl ? `<img src="${client.adminData.photoUrl}" alt="Profile Photo" class="vcard-photo">` : ''}
-            <h1>${data.fullName}</h1>
-            <h2>${data.title} at ${data.company}</h2>
+            ${client.photoUrl ? `<img src="${client.photoUrl}" alt="Profile Photo" class="vcard-photo">` : ''}
+            <h1>${client.fullName}</h1>
+            <h2>${client.title} at ${client.company}</h2>
             <div class="details">
-              <p><img src="https://img.icons8.com/material-outlined/24/000000/phone.png" alt="Phone Icon" class="icon"><strong>Phone:</strong> ${data.phone1}</p>
-              <p><img src="https://img.icons8.com/material-outlined/24/000000/email.png" alt="Email Icon" class="icon"><strong>Email:</strong> ${data.email1}</p>
-              ${data.bio ? `<p><img src="https://img.icons8.com/material-outlined/24/000000/about.png" alt="Bio Icon" class="icon"><strong>Bio:</strong> ${data.bio}</p>` : ''}
-              ${data.businessWebsite ? `<p><img src="https://img.icons8.com/material-outlined/24/000000/website.png" alt="Website Icon" class="icon"><strong>Website:</strong> <a href="${data.businessWebsite}">${data.businessWebsite}</a></p>` : ''}
-              ${data.address ? `<p><img src="https://img.icons8.com/material-outlined/24/000000/address.png" alt="Address Icon" class="icon"><strong>Address:</strong> ${data.address}</p>` : ''}
+              <p><img src="https://img.icons8.com/material-outlined/24/000000/phone.png" alt="Phone Icon" class="icon"><strong>Phone:</strong> ${client.phone1}</p>
+              <p><img src="https://img.icons8.com/material-outlined/24/000000/email.png" alt="Email Icon" class="icon"><strong>Email:</strong> ${client.email1}</p>
+              ${client.bio ? `<p><img src="https://img.icons8.com/material-outlined/24/000000/about.png" alt="Bio Icon" class="icon"><strong>Bio:</strong> ${client.bio}</p>` : ''}
+              ${client.businessWebsite ? `<p><img src="https://img.icons8.com/material-outlined/24/000000/website.png" alt="Website Icon" class="icon"><strong>Website:</strong> <a href="${client.businessWebsite}">${client.businessWebsite}</a></p>` : ''}
+              ${client.address ? `<p><img src="https://img.icons8.com/material-outlined/24/000000/address.png" alt="Address Icon" class="icon"><strong>Address:</strong> ${client.address}</p>` : ''}
             </div>
             <div class="footer-links">
               <a href="#">Save to Contacts</a>
@@ -623,14 +616,14 @@ app.post("/api/admin/login", loginLimiter, async (req, res) => {
   try {
     const isMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
     if (!isMatch) {
-      await logAction(ADMIN_EMAIL, "admin", "LOGIN_FAILED", null, "Invalid credentials provided.", { ip: req.ip });
+      await logAction("admin-attempt", "admin", "LOGIN_FAILED", null, "Invalid credentials provided.", { ip: req.ip });
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
-    const token = jwt.sign({ isAdmin: true, email: ADMIN_EMAIL }, JWT_SECRET, {
+    const token = jwt.sign({ isAdmin: true, email: "admin" }, JWT_SECRET, {
       expiresIn: "1h", audience: "smartcardlink", issuer: "smartcardlink-app",
     });
     const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    await logAction(ADMIN_EMAIL, "admin", "LOGIN_SUCCESS", null, null, { ip: req.ip, expiry });
+    await logAction("admin", "admin", "LOGIN_SUCCESS", null, null, { ip: req.ip, expiry });
     res.json({ success: true, token, message: "Login successful. Token valid for 1 hour." });
   } catch (err) {
     console.error("❌ Admin login error:", err);
@@ -638,19 +631,20 @@ app.post("/api/admin/login", loginLimiter, async (req, res) => {
   }
 });
 
+// New simplified Staff login route
 app.post("/api/staff/login", loginLimiter, async (req, res) => {
   const { password } = req.body;
   try {
-    const isMatch = await bcrypt.compare(password, STAFF_PASSWORD_HASH);
+    const isMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH); // Using same hash for both
     if (!isMatch) {
-      await logAction(STAFF_EMAIL, "staff", "LOGIN_FAILED", null, "Invalid credentials provided.", { ip: req.ip });
+      await logAction("staff-attempt", "staff", "LOGIN_FAILED", null, "Invalid credentials provided.", { ip: req.ip });
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
-    const token = jwt.sign({ isAdmin: false, email: STAFF_EMAIL }, JWT_SECRET, {
+    const token = jwt.sign({ isAdmin: false, email: "staff" }, JWT_SECRET, {
       expiresIn: "1h", audience: "smartcardlink", issuer: "smartcardlink-app",
     });
     const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    await logAction(STAFF_EMAIL, "staff", "LOGIN_SUCCESS", null, null, { ip: req.ip, expiry });
+    await logAction("staff", "staff", "LOGIN_SUCCESS", null, null, { ip: req.ip, expiry });
     res.json({ success: true, token, message: "Login successful. Token valid for 1 hour." });
   } catch (err) {
     console.error("❌ Staff login error:", err);

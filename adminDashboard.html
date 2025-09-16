@@ -6,6 +6,7 @@
     <title>SmartCardLink Admin Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -47,6 +48,7 @@
         .login-card {
             max-width: 500px;
             box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+            text-align: center;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-20px); }
@@ -88,20 +90,6 @@
             border-color: #FFD700;
             box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
         }
-        /* New styles for the login form inputs */
-        #loginCard input {
-            background-color: white;
-            color: black;
-            border-color: #ddd;
-        }
-        #loginCard input::placeholder {
-            color: #555;
-        }
-        #loginCard input:focus {
-            border-color: #FFD700;
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-        
         button {
             padding: 0.75rem 1.5rem;
             border-radius: 0.375rem;
@@ -190,7 +178,6 @@
         .btn-action-disable { background-color: #ef4444; color: white; border-color: #ef4444;}
         .btn-action-reactivate { background-color: #22c55e; color: white; border-color: #22c55e;}
         .btn-action-delete { background-color: #a8a29e; color: white; border-color: #a8a29e;}
-        
         .section-header {
             background-color: #1f2937;
             color: #FFD700;
@@ -293,15 +280,14 @@
 
     <div id="loginCard" class="login-card">
         <h1 class="title">Admin Dashboard Login</h1>
-        <p style="color: #aaa; text-align: center;">Please enter your email and password to continue.</p>
-        <input type="email" id="emailInput" placeholder="Enter email" required />
+        <p style="color: #aaa; text-align: center;">Please enter your password to continue.</p>
         <input type="password" id="passwordInput" placeholder="Enter password" required />
         <button id="loginBtn">Login</button>
     </div>
 
     <div id="dashboardContainer" class="dashboard-card" style="display: none;">
-        <div class="flex justify-between items-center mb-4">
-            <h1 class="title">SmartCardLink Admin Dashboard</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h1 class="title" style="margin: 0; text-align: left;">SmartCardLink Admin Dashboard</h1>
             <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
         
@@ -351,12 +337,9 @@
     <div class="toast-container" id="toast-container"></div>
 
     <script>
-        // The API base URL was updated to use a known working fallback server URL.
-        const API_BASE_URL = 'https://smartcardlink-flyio-fallback.fly.dev';
+        const API_BASE_URL = 'https://smartcardlink-flyio-fallback.fly.dev/api';
         
-        // DOM Elements
         const loginCard = document.getElementById('loginCard');
-        const emailInput = document.getElementById('emailInput');
         const passwordInput = document.getElementById('passwordInput');
         const loginBtn = document.getElementById('loginBtn');
         const dashboardContainer = document.getElementById('dashboardContainer');
@@ -371,7 +354,6 @@
         const saveNoteBtn = document.getElementById('saveNoteBtn');
         const toastContainer = document.getElementById('toast-container');
         
-        // Global State
         let allClients = [];
         let selectedClientId = null;
         
@@ -393,6 +375,28 @@
         
         const getToken = () => localStorage.getItem('adminToken');
         
+        const processClient = (clientId) => {
+            window.open(`/admin_form.html?id=${clientId}`, '_blank');
+        };
+
+        const updateStatus = async (clientId, status) => {
+            const token = getToken();
+            try {
+                const response = await fetch(`${API_BASE_URL}/clients/${clientId}/status/${status}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) throw new Error('Failed to update status.');
+                
+                showToast(`Client status updated to '${status}'.`);
+                await fetchClients();
+            } catch (error) {
+                console.error("Error updating status:", error);
+                showToast(`Failed to update status: ${error.message}`, 'error');
+            }
+        };
+
         const renderTable = (clients) => {
             clientTableBody.innerHTML = '';
             if (clients.length === 0) {
@@ -409,6 +413,13 @@
                 const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
                 const clientStatus = client.status || 'Pending';
                 
+                const actionsHtml = `
+                    ${clientStatus === 'Pending' ? `<button class="btn-action-process" onclick="processClient('${client._id}')">Process</button>` : ''}
+                    ${clientStatus === 'Active' ? `<button class="btn-action-disable" onclick="updateStatus('${client._id}', 'Disabled')">Disable</button>` : ''}
+                    ${clientStatus === 'Disabled' ? `<button class="btn-action-reactivate" onclick="updateStatus('${client._id}', 'Active')">Reactivate</button>` : ''}
+                    ${clientStatus !== 'Deleted' ? `<button class="btn-action-delete" onclick="updateStatus('${client._id}', 'Deleted')">Delete</button>` : ''}
+                `;
+
                 row.innerHTML = `
                     <td><img src="${photoUrl}" alt="${client.fullName} photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
                     <td>${client.fullName || 'N/A'}</td>
@@ -416,16 +427,15 @@
                     <td>${client.email1 || 'N/A'}</td>
                     <td><span class="status-badge status-${clientStatus.replace(/\s/g, '')}">${clientStatus}</span></td>
                     <td class="actions-cell">
-                        ${clientStatus === 'Pending' ? `<button class="btn-action-process" onclick="processClient('${client._id}')">Process</button>` : ''}
-                        ${clientStatus === 'Active' ? `<button class="btn-action-disable" onclick="updateStatus('${client._id}', 'Disabled')">Disable</button>` : ''}
-                        ${clientStatus === 'Disabled' ? `<button class="btn-action-reactivate" onclick="updateStatus('${client._id}', 'Active')">Reactivate</button>` : ''}
-                        ${clientStatus !== 'Deleted' ? `<button class="btn-action-delete" onclick="updateStatus('${client._id}', 'Deleted')">Delete</button>` : ''}
+                       ${actionsHtml}
                     </td>
                 `;
                 
-                // FIX: Added 'async' to the event listener to handle the promise returned by selectClient.
-                row.addEventListener('click', async () => {
-                    await selectClient(client._id);
+                row.addEventListener('click', async (event) => {
+                    // Prevent row click from triggering when clicking on a button inside the cell
+                    if (event.target.tagName !== 'BUTTON') {
+                         await selectClient(client._id);
+                    }
                 });
                 
                 clientTableBody.appendChild(row);
@@ -455,7 +465,7 @@
             
             clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading client data...</td></tr>';
             try {
-                const response = await fetch(`${API_BASE_URL}/api/clients`, {
+                const response = await fetch(`${API_BASE_URL}/clients`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await response.json();
@@ -482,7 +492,7 @@
             const token = getToken();
             
             try {
-                const response = await fetch(`${API_BASE_URL}/api/clients/${selectedClientId}/notes`, {
+                const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
@@ -509,62 +519,55 @@
         };
         
         const selectClient = async (clientId) => {
+            const allRows = document.querySelectorAll('tbody tr');
+            allRows.forEach(row => row.classList.remove('selected'));
+            
             if (selectedClientId === clientId) {
                 selectedClientId = null;
                 notesSection.style.display = 'none';
             } else {
                 selectedClientId = clientId;
+                const selectedRow = document.querySelector(`tr[data-client-id="${clientId}"]`);
+                if (selectedRow) {
+                    selectedRow.classList.add('selected');
+                }
                 await renderNotes();
             }
-            filterClients();
         };
         
-        window.updateStatus = async (clientId, status) => {
+        const checkAuthAndRender = () => {
             const token = getToken();
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/status/${status}`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (!response.ok) throw new Error('Failed to update status.');
-                
-                showToast(`Client status updated to '${status}'.`);
-                await fetchClients();
-            } catch (error) {
-                console.error("Error updating status:", error);
-                showToast(`Failed to update status: ${error.message}`, 'error');
+            if (token) {
+                loginCard.style.display = 'none';
+                dashboardContainer.style.display = 'flex';
+                fetchClients();
+            } else {
+                loginCard.style.display = 'flex';
+                dashboardContainer.style.display = 'none';
             }
         };
-        
-        window.processClient = (clientId) => {
-            window.open(`/admin_form.html?id=${clientId}`, '_blank');
-        };
-        
+
         // Event Listeners
         loginBtn.addEventListener('click', async () => {
-            const email = emailInput.value;
             const password = passwordInput.value;
             
             try {
-                const response = await fetch(`${API_BASE_URL}/api/admin-login`, {
+                const response = await fetch(`${API_BASE_URL}/admin-login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ password })
                 });
                 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.message || 'Invalid credentials.');
+                    throw new Error(error.message || 'Invalid password.');
                 }
                 
                 const { token } = await response.json();
                 localStorage.setItem('adminToken', token);
                 
                 showToast('Login successful!');
-                loginCard.style.display = 'none';
-                dashboardContainer.style.display = 'flex';
-                await fetchClients();
+                checkAuthAndRender();
             } catch (error) {
                 console.error("Login failed:", error);
                 showToast(`Login failed: ${error.message}`, 'error');
@@ -589,7 +592,7 @@
             }
             
             try {
-                const response = await fetch(`${API_BASE_URL}/api/clients/${selectedClientId}/notes`, {
+                const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -611,18 +614,11 @@
         
         logoutBtn.addEventListener('click', () => {
             localStorage.removeItem('adminToken');
-            window.location.reload();
+            checkAuthAndRender();
         });
-        
-        // Initial check on page load
-        document.addEventListener('DOMContentLoaded', async () => {
-            const token = getToken();
-            if (token) {
-                loginCard.style.display = 'none';
-                dashboardContainer.style.display = 'flex';
-                await fetchClients();
-            }
-        });
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', checkAuthAndRender);
     </script>
 </body>
 </html>
