@@ -8,7 +8,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
 const path = require("path");
-const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");
@@ -42,6 +41,7 @@ const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 // Cloudinary config - Corrected to use individual variables
 cloudinary.config({
@@ -52,9 +52,9 @@ cloudinary.config({
 
 // Required environment variables check - Updated to remove auth
 const requiredEnv = [
-    "MONGODB_URI", "APP_BASE_URL", "APP_FALLBACK_URL", "CLOUDINARY_CLOUD_NAME",
+    "MONGODB_URI", "APP_BASE_URL", "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "SMTP_HOST", "SMTP_PORT",
-    "SMTP_USER", "SMTP_PASS"
+    "SMTP_USER", "SMTP_PASS", "ADMIN_EMAIL"
 ];
 for (const key of requiredEnv) {
     if (!process.env[key]) {
@@ -83,7 +83,6 @@ app.use(morgan("combined"));
 
 const allowedOrigins = [
     'https://smartcardlink.perfectparcelsstore.com',
-    'https://smartcardlink-flyio-fallback.fly.dev',
     'https://endearing-banoffee-27fd44.netlify.app',
     'https://allan-m5.github.io',
     'http://localhost:5000'
@@ -105,11 +104,10 @@ app.use(express.static(path.join(__dirname)));
 // ------------------------
 // Root URL
 app.get('/', (req, res) => {
-    res.send('Hello, world!');
+    res.send('SmartCardLink App is running.');
 });
 
 // Admin Form URL
-// This is the new module that was missing. It serves the admin-form.html file at the /admin URL.
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin-form.html'));
 });
@@ -207,7 +205,7 @@ const sendVCardEmail = async (client) => {
     const mailOptions = {
         from: `SmartCardLink <${SMTP_USER}>`,
         to: client.email1,
-        cc: SMTP_USER,
+        cc: ADMIN_EMAIL,
         subject: `Your SmartCardLink vCard is ready!`,
         html: `
             <p>Hello ${client.fullName},</p>
@@ -219,12 +217,12 @@ const sendVCardEmail = async (client) => {
     };
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Email sent to ${client.email1} and ${SMTP_USER}`);
-        await logAction(SMTP_USER, "system", "EMAIL_SENT", client._id, null, { recipient: client.email1, cc: SMTP_USER });
+        console.log(`✅ Email sent to ${client.email1} and ${ADMIN_EMAIL}`);
+        await logAction(ADMIN_EMAIL, "system", "EMAIL_SENT", client._id, null, { recipient: client.email1, cc: ADMIN_EMAIL });
         return { success: true };
     } catch (error) {
         console.error(`❌ Error sending email to ${client.email1}:`, error);
-        await logAction(SMTP_USER, "system", "EMAIL_FAILED", client._id, error.message, { recipient: client.email1 });
+        await logAction(ADMIN_EMAIL, "system", "EMAIL_FAILED", client._id, error.message, { recipient: client.email1 });
         return { success: false, error: error.message };
     }
 };
@@ -235,12 +233,19 @@ const generateVcard = async (client) => {
     vcard.lastName = client.fullName.split(" ").slice(1).join(" ") || "";
     vcard.organization = client.company || "";
     vcard.title = client.title || "";
-    vcard.workPhone = client.phone1 || "";
-    if (client.phone2) vcard.workPhone = [vcard.workPhone, client.phone2];
-    if (client.phone3) vcard.workPhone = [vcard.workPhone, client.phone3];
-    vcard.workEmail = client.email1 || "";
-    if (client.email2) vcard.workEmail = [vcard.workEmail, client.email2];
-    if (client.email3) vcard.workEmail = [vcard.email3, client.email3];
+
+    // Fix: Correctly assign phone numbers as an array
+    const phones = [client.phone1];
+    if (client.phone2) phones.push(client.phone2);
+    if (client.phone3) phones.push(client.phone3);
+    vcard.workPhone = phones.length > 0 ? phones : ["N/A"];
+
+    // Fix: Correctly assign emails as an array
+    const emails = [client.email1];
+    if (client.email2) emails.push(client.email2);
+    if (client.email3) emails.push(client.email3);
+    vcard.workEmail = emails.length > 0 ? emails : ["N/A"];
+
     vcard.url = client.businessWebsite || "";
     vcard.note = client.bio || "";
     vcard.address = client.address || "";
@@ -282,6 +287,84 @@ const storage = new CloudinaryStorage({
 });
 const parser = multer({ storage });
 
+// Unified PDF generation function
+// This function now handles PDF generation and Cloudinary upload,
+// eliminating code duplication and fixing the bug.
+const generateAndUploadPdf = async (clientData) => {
+    let browser;
+    try {
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                    .container { max-width: 600px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                    .photo-container { text-align: center; margin-bottom: 20px; }
+                    .photo { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; }
+                    h1, h2, h3 { color: #0056b3; text-align: center; margin: 0; }
+                    h1 { font-size: 2em; }
+                    h2 { font-size: 1.5em; color: #555; }
+                    h3 { font-size: 1.2em; color: #777; }
+                    .info-section { margin-top: 20px; }
+                    .info-section p { margin: 5px 0; line-height: 1.6; }
+                    .label { font-weight: bold; color: #333; }
+                    .social-links { margin-top: 15px; }
+                    .social-links h4 { margin-bottom: 5px; color: #0056b3; }
+                    .social-links ul { list-style-type: none; padding: 0; }
+                    .social-links li { margin-bottom: 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="photo-container">
+                        <img src="${clientData.photoUrl || ''}" class="photo" alt="Client Photo" />
+                    </div>
+                    <h1>${clientData.fullName}</h1>
+                    <h2>${clientData.company}</h2>
+                    <h3>${clientData.title}</h3>
+                    <div class="info-section">
+                        <p><span class="label">Bio:</span> ${clientData.bio || 'N/A'}</p>
+                        <p><span class="label">Address:</span> ${clientData.address || 'N/A'}</p>
+                        <p><span class="label">Phone 1:</span> ${clientData.phone1 || 'N/A'}</p>
+                        <p><span class="label">Email 1:</span> ${clientData.email1 || 'N/A'}</p>
+                        <p><span class="label">Business Website:</span> <a href="${clientData.businessWebsite || '#'}">${clientData.businessWebsite || 'N/A'}</a></p>
+                        <p><span class="label">Portfolio Website:</span> <a href="${clientData.portfolioWebsite || '#'}">${clientData.portfolioWebsite || 'N/A'}</a></p>
+                    </div>
+                    ${clientData.socialLinks && Object.keys(clientData.socialLinks).length > 0 ? `
+                        <div class="social-links">
+                            <h4>Social Links:</h4>
+                            <ul>
+                                ${Object.entries(clientData.socialLinks).map(([key, value]) => `<li>${key}: <a href="${value}">${value}</a></li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                </div>
+            </body>
+            </html>
+        `;
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+        });
+
+        const uploadResult = await uploadToCloudinary(pdfBuffer, `client_info_${clientData.slug}`, "raw", "smartcardlink_client_pdfs");
+        return uploadResult.secure_url;
+    } catch (err) {
+        console.error("❌ Error generating or uploading PDF:", err);
+        throw err;
+    } finally {
+        if (browser) await browser.close();
+    }
+};
+
 // ------------------------
 // Routes
 // ------------------------
@@ -300,10 +383,7 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
         }
 
         const clientDataForPdf = { ...req.body, fullName, slug };
-        const pdfBuffer = await generatePdfFromHtml(clientDataForPdf);
-
-        const uploadResult = await uploadToCloudinary(pdfBuffer, `client_info_${slug}`, "raw", "smartcardlink_client_pdfs");
-        const pdfUrl = uploadResult.secure_url;
+        const pdfUrl = await generateAndUploadPdf(clientDataForPdf);
 
         const client = new Client({
             ...req.body,
@@ -455,101 +535,43 @@ app.post("/api/clients/:id/vcard", async (req, res) => {
     }
 });
 
-// Helper function to generate HTML from client data
-const generateHtmlFromClientData = (client) => {
-    return `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                .container { max-width: 600px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-                .photo-container { text-align: center; margin-bottom: 20px; }
-                .photo { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; }
-                h1, h2, h3 { color: #0056b3; text-align: center; margin: 0; }
-                h1 { font-size: 2em; }
-                h2 { font-size: 1.5em; color: #555; }
-                h3 { font-size: 1.2em; color: #777; }
-                .info-section { margin-top: 20px; }
-                .info-section p { margin: 5px 0; line-height: 1.6; }
-                .label { font-weight: bold; color: #333; }
-                .social-links { margin-top: 15px; }
-                .social-links h4 { margin-bottom: 5px; color: #0056b3; }
-                .social-links ul { list-style-type: none; padding: 0; }
-                .social-links li { margin-bottom: 5px; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="photo-container">
-                    <img src="${client.photoUrl || ''}" class="photo" alt="Client Photo" />
-                </div>
-                <h1>${client.fullName}</h1>
-                <h2>${client.company}</h2>
-                <h3>${client.title}</h3>
-                <div class="info-section">
-                    <p><span class="label">Bio:</span> ${client.bio || 'N/A'}</p>
-                    <p><span class="label">Address:</span> ${client.address || 'N/A'}</p>
-                    <p><span class="label">Phone 1:</span> ${client.phone1 || 'N/A'}</p>
-                    <p><span class="label">Email 1:</span> ${client.email1 || 'N/A'}</p>
-                    <p><span class="label">Business Website:</span> <a href="${client.businessWebsite || '#'}">${client.businessWebsite || 'N/A'}</a></p>
-                    <p><span class="label">Portfolio Website:</span> <a href="${client.portfolioWebsite || '#'}">${client.portfolioWebsite || 'N/A'}</a></p>
-                </div>
-                ${client.socialLinks && Object.keys(client.socialLinks).length > 0 ? `
-                    <div class="social-links">
-                        <h4>Social Links:</h4>
-                        <ul>
-                            ${Object.entries(client.socialLinks).map(([key, value]) => `<li>${key}: <a href="${value}">${value}</a></li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
-            </div>
-        </body>
-        </html>
-    `;
-};
-
-// Helper function to generate PDF from HTML
-const generatePdfFromHtml = async (clientData) => {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, {
-        waitUntil: 'networkidle0',
-    });
-
-    const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-    });
-    await browser.close();
-    return pdfBuffer;
-};
-
 // View Client PDF: GET /api/clients/:id/pdf
+// Fix: Added fallback generation logic
 app.get("/api/clients/:id/pdf", async (req, res) => {
+    const release = await pdfSemaphore.acquire();
     try {
         const client = await Client.findById(req.params.id);
         if (!client) {
             return res.status(404).json({ success: false, message: "Client not found." });
         }
 
-        const isFromDashboard = req.headers['x-origin-dashboard'] === 'true';
-
+        // If a PDF URL exists, redirect to it
         if (client.pdfUrl) {
-            res.redirect(302, client.pdfUrl);
-        } else if (!isFromDashboard) {
-            return res.status(400).json({ success: false, message: "Application not originating from client form and admin dashboard, no pdf for viewing." });
-        } else {
-            return res.status(404).json({ success: false, message: "No PDF found for this client." });
+            return res.redirect(302, client.pdfUrl);
         }
 
+        // Fallback: If no PDF URL exists, generate and upload it now
+        console.log("PDF not found, generating a new one...");
+        const newPdfUrl = await generateAndUploadPdf(client);
+        
+        // Update the client record with the new URL
+        client.pdfUrl = newPdfUrl;
+        client.history.push({
+            action: "PDF_GENERATED_ON_DEMAND",
+            notes: "PDF was generated and uploaded upon a view request.",
+            actorEmail: "admin"
+        });
+        await client.save();
+        await logAction("admin", "admin", "PDF_GENERATED_ON_DEMAND", client._id, "PDF generated on demand.");
+
+        // Redirect to the newly created PDF
+        res.redirect(302, newPdfUrl);
+
     } catch (error) {
-        console.error("❌ Error retrieving PDF:", error);
-        res.status(500).json({ success: false, message: "Server error retrieving PDF." });
+        console.error("❌ Error retrieving or generating PDF:", error);
+        res.status(500).json({ success: false, message: "Server error retrieving or generating PDF." });
+    } finally {
+        release();
     }
 });
 
