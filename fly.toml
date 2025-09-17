@@ -2,27 +2,34 @@
 app = 'smartcardlink-app'
 # The primary region for your application.
 primary_region = 'jnb'
+
 [build]
+  # Your application's build settings, if any, go here.
+
 # This block configures the service your app provides.
 [[services]]
-  # This is the internal port your application listens on.
-  internal_port = 5000
+  # The internal_port must match the port your server listens on.
+  internal_port = 8080
   protocol = "tcp"
+
   [[services.ports]]
     port = 80
     handlers = ["http"]
     force_https = true
+  
   [[services.ports]]
     port = 443
     handlers = ["tls", "http"]
+
   [[services.http_checks]]
     interval = "10s"
     grace_period = "5s"
     method = "GET"
-    # Corrective action: Change the path to a public endpoint for health checks.
+    # Ensure the health check path is a public endpoint your server responds to.
     path = "/"
     protocol = "http"
     timeout = "2s"
+
 [env]
   # Environment variables for your application go here.
   # For example:

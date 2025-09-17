@@ -99,8 +99,19 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "5mb" }));
 app.use(express.static(path.join(__dirname)));
+
+// ------------------------
+// Public-facing Routes
+// ------------------------
+// Root URL
 app.get('/', (req, res) => {
     res.send('Hello, world!');
+});
+
+// Admin Form URL
+// This is the new module that was missing. It serves the admin-form.html file at the /admin URL.
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin-form.html'));
 });
 
 // ------------------------
@@ -501,7 +512,6 @@ const generateHtmlFromClientData = (client) => {
 
 // Helper function to generate PDF from HTML
 const generatePdfFromHtml = async (clientData) => {
-    const htmlContent = generateHtmlFromClientData(clientData);
     const browser = await puppeteer.launch({
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
