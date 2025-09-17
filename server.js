@@ -31,13 +31,11 @@ dotenv.config();
 // Configuration & Initialization
 // ------------------------
 const app = express();
-const PORT = process.env.PORT || 8080; // Corrected port
+const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
-const JWT_SECRET = process.env.JWT_SECRET;
 const APP_BASE_URL = process.env.APP_BASE_URL;
 const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL;
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
 
 // Email Config
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -45,17 +43,16 @@ const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 
-// Cloudinary config
+// Cloudinary config - Corrected to use individual variables
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Required environment variables check
+// Required environment variables check - Updated to remove auth
 const requiredEnv = [
-    "MONGODB_URI", "JWT_SECRET", "ADMIN_PASSWORD_HASH",
-    "APP_BASE_URL", "APP_FALLBACK_URL", "CLOUDINARY_CLOUD_NAME",
+    "MONGODB_URI", "APP_BASE_URL", "APP_FALLBACK_URL", "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "SMTP_HOST", "SMTP_PORT",
     "SMTP_USER", "SMTP_PASS"
 ];

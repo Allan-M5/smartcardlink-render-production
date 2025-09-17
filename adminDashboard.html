@@ -94,6 +94,7 @@
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
+            white-space: nowrap;
         }
         button:hover {
             background-color: #FFD700;
@@ -279,6 +280,7 @@
                 <option value="Disabled">Disabled</option>
                 <option value="Deleted">Deleted</option>
             </select>
+            <button id="refreshBtn">Re-fetch All Clients</button>
         </div>
 
         <div class="table-container">
@@ -314,10 +316,12 @@
     <script>
         const API_BASE_URL = 'https://smartcardlink-flyio-fallback.fly.dev/api';
         
+        // DOM Elements
         const clientTableBody = document.getElementById('clientTableBody');
         const filterInput = document.getElementById('filterInput');
         const statusFilter = document.getElementById('statusFilter');
         const searchBtn = document.getElementById('searchBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
         const notesSection = document.getElementById('notesSection');
         const notesList = document.getElementById('notesList');
         const notesTextarea = document.getElementById('notesTextarea');
@@ -327,42 +331,30 @@
         let allClients = [];
         let selectedClientId = null;
         
+        // --- Helper Functions ---
+
+        /**
+         * Displays a toast notification.
+         * @param {string} message The message to display.
+         * @param {string} type The toast type ('success' or 'error').
+         */
         const showToast = (message, type = 'success') => {
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerText = message;
             toastContainer.appendChild(toast);
             
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 10);
-            
+            setTimeout(() => { toast.classList.add('show'); }, 10);
             setTimeout(() => {
                 toast.classList.remove('show');
                 toast.addEventListener('transitionend', () => toast.remove());
             }, 5000);
         };
         
-        const processClient = (clientId) => {
-            window.open(`/admin_form.html?id=${clientId}`, '_blank');
-        };
-
-        const updateStatus = async (clientId, status) => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/clients/${clientId}/status/${status}`, {
-                    method: 'PUT'
-                });
-                
-                if (!response.ok) throw new Error('Failed to update status.');
-                
-                showToast(`Client status updated to '${status}'.`);
-                await fetchClients();
-            } catch (error) {
-                console.error("Error updating status:", error);
-                showToast(`Failed to update status: ${error.message}`, 'error');
-            }
-        };
-
+        /**
+         * Renders the client table with the given data.
+         * @param {Array<Object>} clients The list of client objects to display.
+         */
         const renderTable = (clients) => {
             clientTableBody.innerHTML = '';
             if (clients.length === 0) {
@@ -376,15 +368,23 @@
                 if (client._id === selectedClientId) {
                     row.classList.add('selected');
                 }
+
                 const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
                 const clientStatus = client.status || 'Pending';
-                
-                const actionsHtml = `
-                    ${clientStatus === 'Pending' ? `<button class="btn-action-process" onclick="processClient('${client._id}')">Process</button>` : ''}
-                    ${clientStatus === 'Active' ? `<button class="btn-action-disable" onclick="updateStatus('${client._id}', 'Disabled')">Disable</button>` : ''}
-                    ${clientStatus === 'Disabled' ? `<button class="btn-action-reactivate" onclick="updateStatus('${client._id}', 'Active')">Reactivate</button>` : ''}
-                    ${clientStatus !== 'Deleted' ? `<button class="btn-action-delete" onclick="updateStatus('${client._id}', 'Deleted')">Delete</button>` : ''}
-                `;
+
+                let actionsHtml = '';
+                if (clientStatus === 'Pending') {
+                    actionsHtml += `<button class="btn-action-process" onclick="processClient('${client._id}')">Process</button>`;
+                }
+                if (clientStatus === 'Active') {
+                    actionsHtml += `<button class="btn-action-disable" onclick="updateStatus('${client._id}', 'Disabled')">Disable</button>`;
+                }
+                if (clientStatus === 'Disabled' || clientStatus === 'Processed') {
+                    actionsHtml += `<button class="btn-action-reactivate" onclick="updateStatus('${client._id}', 'Active')">Reactivate</button>`;
+                }
+                if (clientStatus !== 'Deleted') {
+                    actionsHtml += `<button class="btn-action-delete" onclick="updateStatus('${client._id}', 'Deleted')">Delete</button>`;
+                }
 
                 row.innerHTML = `
                     <td><img src="${photoUrl}" alt="${client.fullName} photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
@@ -392,14 +392,13 @@
                     <td>${client.phone1 || 'N/A'}</td>
                     <td>${client.email1 || 'N/A'}</td>
                     <td><span class="status-badge status-${clientStatus.replace(/\s/g, '')}">${clientStatus}</span></td>
-                    <td class="actions-cell">
-                        ${actionsHtml}
-                    </td>
+                    <td class="actions-cell">${actionsHtml}</td>
                 `;
                 
-                row.addEventListener('click', async (event) => {
+                row.addEventListener('click', (event) => {
+                    // Prevent row selection when clicking action buttons
                     if (event.target.tagName !== 'BUTTON') {
-                        await selectClient(client._id);
+                        selectClient(client._id);
                     }
                 });
                 
@@ -407,6 +406,9 @@
             });
         };
         
+        /**
+         * Filters the allClients array based on search and status inputs and then renders the table.
+         */
         const filterClients = () => {
             const searchTerm = filterInput.value.toLowerCase();
             const selectedStatus = statusFilter.value;
@@ -424,6 +426,9 @@
             renderTable(filtered);
         };
         
+        /**
+         * Fetches all client data from the API.
+         */
         const fetchClients = async () => {
             clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading client data...</td></tr>';
             try {
@@ -433,14 +438,47 @@
                 
                 allClients = data;
                 filterClients();
-                showToast('Client data loaded successfully!', 'success');
+                showToast('Client data loaded successfully!');
             } catch (error) {
                 console.error("Fetch error:", error);
                 showToast(`Failed to load clients: ${error.message}`, 'error');
                 clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Failed to load data.</td></tr>';
             }
         };
-        
+
+        /**
+         * Updates the status of a specific client on the server and locally.
+         * @param {string} clientId The ID of the client to update.
+         * @param {string} newStatus The new status to set.
+         */
+        const updateStatus = async (clientId, newStatus) => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/clients/${clientId}/status/${newStatus}`, {
+                    method: 'PUT'
+                });
+                
+                if (!response.ok) throw new Error('Failed to update status.');
+                
+                // Update the local state
+                const clientToUpdate = allClients.find(client => client._id === clientId);
+                if (clientToUpdate) {
+                    clientToUpdate.status = newStatus;
+                    filterClients(); // Re-render the table with the updated data
+                    if (newStatus === 'Deleted') {
+                        selectClient(null); // Unselect the client if it's deleted
+                    }
+                }
+                
+                showToast(`Client status updated to '${newStatus}'.`);
+            } catch (error) {
+                console.error("Error updating status:", error);
+                showToast(`Failed to update status: ${error.message}`, 'error');
+            }
+        };
+
+        /**
+         * Fetches and renders the notes for the currently selected client.
+         */
         const renderNotes = async () => {
             notesList.innerHTML = '';
             if (!selectedClientId) {
@@ -475,7 +513,11 @@
             }
         };
         
-        const selectClient = async (clientId) => {
+        /**
+         * Manages the selection of a client row.
+         * @param {string} clientId The ID of the client to select, or null to unselect.
+         */
+        const selectClient = (clientId) => {
             const allRows = document.querySelectorAll('tbody tr');
             allRows.forEach(row => row.classList.remove('selected'));
             
@@ -488,14 +530,21 @@
                 if (selectedRow) {
                     selectedRow.classList.add('selected');
                 }
-                await renderNotes();
+                renderNotes();
             }
         };
 
-        // Event Listeners
+        // --- Event Handlers ---
+
+        const processClient = (clientId) => {
+            window.open(`/admin_form.html?id=${clientId}`, '_blank');
+        };
+        
+        // --- Event Listeners ---
         filterInput.addEventListener('input', filterClients);
         statusFilter.addEventListener('change', filterClients);
         searchBtn.addEventListener('click', filterClients);
+        refreshBtn.addEventListener('click', fetchClients);
         
         saveNoteBtn.addEventListener('click', async () => {
             const noteText = notesTextarea.value.trim();
@@ -520,7 +569,7 @@
                 
                 notesTextarea.value = '';
                 showToast('Note saved successfully!');
-                await renderNotes();
+                renderNotes();
             } catch (error) {
                 console.error("Error saving note:", error);
                 showToast(`Failed to save note: ${error.message}`, 'error');

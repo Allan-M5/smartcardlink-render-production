@@ -351,7 +351,8 @@
         <div id="toast-message" class="toast-message"></div>
     </div>
     <script>
-        const API_BASE = 'https://smartcardlink-app.fly.dev';
+        // Update this URL to your actual live server URL.
+        const API_BASE = 'https://smartcardlink-app.fly.dev'; 
         const API_URL = `${API_BASE}/api`;
         const params = new URLSearchParams(window.location.search);
         const clientId = params.get('id');
@@ -385,6 +386,7 @@
             document.getElementById('phone1').value = data.phone1 || '';
             document.getElementById('phone2').value = data.phone2 || '';
             document.getElementById('phone3').value = data.phone3 || '';
+            
             document.getElementById('email1').value = data.email1 || '';
             document.getElementById('email2').value = data.email2 || '';
             document.getElementById('email3').value = data.email3 || '';
