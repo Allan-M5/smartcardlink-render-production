@@ -369,12 +369,6 @@
 
         let isSaving = false;
 
-        // Check for JWT token on page load
-        const token = localStorage.getItem('jwtToken');
-        if (!token) {
-            window.location.href = '/admin-login.html'; // Redirect to login if no token
-        }
-
         const showToast = (message, isError = false) => {
             toastMessage.textContent = message;
             toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
@@ -432,16 +426,8 @@
 
         const fetchClientData = async (id) => {
             try {
-                const response = await fetch(`${API_URL}/clients/${id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch(`${API_URL}/clients/${id}`);
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        showToast('Session expired. Please log in again.', true);
-                        localStorage.removeItem('jwtToken');
-                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
-                        return;
-                    }
                     throw new Error(`Failed to fetch client data for ID: ${id}`);
                 }
                 const data = await response.json();
@@ -465,16 +451,10 @@
 
                 const response = await fetch(`${API_URL}/upload-photo`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
                     body: formData,
                 });
 
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        showToast('Session expired. Please log in again.', true);
-                        localStorage.removeItem('jwtToken');
-                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
-                    }
                     throw new Error('Photo upload failed on the server.');
                 }
 
@@ -513,7 +493,6 @@
                     photoPreviewContainer.style.display = 'block';
                 };
                 reader.readAsDataURL(file);
-
                 await uploadPhoto(file);
             }
         });
@@ -562,18 +541,11 @@
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify(payload),
                 });
 
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        showToast('Session expired. Please log in again.', true);
-                        localStorage.removeItem('jwtToken');
-                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
-                        return;
-                    }
                     throw new Error('Failed to save client info.');
                 }
                 
@@ -607,19 +579,13 @@
             try {
                 const response = await fetch(`${API_URL}/clients/${clientId}/pdf`, {
                     headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'X-Origin-Dashboard': 'true' // Add this header for conditional logic in the backend
+                        'X-Origin-Dashboard': 'true'
                     }
                 });
 
                 if (response.ok) {
-                    // Backend now redirects to the Cloudinary URL
                     window.open(response.url, '_blank');
                     showToast('PDF opened successfully!');
-                } else if (response.status === 401) {
-                    showToast('Session expired. Please log in again.', true);
-                    localStorage.removeItem('jwtToken');
-                    setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
                 } else {
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to retrieve PDF.');
@@ -649,17 +615,10 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
                     },
                 });
                 
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        showToast('Session expired. Please log in again.', true);
-                        localStorage.removeItem('jwtToken');
-                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
-                        return;
-                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to create vCard or send email.');
                 }
@@ -668,7 +627,7 @@
                 showToast('vCard and QR code created successfully! Email sent to client.', false);
                 
                 if (data.vcardUrl) {
-                     window.open(data.vcardUrl, '_blank');
+                    window.open(data.vcardUrl, '_blank');
                 }
                 if (data.qrCodeUrl) {
                     const qrCodeWindow = window.open('', '_blank');

@@ -10,8 +10,6 @@ const mongoose = require("mongoose");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");
 const RateLimit = require("express-rate-limit");
@@ -33,7 +31,7 @@ dotenv.config();
 // Configuration & Initialization
 // ------------------------
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080; // Corrected port
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -76,11 +74,6 @@ const publicLimiter = RateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
     message: "Too many requests from this IP, please try again later.",
-});
-const loginLimiter = RateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: "Too many login attempts from this IP, please try again after 15 minutes.",
 });
 
 // ------------------------
@@ -189,28 +182,6 @@ const logAction = async (actorEmail, actorRole, action, targetClientId, notes = 
         await Log.create({ actorEmail, actorRole, action, targetClientId, notes, payload });
     } catch (error) {
         console.error(`❌ Failed to log action '${action}' for client ${targetClientId}:`, error);
-    }
-};
-
-const authMiddleware = (req, res, next) => {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ success: false, message: "No token provided." });
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET, { audience: "smartcardlink", issuer: "smartcardlink-app" });
-        req.user = decoded;
-        next();
-    } catch (error) {
-        if (error.name === "TokenExpiredError") return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
-        if (error.name === "JsonWebTokenError" || error.name === "NotBeforeError") return res.status(401).json({ success: false, message: "Invalid token." });
-        return res.status(500).json({ success: false, message: "Authentication error." });
-    }
-};
-
-const adminAuth = (req, res, next) => {
-    if (req.user && req.user.isAdmin) {
-        next();
-    } else {
-        res.status(403).json({ success: false, message: "Forbidden: Admin access required." });
     }
 };
 
@@ -361,8 +332,8 @@ app.get("/api/clients/all", async (req, res) => {
     }
 });
 
-// Admin Dashboard: GET /api/clients (protected)
-app.get("/api/clients", authMiddleware, adminAuth, async (req, res) => {
+// Admin Dashboard: GET /api/clients
+app.get("/api/clients", async (req, res) => {
     try {
         const allClients = await Client.find({});
         res.status(200).json(allClients);
@@ -372,8 +343,8 @@ app.get("/api/clients", authMiddleware, adminAuth, async (req, res) => {
     }
 });
 
-// Admin Form: GET /api/clients/:id (protected)
-app.get("/api/clients/:id", authMiddleware, async (req, res) => {
+// Admin Form: GET /api/clients/:id
+app.get("/api/clients/:id", async (req, res) => {
     try {
         const client = await Client.findById(req.params.id);
         if (!client) {
@@ -400,8 +371,8 @@ app.post("/api/upload-photo", parser.single("photo"), async (req, res) => {
     }
 });
 
-// Save/Update Info: PUT /api/clients/:id (protected)
-app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
+// Save/Update Info: PUT /api/clients/:id
+app.put("/api/clients/:id", async (req, res) => {
     try {
         const { photoUrl, ...adminData } = req.body;
         const client = await Client.findById(req.params.id);
@@ -414,10 +385,10 @@ app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
         client.history.push({
             action: "CLIENT_UPDATED / SAVE_INFO",
             notes: "Admin confirmed and saved client data.",
-            actorEmail: req.user.email
+            actorEmail: "admin"
         });
         await client.save();
-        await logAction(req.user.email, "admin", "CLIENT_UPDATED / SAVE_INFO", client._id, "Admin saved confirmed data.");
+        await logAction("admin", "admin", "CLIENT_UPDATED / SAVE_INFO", client._id, "Admin saved confirmed data.");
 
         res.status(200).json({ success: true, message: "Client info saved successfully.", client });
     } catch (error) {
@@ -427,8 +398,8 @@ app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
     }
 });
 
-// Create vCard: POST /api/clients/:id/vcard (protected)
-app.post("/api/clients/:id/vcard", authMiddleware, adminAuth, async (req, res) => {
+// Create vCard: POST /api/clients/:id/vcard
+app.post("/api/clients/:id/vcard", async (req, res) => {
     try {
         const client = await Client.findById(req.params.id);
         if (!client) return res.status(404).json({ success: false, message: "Client not found." });
@@ -455,11 +426,11 @@ app.post("/api/clients/:id/vcard", authMiddleware, adminAuth, async (req, res) =
         client.history.push({
             action: "VCARD_CREATED",
             notes: "vCard and QR code generated and saved to Cloudinary.",
-            actorEmail: req.user.email
+            actorEmail: "admin"
         });
         await client.save();
 
-        await logAction(req.user.email, "admin", "VCARD_CREATED", client._id, "vCard generated and status set to Active.");
+        await logAction("admin", "admin", "VCARD_CREATED", client._id, "vCard generated and status set to Active.");
 
         const emailStatus = await sendVCardEmail(client);
 
@@ -551,8 +522,8 @@ const generatePdfFromHtml = async (clientData) => {
     return pdfBuffer;
 };
 
-// View Client PDF: GET /api/clients/:id/pdf (protected)
-app.get("/api/clients/:id/pdf", authMiddleware, adminAuth, async (req, res) => {
+// View Client PDF: GET /api/clients/:id/pdf
+app.get("/api/clients/:id/pdf", async (req, res) => {
     try {
         const client = await Client.findById(req.params.id);
         if (!client) {
@@ -576,8 +547,8 @@ app.get("/api/clients/:id/pdf", authMiddleware, adminAuth, async (req, res) => {
 });
 
 
-// Status change routes (Disable/Reactivate/Delete) (protected)
-app.put("/api/clients/:id/status/:newStatus", authMiddleware, adminAuth, async (req, res) => {
+// Status change routes (Disable/Reactivate/Delete)
+app.put("/api/clients/:id/status/:newStatus", async (req, res) => {
     const { newStatus } = req.params;
     const { notes } = req.body;
     const validStatuses = ["Active", "Disabled", "Deleted"];
@@ -596,10 +567,10 @@ app.put("/api/clients/:id/status/:newStatus", authMiddleware, adminAuth, async (
         client.history.push({
             action: `STATUS_CHANGED to ${newStatus}`,
             notes,
-            actorEmail: req.user.email
+            actorEmail: "admin"
         });
         await client.save();
-        await logAction(req.user.email, "admin", "STATUS_CHANGED", client._id, notes, { newStatus });
+        await logAction("admin", "admin", "STATUS_CHANGED", client._id, notes, { newStatus });
 
         res.status(200).json({ success: true, message: `Client status updated to ${newStatus}.`, client });
     } catch (error) {
@@ -608,8 +579,8 @@ app.put("/api/clients/:id/status/:newStatus", authMiddleware, adminAuth, async (
     }
 });
 
-// Excel Export: GET /api/clients/export (protected)
-app.get("/api/clients/export", authMiddleware, adminAuth, async (req, res) => {
+// Excel Export: GET /api/clients/export
+app.get("/api/clients/export", async (req, res) => {
     try {
         const clients = await Client.find({});
         const fields = [
@@ -629,15 +600,15 @@ app.get("/api/clients/export", authMiddleware, adminAuth, async (req, res) => {
         res.header('Content-Type', 'text/csv');
         res.attachment('smartcardlink_clients_export.csv');
         res.send(csv);
-        await logAction(req.user.email, "admin", "DATA_EXPORTED", null, "Client data exported to Excel.");
+        await logAction("admin", "admin", "DATA_EXPORTED", null, "Client data exported to Excel.");
     } catch (error) {
         console.error("❌ Error exporting client data:", error);
         res.status(500).json({ success: false, message: "Server error exporting data." });
     }
 });
 
-// Log Viewer: GET /api/logs (protected)
-app.get("/api/logs", authMiddleware, adminAuth, async (req, res) => {
+// Log Viewer: GET /api/logs
+app.get("/api/logs", async (req, res) => {
     try {
         const logs = await Log.find({}).sort({ timestamp: -1 });
         res.status(200).json(logs);
@@ -663,27 +634,6 @@ app.get("/vcard/:id", async (req, res) => {
     } catch (error) {
         console.error("❌ Error accessing public vCard:", error);
         res.status(500).send("Error accessing vCard.");
-    }
-});
-
-// Admin Login
-app.post("/api/admin/login", loginLimiter, async (req, res) => {
-    const { password } = req.body;
-    try {
-        const isMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-        if (!isMatch) {
-            await logAction("admin-attempt", "admin", "LOGIN_FAILED", null, "Invalid credentials provided.", { ip: req.ip });
-            return res.status(401).json({ success: false, message: "Invalid credentials" });
-        }
-        const token = jwt.sign({ isAdmin: true, email: "admin" }, JWT_SECRET, {
-            expiresIn: "1h", audience: "smartcardlink", issuer: "smartcardlink-app",
-        });
-        const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-        await logAction("admin", "admin", "LOGIN_SUCCESS", null, null, { ip: req.ip, expiry });
-        res.json({ success: true, token, message: "Login successful. Token valid for 1 hour." });
-    } catch (err) {
-        console.error("❌ Admin login error:", err);
-        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 

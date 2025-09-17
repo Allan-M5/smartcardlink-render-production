@@ -31,7 +31,7 @@
             filter: brightness(0.4) saturate(1.2);
             object-fit: cover;
         }
-        .dashboard-card, .login-card {
+        .dashboard-card {
             background-color: #111;
             border-radius: 1rem;
             padding: 2rem;
@@ -44,11 +44,6 @@
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
-        }
-        .login-card {
-            max-width: 500px;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-            text-align: center;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-20px); }
@@ -254,16 +249,6 @@
         }
         .toast.success { background-color: #22c55e; color: white; }
         .toast.error { background-color: #ef4444; color: white; }
-        .logout-btn {
-            background-color: #ef4444;
-            color: white;
-            border-color: #ef4444;
-            font-weight: 600;
-        }
-        .logout-btn:hover {
-            background-color: #dc2626;
-            color: white;
-        }
         @media (max-width: 768px) {
             .controls-container {
                 flex-direction: column;
@@ -278,18 +263,8 @@
         Your browser does not support the video tag.
     </video>
 
-    <div id="loginCard" class="login-card">
-        <h1 class="title">Admin Dashboard Login</h1>
-        <p style="color: #aaa; text-align: center;">Please enter your password to continue.</p>
-        <input type="password" id="passwordInput" placeholder="Enter password" required />
-        <button id="loginBtn">Login</button>
-    </div>
-
-    <div id="dashboardContainer" class="dashboard-card" style="display: none;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h1 class="title" style="margin: 0; text-align: left;">SmartCardLink Admin Dashboard</h1>
-            <button id="logoutBtn" class="logout-btn">Logout</button>
-        </div>
+    <div id="dashboardContainer" class="dashboard-card">
+        <h1 class="title">SmartCardLink Admin Dashboard</h1>
         
         <div class="controls-container">
             <div class="search-container">
@@ -339,15 +314,10 @@
     <script>
         const API_BASE_URL = 'https://smartcardlink-flyio-fallback.fly.dev/api';
         
-        const loginCard = document.getElementById('loginCard');
-        const passwordInput = document.getElementById('passwordInput');
-        const loginBtn = document.getElementById('loginBtn');
-        const dashboardContainer = document.getElementById('dashboardContainer');
         const clientTableBody = document.getElementById('clientTableBody');
         const filterInput = document.getElementById('filterInput');
         const statusFilter = document.getElementById('statusFilter');
         const searchBtn = document.getElementById('searchBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
         const notesSection = document.getElementById('notesSection');
         const notesList = document.getElementById('notesList');
         const notesTextarea = document.getElementById('notesTextarea');
@@ -373,18 +343,14 @@
             }, 5000);
         };
         
-        const getToken = () => localStorage.getItem('adminToken');
-        
         const processClient = (clientId) => {
             window.open(`/admin_form.html?id=${clientId}`, '_blank');
         };
 
         const updateStatus = async (clientId, status) => {
-            const token = getToken();
             try {
                 const response = await fetch(`${API_BASE_URL}/clients/${clientId}/status/${status}`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    method: 'PUT'
                 });
                 
                 if (!response.ok) throw new Error('Failed to update status.');
@@ -427,14 +393,13 @@
                     <td>${client.email1 || 'N/A'}</td>
                     <td><span class="status-badge status-${clientStatus.replace(/\s/g, '')}">${clientStatus}</span></td>
                     <td class="actions-cell">
-                       ${actionsHtml}
+                        ${actionsHtml}
                     </td>
                 `;
                 
                 row.addEventListener('click', async (event) => {
-                    // Prevent row click from triggering when clicking on a button inside the cell
                     if (event.target.tagName !== 'BUTTON') {
-                         await selectClient(client._id);
+                        await selectClient(client._id);
                     }
                 });
                 
@@ -460,14 +425,9 @@
         };
         
         const fetchClients = async () => {
-            const token = getToken();
-            if (!token) return;
-            
             clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading client data...</td></tr>';
             try {
-                const response = await fetch(`${API_BASE_URL}/clients`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch(`${API_BASE_URL}/clients`);
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Failed to fetch clients.');
                 
@@ -489,12 +449,9 @@
             }
             
             notesSection.style.display = 'flex';
-            const token = getToken();
             
             try {
-                const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`);
                 
                 if (!response.ok) throw new Error('Failed to fetch notes.');
                 
@@ -534,46 +491,8 @@
                 await renderNotes();
             }
         };
-        
-        const checkAuthAndRender = () => {
-            const token = getToken();
-            if (token) {
-                loginCard.style.display = 'none';
-                dashboardContainer.style.display = 'flex';
-                fetchClients();
-            } else {
-                loginCard.style.display = 'flex';
-                dashboardContainer.style.display = 'none';
-            }
-        };
 
         // Event Listeners
-        loginBtn.addEventListener('click', async () => {
-            const password = passwordInput.value;
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/admin-login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.message || 'Invalid password.');
-                }
-                
-                const { token } = await response.json();
-                localStorage.setItem('adminToken', token);
-                
-                showToast('Login successful!');
-                checkAuthAndRender();
-            } catch (error) {
-                console.error("Login failed:", error);
-                showToast(`Login failed: ${error.message}`, 'error');
-            }
-        });
-        
         filterInput.addEventListener('input', filterClients);
         statusFilter.addEventListener('change', filterClients);
         searchBtn.addEventListener('click', filterClients);
@@ -585,7 +504,6 @@
                 return;
             }
             
-            const token = getToken();
             if (!selectedClientId) {
                 showToast('Please select a client first.', 'error');
                 return;
@@ -594,10 +512,7 @@
             try {
                 const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: noteText })
                 });
                 
@@ -612,13 +527,8 @@
             }
         });
         
-        logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('adminToken');
-            checkAuthAndRender();
-        });
-
         // Initial setup
-        document.addEventListener('DOMContentLoaded', checkAuthAndRender);
+        document.addEventListener('DOMContentLoaded', fetchClients);
     </script>
 </body>
 </html>
