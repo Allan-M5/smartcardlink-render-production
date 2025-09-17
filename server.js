@@ -24,6 +24,7 @@ const slugify = require("slugify");
 const vCardsJS = require("vcards-js");
 const fetch = require('node-fetch');
 const puppeteer = require("puppeteer");
+const { PassThrough } = require('stream');
 
 // Ensure environment variables are loaded from a .env file
 dotenv.config();
@@ -107,7 +108,6 @@ app.use(cors({
     }
 }));
 app.use(express.json({ limit: "5mb" }));
-// 🟢 CHANGE: Serve static files from the root directory instead of a 'public' folder
 app.use(express.static(path.join(__dirname)));
 app.get('/', (req, res) => {
     res.send('Hello, world!');
@@ -159,6 +159,7 @@ const clientSchema = new mongoose.Schema({
     socialLinks: { type: Object, default: {} },
     workingHours: { type: Object, default: {} },
     photoUrl: { type: String, default: "" },
+    pdfUrl: { type: String, default: "" },
     slug: { type: String, required: true, unique: true },
     vcardUrl: { type: String, default: "" },
     qrCodeUrl: { type: String, default: "" },
@@ -213,17 +214,6 @@ const adminAuth = (req, res, next) => {
     }
 };
 
-const staffAuth = (req, res, next) => {
-    if (req.user && !req.user.isAdmin) {
-        next();
-    } else {
-        res.status(403).json({ success: false, message: "Forbidden: Staff access required." });
-    }
-};
-
-const pdfDir = path.join(__dirname, "vcards");
-if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
-
 const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
@@ -271,7 +261,7 @@ const generateVcard = async (client) => {
     if (client.phone3) vcard.workPhone = [vcard.workPhone, client.phone3];
     vcard.workEmail = client.email1 || "";
     if (client.email2) vcard.workEmail = [vcard.workEmail, client.email2];
-    if (client.email3) vcard.workEmail = [vcard.workEmail, client.email3];
+    if (client.email3) vcard.workEmail = [vcard.email3, client.email3];
     vcard.url = client.businessWebsite || "";
     vcard.note = client.bio || "";
     vcard.address = client.address || "";
@@ -289,18 +279,17 @@ const generateVcard = async (client) => {
     return vcard.getFormattedString();
 };
 
-const uploadVcardToCloudinary = (filePath, slug) => {
+const uploadToCloudinary = (fileBuffer, slug, resourceType, folderName) => {
     return new Promise((resolve, reject) => {
-        cloudinary.uploader.upload(filePath, {
-            folder: "smartcardlink_vcards",
+        const stream = cloudinary.uploader.upload_stream({
+            folder: folderName,
             public_id: slug,
-            resource_type: "raw"
+            resource_type: resourceType,
         }, (error, result) => {
-            if (error) {
-                return reject(error);
-            }
+            if (error) return reject(error);
             resolve(result);
         });
+        stream.end(fileBuffer);
     });
 };
 
@@ -319,6 +308,7 @@ const parser = multer({ storage });
 // ------------------------
 // Client Submission: POST /api/clients
 app.post("/api/clients", publicLimiter, async (req, res) => {
+    const release = await pdfSemaphore.acquire();
     try {
         const { fullName } = req.body;
         let baseSlug = slugify(fullName, { lower: true, strict: true });
@@ -330,18 +320,28 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
             counter++;
         }
 
+        const clientDataForPdf = { ...req.body, fullName, slug };
+        const pdfBuffer = await generatePdfFromHtml(clientDataForPdf);
+
+        const uploadResult = await uploadToCloudinary(pdfBuffer, `client_info_${slug}`, "raw", "smartcardlink_client_pdfs");
+        const pdfUrl = uploadResult.secure_url;
+
         const client = new Client({
             ...req.body,
             slug,
+            pdfUrl,
             status: "Pending"
         });
         await client.save();
+
         await logAction("public", "public", "CLIENT_CREATED", client._id, "New client submitted via public form.");
         res.status(201).json({ success: true, message: "Client form saved", recordId: client._id });
     } catch (err) {
         console.error("❌ Error saving client form:", err);
         if (err.name === "ValidationError") return res.status(400).json({ success: false, message: err.message });
         res.status(500).json({ success: false, message: "Server error" });
+    } finally {
+        release();
     }
 });
 
@@ -408,11 +408,9 @@ app.put("/api/clients/:id", authMiddleware, adminAuth, async (req, res) => {
         if (!client) {
             return res.status(404).json({ success: false, message: "Client not found." });
         }
-
         Object.assign(client, adminData);
         client.photoUrl = photoUrl;
         client.status = "Processed";
-
         client.history.push({
             action: "CLIENT_UPDATED / SAVE_INFO",
             notes: "Admin confirmed and saved client data.",
@@ -434,31 +432,24 @@ app.post("/api/clients/:id/vcard", authMiddleware, adminAuth, async (req, res) =
     try {
         const client = await Client.findById(req.params.id);
         if (!client) return res.status(404).json({ success: false, message: "Client not found." });
-        if (client.status !== "Processed") return res.status(400).json({ success: false, message: "vCard can only be created for clients with 'Processed' status." });
 
         const vcfContent = await generateVcard(client);
-        const tempFilePath = path.join(__dirname, 'temp', `${client.slug}.vcf`);
-
-        if (!fs.existsSync(path.join(__dirname, 'temp'))) {
-            fs.mkdirSync(path.join(__dirname, 'temp'));
-        }
-        fs.writeFileSync(tempFilePath, vcfContent);
+        const vcfBuffer = Buffer.from(vcfContent, 'utf-8');
 
         let vcardCloudinaryUrl;
+        let qrCodeUrl;
         try {
-            const uploadResult = await uploadVcardToCloudinary(tempFilePath, client.slug);
+            const uploadResult = await uploadToCloudinary(vcfBuffer, client.slug, "raw", "smartcardlink_vcards");
             vcardCloudinaryUrl = uploadResult.secure_url;
-            fs.unlinkSync(tempFilePath);
+
+            const qrCodeData = await QRCode.toDataURL(vcardCloudinaryUrl);
+            qrCodeUrl = qrCodeData;
         } catch (uploadError) {
-            console.error("❌ Error uploading vCard to Cloudinary:", uploadError);
-            fs.unlinkSync(tempFilePath);
+            console.error("❌ Error uploading vCard:", uploadError);
             return res.status(500).json({ success: false, message: "Server error uploading vCard file." });
         }
 
-        const finalVcardUrl = vcardCloudinaryUrl;
-        const qrCodeUrl = await QRCode.toDataURL(finalVcardUrl);
-
-        client.vcardUrl = finalVcardUrl;
+        client.vcardUrl = vcardCloudinaryUrl;
         client.qrCodeUrl = qrCodeUrl;
         client.status = "Active";
         client.history.push({
@@ -472,141 +463,118 @@ app.post("/api/clients/:id/vcard", authMiddleware, adminAuth, async (req, res) =
 
         const emailStatus = await sendVCardEmail(client);
 
-        if (emailStatus.success) {
-            res.status(200).json({
-                success: true,
-                message: "vCard created, saved, and email sent successfully.",
-                vcardUrl: finalVcardUrl,
-                qrCodeUrl: qrCodeUrl
-            });
-        } else {
-            res.status(200).json({
-                success: true,
-                message: "vCard created and saved successfully. WARNING: Email failed to send.",
-                vcardUrl: finalVcardUrl,
-                qrCodeUrl: qrCodeUrl,
-                emailError: emailStatus.error
-            });
-        }
+        res.status(200).json({
+            success: true,
+            message: "vCard created, saved, and email sent successfully.",
+            vcardUrl: vcardCloudinaryUrl,
+            qrCodeUrl: qrCodeUrl,
+            emailStatus: emailStatus.success ? "success" : "failed"
+        });
     } catch (error) {
         console.error("❌ Error creating vCard:", error);
         res.status(500).json({ success: false, message: "Server error creating vCard." });
     }
 });
 
-// 🟢 NEW: Endpoint to generate HTML for the PDF
-app.get("/api/client-card-html/:id", authMiddleware, async (req, res) => {
-    try {
-        const client = await Client.findById(req.params.id);
-        if (!client) {
-            return res.status(404).send("Client not found.");
-        }
-
-        // Construct the HTML string with client data
-        const html = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                    .container { max-width: 600px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-                    .photo-container { text-align: center; margin-bottom: 20px; }
-                    .photo { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; }
-                    h1, h2, h3 { color: #0056b3; text-align: center; margin: 0; }
-                    h1 { font-size: 2em; }
-                    h2 { font-size: 1.5em; color: #555; }
-                    h3 { font-size: 1.2em; color: #777; }
-                    .info-section { margin-top: 20px; }
-                    .info-section p { margin: 5px 0; line-height: 1.6; }
-                    .label { font-weight: bold; color: #333; }
-                    .social-links { margin-top: 15px; }
-                    .social-links h4 { margin-bottom: 5px; color: #0056b3; }
-                    .social-links ul { list-style-type: none; padding: 0; }
-                    .social-links li { margin-bottom: 5px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="photo-container">
-                        <img src="${client.photoUrl || ''}" class="photo" alt="Client Photo" />
-                    </div>
-                    <h1>${client.fullName}</h1>
-                    <h2>${client.company}</h2>
-                    <h3>${client.title}</h3>
-                    <div class="info-section">
-                        <p><span class="label">Bio:</span> ${client.bio || 'N/A'}</p>
-                        <p><span class="label">Address:</span> ${client.address || 'N/A'}</p>
-                        <p><span class="label">Phone 1:</span> ${client.phone1 || 'N/A'}</p>
-                        <p><span class="label">Email 1:</span> ${client.email1 || 'N/A'}</p>
-                        <p><span class="label">Business Website:</span> <a href="${client.businessWebsite || '#'}">${client.businessWebsite || 'N/A'}</a></p>
-                        <p><span class="label">Portfolio Website:</span> <a href="${client.portfolioWebsite || '#'}">${client.portfolioWebsite || 'N/A'}</a></p>
-                    </div>
-                    ${client.socialLinks && Object.keys(client.socialLinks).length > 0 ? `
-                        <div class="social-links">
-                            <h4>Social Links:</h4>
-                            <ul>
-                                ${Object.entries(client.socialLinks).map(([key, value]) => `<li>${key}: <a href="${value}">${value}</a></li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
+// Helper function to generate HTML from client data
+const generateHtmlFromClientData = (client) => {
+    return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                .container { max-width: 600px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                .photo-container { text-align: center; margin-bottom: 20px; }
+                .photo { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; }
+                h1, h2, h3 { color: #0056b3; text-align: center; margin: 0; }
+                h1 { font-size: 2em; }
+                h2 { font-size: 1.5em; color: #555; }
+                h3 { font-size: 1.2em; color: #777; }
+                .info-section { margin-top: 20px; }
+                .info-section p { margin: 5px 0; line-height: 1.6; }
+                .label { font-weight: bold; color: #333; }
+                .social-links { margin-top: 15px; }
+                .social-links h4 { margin-bottom: 5px; color: #0056b3; }
+                .social-links ul { list-style-type: none; padding: 0; }
+                .social-links li { margin-bottom: 5px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="photo-container">
+                    <img src="${client.photoUrl || ''}" class="photo" alt="Client Photo" />
                 </div>
-            </body>
-            </html>
-        `;
+                <h1>${client.fullName}</h1>
+                <h2>${client.company}</h2>
+                <h3>${client.title}</h3>
+                <div class="info-section">
+                    <p><span class="label">Bio:</span> ${client.bio || 'N/A'}</p>
+                    <p><span class="label">Address:</span> ${client.address || 'N/A'}</p>
+                    <p><span class="label">Phone 1:</span> ${client.phone1 || 'N/A'}</p>
+                    <p><span class="label">Email 1:</span> ${client.email1 || 'N/A'}</p>
+                    <p><span class="label">Business Website:</span> <a href="${client.businessWebsite || '#'}">${client.businessWebsite || 'N/A'}</a></p>
+                    <p><span class="label">Portfolio Website:</span> <a href="${client.portfolioWebsite || '#'}">${client.portfolioWebsite || 'N/A'}</a></p>
+                </div>
+                ${client.socialLinks && Object.keys(client.socialLinks).length > 0 ? `
+                    <div class="social-links">
+                        <h4>Social Links:</h4>
+                        <ul>
+                            ${Object.entries(client.socialLinks).map(([key, value]) => `<li>${key}: <a href="${value}">${value}</a></li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            </div>
+        </body>
+        </html>
+    `;
+};
 
-        res.send(html);
-    } catch (error) {
-        console.error("❌ Error generating HTML for PDF:", error);
-        res.status(500).send("Server error generating HTML.");
-    }
-});
+// Helper function to generate PDF from HTML
+const generatePdfFromHtml = async (clientData) => {
+    const htmlContent = generateHtmlFromClientData(clientData);
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, {
+        waitUntil: 'networkidle0',
+    });
 
+    const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+    });
+    await browser.close();
+    return pdfBuffer;
+};
 
 // View Client PDF: GET /api/clients/:id/pdf (protected)
 app.get("/api/clients/:id/pdf", authMiddleware, adminAuth, async (req, res) => {
-    const release = await pdfSemaphore.acquire();
     try {
         const client = await Client.findById(req.params.id);
         if (!client) {
-            return res.status(404).send("Client not found.");
+            return res.status(404).json({ success: false, message: "Client not found." });
         }
 
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
-        const page = await browser.newPage();
+        const isFromDashboard = req.headers['x-origin-dashboard'] === 'true';
 
-        // 🟢 CHANGE: Use the new inline HTML generation route
-        const clientCardUrl = `http://localhost:${PORT}/api/client-card-html/${client._id}`;
-
-        await page.goto(clientCardUrl, {
-            waitUntil: 'networkidle0',
-        });
-
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            displayHeaderFooter: true,
-            headerTemplate: '',
-            footerTemplate: `<div style="font-size: 10px; margin-left: 20px; text-align: right; width: 100%;"><span class="pageNumber"></span>/<span class="totalPages"></span></div>`,
-        });
-
-        await browser.close();
-
-        res.contentType('application/pdf');
-        res.send(pdfBuffer);
-
-        await logAction(req.user.email, "admin", "PDF_GENERATED_VIA_PUPPETEER", client._id);
+        if (client.pdfUrl) {
+            res.redirect(302, client.pdfUrl);
+        } else if (!isFromDashboard) {
+            return res.status(400).json({ success: false, message: "Application not originating from client form and admin dashboard, no pdf for viewing." });
+        } else {
+            return res.status(404).json({ success: false, message: "No PDF found for this client." });
+        }
 
     } catch (error) {
-        console.error("❌ Error generating PDF with Puppeteer:", error);
-        res.status(500).send("Server error generating PDF.");
-    } finally {
-        release();
+        console.error("❌ Error retrieving PDF:", error);
+        res.status(500).json({ success: false, message: "Server error retrieving PDF." });
     }
 });
+
 
 // Status change routes (Disable/Reactivate/Delete) (protected)
 app.put("/api/clients/:id/status/:newStatus", authMiddleware, adminAuth, async (req, res) => {
@@ -698,7 +666,7 @@ app.get("/vcard/:id", async (req, res) => {
     }
 });
 
-// Login routes
+// Admin Login
 app.post("/api/admin/login", loginLimiter, async (req, res) => {
     const { password } = req.body;
     try {
@@ -715,27 +683,6 @@ app.post("/api/admin/login", loginLimiter, async (req, res) => {
         res.json({ success: true, token, message: "Login successful. Token valid for 1 hour." });
     } catch (err) {
         console.error("❌ Admin login error:", err);
-        res.status(500).json({ success: false, message: "Server error" });
-    }
-});
-
-// New simplified Staff login route
-app.post("/api/staff/login", loginLimiter, async (req, res) => {
-    const { password } = req.body;
-    try {
-        const isMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-        if (!isMatch) {
-            await logAction("staff-attempt", "staff", "LOGIN_FAILED", null, "Invalid credentials provided.", { ip: req.ip });
-            return res.status(401).json({ success: false, message: "Invalid credentials" });
-        }
-        const token = jwt.sign({ isAdmin: false, email: "staff" }, JWT_SECRET, {
-            expiresIn: "1h", audience: "smartcardlink", issuer: "smartcardlink-app",
-        });
-        const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-        await logAction("staff", "staff", "LOGIN_SUCCESS", null, null, { ip: req.ip, expiry });
-        res.json({ success: true, token, message: "Login successful. Token valid for 1 hour." });
-    } catch (err) {
-        console.error("❌ Staff login error:", err);
         res.status(500).json({ success: false, message: "Server error" });
     }
 });

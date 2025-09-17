@@ -351,13 +351,10 @@
         <div id="toast-message" class="toast-message"></div>
     </div>
     <script>
-        // Update this line to point to your live backend on Fly.io
         const API_BASE = 'https://smartcardlink-app.fly.dev';
         const API_URL = `${API_BASE}/api`;
         const params = new URLSearchParams(window.location.search);
         const clientId = params.get('id');
-        // NOTE: For security, you will eventually need to add a JWT token to authenticated requests.
-        // Example: fetch(url, { headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' } })
 
         const form = document.getElementById('adminForm');
         const viewPdfBtn = document.getElementById('view-pdf-btn');
@@ -371,7 +368,13 @@
         const toastMessage = document.getElementById('toast-message');
 
         let isSaving = false;
-        
+
+        // Check for JWT token on page load
+        const token = localStorage.getItem('jwtToken');
+        if (!token) {
+            window.location.href = '/admin-login.html'; // Redirect to login if no token
+        }
+
         const showToast = (message, isError = false) => {
             toastMessage.textContent = message;
             toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
@@ -383,7 +386,6 @@
         };
 
         const populateForm = (data) => {
-            // Personal Details
             document.getElementById('fullName').value = data.fullName || '';
             document.getElementById('title').value = data.title || '';
             document.getElementById('phone1').value = data.phone1 || '';
@@ -393,13 +395,11 @@
             document.getElementById('email2').value = data.email2 || '';
             document.getElementById('email3').value = data.email3 || '';
             
-            // Business Details
-            document.getElementById('companyName').value = data.companyName || '';
+            document.getElementById('companyName').value = data.company || '';
             document.getElementById('businessWebsite').value = data.businessWebsite || '';
             document.getElementById('portfolioWebsite').value = data.portfolioWebsite || '';
-            document.getElementById('locationMapUrl').value = data.locationMapUrl || '';
+            document.getElementById('locationMapUrl').value = data.locationMap || '';
 
-            // Photo URL
             if (data.photoUrl) {
                 photoUrlInput.value = data.photoUrl;
                 photoPreview.src = data.photoUrl;
@@ -408,31 +408,40 @@
                 photoUploadLabel.style.backgroundColor = '#22c55e';
             }
 
-            // Working Hours
             if (data.workingHours) {
-                for (const day in data.workingHours) {
-                    const input = document.getElementById(day);
-                    if (input) input.value = data.workingHours[day] || '';
-                }
+                document.getElementById('monFriStart').value = data.workingHours.monFriStart || '';
+                document.getElementById('monFriEnd').value = data.workingHours.monFriEnd || '';
+                document.getElementById('satStart').value = data.workingHours.satStart || '';
+                document.getElementById('satEnd').value = data.workingHours.satEnd || '';
+                document.getElementById('sunStart').value = data.workingHours.sunStart || '';
+                document.getElementById('sunEnd').value = data.workingHours.sunEnd || '';
             }
 
-            // Social Links
             if (data.socialLinks) {
-                for (const platform in data.socialLinks) {
-                    const input = document.getElementById(platform);
-                    if (input) input.value = data.socialLinks[platform];
-                }
+                document.getElementById('facebook').value = data.socialLinks.facebook || '';
+                document.getElementById('instagram').value = data.socialLinks.instagram || '';
+                document.getElementById('twitter').value = data.socialLinks.twitter || '';
+                document.getElementById('linkedin').value = data.socialLinks.linkedin || '';
+                document.getElementById('tiktok').value = data.socialLinks.tiktok || '';
+                document.getElementById('youtube').value = data.socialLinks.youtube || '';
             }
 
-            // Bio & Address
             document.getElementById('bio').value = data.bio || '';
             document.getElementById('address').value = data.address || '';
         };
 
         const fetchClientData = async (id) => {
             try {
-                const response = await fetch(`${API_URL}/clients/${id}`);
+                const response = await fetch(`${API_URL}/clients/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        showToast('Session expired. Please log in again.', true);
+                        localStorage.removeItem('jwtToken');
+                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
+                        return;
+                    }
                     throw new Error(`Failed to fetch client data for ID: ${id}`);
                 }
                 const data = await response.json();
@@ -456,10 +465,16 @@
 
                 const response = await fetch(`${API_URL}/upload-photo`, {
                     method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
                     body: formData,
                 });
 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        showToast('Session expired. Please log in again.', true);
+                        localStorage.removeItem('jwtToken');
+                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
+                    }
                     throw new Error('Photo upload failed on the server.');
                 }
 
@@ -547,19 +562,26 @@
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify(payload),
                 });
 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        showToast('Session expired. Please log in again.', true);
+                        localStorage.removeItem('jwtToken');
+                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
+                        return;
+                    }
                     throw new Error('Failed to save client info.');
                 }
                 
                 showToast('Client info saved successfully!');
                 
                 const data = await response.json();
-                if (!clientId && data._id) {
-                    window.location.href = `/admin-form.html?id=${data._id}`;
+                if (!clientId && data.recordId) {
+                    window.location.href = `/admin-form.html?id=${data.recordId}`;
                 }
                 
             } catch (error) {
@@ -583,17 +605,28 @@
             viewPdfBtn.disabled = true;
 
             try {
-                const response = await fetch(`${API_URL}/pdf-viewer/${clientId}`);
-                if (!response.ok) {
-                    throw new Error('Failed to generate PDF.');
+                const response = await fetch(`${API_URL}/clients/${clientId}/pdf`, {
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'X-Origin-Dashboard': 'true' // Add this header for conditional logic in the backend
+                    }
+                });
+
+                if (response.ok) {
+                    // Backend now redirects to the Cloudinary URL
+                    window.open(response.url, '_blank');
+                    showToast('PDF opened successfully!');
+                } else if (response.status === 401) {
+                    showToast('Session expired. Please log in again.', true);
+                    localStorage.removeItem('jwtToken');
+                    setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to retrieve PDF.');
                 }
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                window.open(url, '_blank');
-                showToast('PDF generated successfully!');
             } catch (error) {
-                console.error('PDF generation error:', error);
-                showToast(`PDF generation failed: ${error.message}`, true);
+                console.error('PDF retrieval error:', error);
+                showToast(`PDF retrieval failed: ${error.message}`, true);
             } finally {
                 viewPdfBtn.innerHTML = 'View Client Info PDF';
                 viewPdfBtn.classList.remove('pressed');
@@ -612,25 +645,46 @@
             createVcardBtn.disabled = true;
 
             try {
-                const response = await fetch(`${API_URL}/create-vcard/${clientId}`, {
+                const response = await fetch(`${API_URL}/clients/${clientId}/vcard`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ adminEmail: document.getElementById('email1').value })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Failed to create vCard or send email.');
+                    if (response.status === 401) {
+                        showToast('Session expired. Please log in again.', true);
+                        localStorage.removeItem('jwtToken');
+                        setTimeout(() => { window.location.href = '/admin-login.html'; }, 1000);
+                        return;
+                    }
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to create vCard or send email.');
                 }
 
                 const data = await response.json();
                 showToast('vCard and QR code created successfully! Email sent to client.', false);
                 
-                // Open new tab with the vCard URL for admin to view
-                window.open(data.vCardUrl, '_blank');
-                // Open new tab with the QR code image for printing
-                window.open(data.qrCodeUrl, '_blank');
+                if (data.vcardUrl) {
+                     window.open(data.vcardUrl, '_blank');
+                }
+                if (data.qrCodeUrl) {
+                    const qrCodeWindow = window.open('', '_blank');
+                    qrCodeWindow.document.write(`
+                        <html>
+                        <head>
+                            <title>QR Code</title>
+                            <style>body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f0f0f0; }</style>
+                        </head>
+                        <body>
+                            <img src="${data.qrCodeUrl}" alt="QR Code" style="max-width: 90%; max-height: 90vh;">
+                        </body>
+                        </html>
+                    `);
+                    qrCodeWindow.document.close();
+                }
                 
             } catch (error) {
                 console.error('vCard creation error:', error);
