@@ -34,7 +34,6 @@ const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
 const APP_BASE_URL = process.env.APP_BASE_URL;
-const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL;
 
 // Email Config
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -43,14 +42,14 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
-// Cloudinary config - Corrected to use individual variables
+// Cloudinary config
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Required environment variables check - Updated to remove auth
+// Required environment variables check - Updated to reflect correct env vars
 const requiredEnv = [
     "MONGODB_URI", "APP_BASE_URL", "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "SMTP_HOST", "SMTP_PORT",
@@ -76,9 +75,17 @@ const publicLimiter = RateLimit({
 // ------------------------
 // Middleware
 // ------------------------
-app.use(helmet({
-    crossOriginEmbedderPolicy: false,
+// FIX: Configure Helmet to allow inline scripts for the admin page
+app.use(helmet.contentSecurityPolicy({
+    directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "res.cloudinary.com"],
+        connectSrc: ["'self'", "res.cloudinary.com", "https://api.cloudinary.com"],
+    },
 }));
+
 app.use(morgan("combined"));
 
 const allowedOrigins = [
@@ -102,9 +109,9 @@ app.use(express.static(path.join(__dirname)));
 // ------------------------
 // Public-facing Routes
 // ------------------------
-// Root URL
+// FIX: Serve the admin-form.html on the root URL
 app.get('/', (req, res) => {
-    res.send('SmartCardLink App is running.');
+    res.sendFile(path.join(__dirname, 'admin-form.html'));
 });
 
 // Admin Form URL
@@ -234,13 +241,11 @@ const generateVcard = async (client) => {
     vcard.organization = client.company || "";
     vcard.title = client.title || "";
 
-    // Fix: Correctly assign phone numbers as an array
     const phones = [client.phone1];
     if (client.phone2) phones.push(client.phone2);
     if (client.phone3) phones.push(client.phone3);
     vcard.workPhone = phones.length > 0 ? phones : ["N/A"];
 
-    // Fix: Correctly assign emails as an array
     const emails = [client.email1];
     if (client.email2) emails.push(client.email2);
     if (client.email3) emails.push(client.email3);
@@ -287,9 +292,6 @@ const storage = new CloudinaryStorage({
 });
 const parser = multer({ storage });
 
-// Unified PDF generation function
-// This function now handles PDF generation and Cloudinary upload,
-// eliminating code duplication and fixing the bug.
 const generateAndUploadPdf = async (clientData) => {
     let browser;
     try {
@@ -536,7 +538,6 @@ app.post("/api/clients/:id/vcard", async (req, res) => {
 });
 
 // View Client PDF: GET /api/clients/:id/pdf
-// Fix: Added fallback generation logic
 app.get("/api/clients/:id/pdf", async (req, res) => {
     const release = await pdfSemaphore.acquire();
     try {
@@ -545,16 +546,13 @@ app.get("/api/clients/:id/pdf", async (req, res) => {
             return res.status(404).json({ success: false, message: "Client not found." });
         }
 
-        // If a PDF URL exists, redirect to it
         if (client.pdfUrl) {
             return res.redirect(302, client.pdfUrl);
         }
 
-        // Fallback: If no PDF URL exists, generate and upload it now
         console.log("PDF not found, generating a new one...");
         const newPdfUrl = await generateAndUploadPdf(client);
         
-        // Update the client record with the new URL
         client.pdfUrl = newPdfUrl;
         client.history.push({
             action: "PDF_GENERATED_ON_DEMAND",
@@ -564,7 +562,6 @@ app.get("/api/clients/:id/pdf", async (req, res) => {
         await client.save();
         await logAction("admin", "admin", "PDF_GENERATED_ON_DEMAND", client._id, "PDF generated on demand.");
 
-        // Redirect to the newly created PDF
         res.redirect(302, newPdfUrl);
 
     } catch (error) {
