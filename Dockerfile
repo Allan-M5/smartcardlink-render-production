@@ -1,21 +1,18 @@
-# Use a full, non-slim version of Node.js as a base for better compatibility.
+# Use full Node.js image (not slim) for maximum compatibility with Puppeteer
 FROM node:18.17.0
 
-# Install the necessary system dependencies for Puppeteer.
-# The 'gconf-service' is a legacy dependency, but it's often required.
+# Install only required Chromium dependencies (lean & stable)
 RUN apt-get update && apt-get install -y \
-    gconf-service \
-    libgbm-dev \
     libasound2 \
     libatk1.0-0 \
+    libatk-bridge2.0-0 \
     libc6 \
     libcairo2 \
     libcups2 \
     libdbus-1-3 \
     libexpat1 \
     libfontconfig1 \
-    libgcc1 \
-    libgdk-pixbuf2.0-0 \
+    libgbm-dev \
     libglib2.0-0 \
     libgtk-3-0 \
     libnspr4 \
@@ -36,38 +33,25 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    libappindicator1 \
-    libnss3 \
-    libgconf-2-4 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
     libxkbcommon-x11-0 \
     libxshmfence-dev \
-    libxcomposite-dev \
-    libxcursor-dev \
-    libxdamage-dev \
-    libxfixes-dev \
-    libxi-dev \
-    libxrandr-dev \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set the working directory inside the container.
+# Set workdir
 WORKDIR /usr/src/app
 
-# Copy the core application files and dependencies.
+# Copy dependency manifests first for caching
 COPY package*.json ./
 
-# Install application dependencies.
-RUN npm install
+# Install dependencies
+RUN npm install --legacy-peer-deps
 
-# This is the corrected line. It copies everything from your local
-# root directory into the container's app directory.
+# Copy app source code
 COPY . .
 
-# Expose the port your application listens on.
+# Expose port
 EXPOSE 8080
 
-# Define the command to start your application.
+# Start server
 CMD ["node", "server.js"]

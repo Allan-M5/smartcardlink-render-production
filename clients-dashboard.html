@@ -1,347 +1,389 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SmartCardLink vCard Client Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 2rem;
-            background: none;
-            position: relative;
-            color: #e2e8f0;
-            transition: all 0.5s ease-in-out;
-        }
-        #bg-video {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            min-width: 100%;
-            min-height: 100%;
-            z-index: -100;
-            filter: brightness(0.4) saturate(1.2);
-            object-fit: cover;
-        }
-        .dashboard-card {
-            background-color: #111;
-            border-radius: 1rem;
-            padding: 2rem;
-            width: 100%;
-            max-width: 1200px;
-            border: 1px solid #333;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
-            overflow: hidden;
-            animation: fadeIn 1s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        h1.title {
-            color: #FFD700;
-            font-size: 1.75rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 2rem;
-            letter-spacing: 0.05em;
-        }
-        .controls-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        .search-container {
-            display: flex;
-            gap: 0.5rem;
-            flex-grow: 1;
-        }
-        input, select {
-            flex-grow: 1;
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            border: 1px solid #555;
-            box-sizing: border-box;
-            background-color: #222;
-            color: white;
-            transition: all 0.3s ease;
-        }
-        input:focus, select:focus {
-            outline: none;
-            border-color: #FFD700;
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-        .button-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-        button {
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.375rem;
-            border: 1px solid #FFD700;
-            background-color: #1a1a1a;
-            color: #FFD700;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        button:hover {
-            background-color: #FFD700;
-            color: black;
-        }
-        button:disabled {
-            background-color: #444;
-            color: #888;
-            cursor: not-allowed;
-            border-color: #555;
-        }
-        .table-container {
-            overflow-x: auto;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #333;
-        }
-        th {
-            background-color: #222;
-            color: #FFD700;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        td {
-            background-color: #1a1a1a;
-            color: #e2e8f0;
-            font-size: 0.9rem;
-        }
-        tbody tr:hover {
-            background-color: #2d2d2d;
-        }
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: white;
-            white-space: nowrap;
-        }
-        .status-Pending { background-color: #d69e2e; }
-        .status-Processed { background-color: #4299e1; }
-        .status-Active { background-color: #38a169; }
-        .status-Disabled { background-color: #e53e3e; }
-        .status-Deleted { background-color: #4a5568; }
-        .client-photo {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #555;
-        }
-        #noResults, #loadingMessage {
-            text-align: center;
-            padding: 2rem;
-            color: #ef4444;
-            display: none;
-        }
-        .toast-container {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            z-index: 1000;
-        }
-        .toast {
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease-in-out;
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        .toast.show {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        .toast.success { background-color: #22c55e; color: white; }
-        .toast.error { background-color: #ef4444; color: white; }
-        @media (max-width: 768px) {
-            .controls-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .button-group {
-                width: 100%;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink vCard Client Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 2rem;
+      background: none;
+      position: relative;
+      color: #e2e8f0;
+      transition: all 0.5s ease-in-out;
+    }
+    #bg-video {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      z-index: -100;
+      filter: brightness(0.4) saturate(1.2);
+      object-fit: cover;
+    }
+    .dashboard-card {
+      background-color: #111;
+      border-radius: 1rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 1200px;
+      border: 1px solid #333;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1.title {
+      color: #FFD700;
+      font-size: 1.75rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 2rem;
+      letter-spacing: 0.05em;
+    }
+    .controls-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .search-container {
+      display: flex;
+      gap: 0.5rem;
+      flex-grow: 1;
+    }
+    input, select {
+      flex-grow: 1;
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      border: 1px solid #555;
+      box-sizing: border-box;
+      background-color: #222;
+      color: white;
+      transition: all 0.3s ease;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #FFD700;
+      box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+    button {
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.375rem;
+      border: 1px solid #FFD700;
+      background-color: #1a1a1a;
+      color: #FFD700;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background-color: #FFD700;
+      color: black;
+    }
+    button:disabled {
+      background-color: #444;
+      color: #888;
+      cursor: not-allowed;
+      border-color: #555;
+    }
+    .table-container {
+      overflow-x: auto;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid #333;
+    }
+    th {
+      background-color: #222;
+      color: #FFD700;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    td {
+      background-color: #1a1a1a;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+    }
+    tbody tr:hover { background-color: #2d2d2d; }
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: white;
+      white-space: nowrap;
+    }
+    .status-Pending { background-color: #d69e2e; }
+    .status-Processed { background-color: #4299e1; }
+    .status-Active { background-color: #38a169; }
+    .status-Disabled { background-color: #e53e3e; }
+    .status-Deleted { background-color: #4a5568; }
+    .client-photo {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #555;
+    }
+    #noResults, #loadingMessage {
+      text-align: center;
+      padding: 2rem;
+      display: none;
+    }
+    #loadingMessage { color: #FFD700; display: block; }
+    .toast-container {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 1000;
+    }
+    .toast {
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease-in-out;
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background-color: #22c55e; color: white; }
+    .toast.error { background-color: #ef4444; color: white; }
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #FFD700;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @media (max-width: 768px) {
+      .controls-container { flex-direction: column; align-items: stretch; }
+      .button-group { width: 100%; }
+    }
+  </style>
 </head>
 <body>
-    <video autoplay muted loop playsinline id="bg-video">
-        <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-    </video>
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
 
-    <div class="dashboard-card">
-        <h1 class="title">SmartCardLink vCard Client Dashboard</h1>
+  <div class="dashboard-card">
+    <h1 class="title">SmartCardLink vCard Client Dashboard</h1>
 
-        <div class="controls-container">
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search by name, phone, or email" />
-                <button id="searchBtn">Search</button>
-            </div>
-            <div class="button-group">
-                <select id="statusFilter">
-                    <option value="">All Statuses</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Processed">Processed</option>
-                    <option value="Active">Active</option>
-                    <option value="Disabled">Disabled</option>
-                    <option value="Deleted">Deleted</option>
-                </select>
-            </div>
-        </div>
-        
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Photo</th>
-                        <th>Full Name</th>
-                        <th>Company</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Date VCard Created</th>
-                        <th>Active Months</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="clientTableBody"></tbody>
-            </table>
-        </div>
-        
-        <div id="noResults" class="hidden">No results found.</div>
-        <div id="loadingMessage">Loading client data...</div>
+    <div class="controls-container">
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search by name, phone, or email" />
+        <button id="searchBtn">Search</button>
+      </div>
+      <div class="button-group">
+        <select id="statusFilter">
+          <option value="">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Processed">Processed</option>
+          <option value="Active">Active</option>
+          <option value="Disabled">Disabled</option>
+          <option value="Deleted">Deleted</option>
+        </select>
+        <button id="resetBtn">Reset Filters</button>
+      </div>
     </div>
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Photo</th>
+            <th>Full Name</th>
+            <th>Company</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Date VCard Created</th>
+            <th>Active Months</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="clientTableBody">
+          <tr>
+            <td colspan="9" id="loadingMessage">
+              <div class="loading-spinner"></div>
+              <p>Loading client data...</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="noResults" class="hidden">No results found.</div>
+  </div>
+  <div class="toast-container" id="toast-container"></div>
 
-    <div class="toast-container" id="toast-container"></div>
+  <script>
+    const API_BASE = window.SCL_CONFIG?.API_BASE || "http://localhost:8080";
 
-    <script>
-        const API_BASE = 'https://smartcardlink-app.fly.dev/api';
-        const clientTableBody = document.getElementById('clientTableBody');
-        const searchInput = document.getElementById('searchInput');
-        const statusFilter = document.getElementById('statusFilter');
-        const searchBtn = document.getElementById('searchBtn');
-        const noResultsMessage = document.getElementById('noResults');
-        const loadingMessage = document.getElementById('loadingMessage');
-        let allClients = [];
+    const clientTableBody = document.getElementById('clientTableBody');
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const searchBtn = document.getElementById('searchBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const noResultsMessage = document.getElementById('noResults');
+    const loadingMessage = document.getElementById('loadingMessage');
+    
+    const showToast = (message, type = 'info') => {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.getElementById('toast-container').appendChild(toast);
+      setTimeout(() => { toast.classList.add('show'); }, 10);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove());
+      }, 5000);
+    };
 
-        const showToast = (message, type = 'info') => {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerText = message;
-            document.getElementById('toast-container').appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                toast.addEventListener('transitionend', () => toast.remove());
-            }, 5000);
+    const renderTable = (clients) => {
+      clientTableBody.innerHTML = '';
+      if (!clients || clients.length === 0) {
+        noResultsMessage.style.display = 'block';
+        return;
+      }
+      noResultsMessage.style.display = 'none';
+      clients.forEach(client => {
+        const row = document.createElement('tr');
+        const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
+        const clientStatus = client.status || 'Pending';
+
+        const photoTd = document.createElement('td');
+        const photoImg = document.createElement('img');
+        photoImg.src = photoUrl;
+        photoImg.alt = `${client.fullName} photo`;
+        photoImg.className = 'client-photo';
+        photoImg.onerror = function() {
+          this.onerror = null;
+          this.src = 'https://placehold.co/50x50/111/fff?text=No+Photo';
         };
+        photoTd.appendChild(photoImg);
+        row.appendChild(photoTd);
 
-        const renderTable = (clients) => {
-            clientTableBody.innerHTML = '';
-            if (clients.length === 0) {
-                noResultsMessage.style.display = 'block';
-                return;
-            }
-            noResultsMessage.style.display = 'none';
+        const fullNameTd = document.createElement('td');
+        fullNameTd.textContent = client.fullName || 'N/A';
+        row.appendChild(fullNameTd);
 
-            clients.forEach(client => {
-                const row = document.createElement('tr');
-                const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
-                const clientStatus = client.status || 'Pending';
-                
-                row.innerHTML = `
-                    <td><img src="${photoUrl}" alt="${client.fullName} photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
-                    <td>${client.fullName || 'N/A'}</td>
-                    <td>${client.company || 'N/A'}</td>
-                    <td>${client.email1 || 'N/A'}</td>
-                    <td>${client.phone1 || 'N/A'}</td>
-                    <td>${client.vcardCreatedDate || 'N/A'}</td>
-                    <td>${client.activeMonths || 'N/A'}</td>
-                    <td><span class="status-badge status-${clientStatus.replace(/\s/g, '')}">${clientStatus}</span></td>
-                `;
-                clientTableBody.appendChild(row);
-            });
+        const companyTd = document.createElement('td');
+        companyTd.textContent = client.company || 'N/A';
+        row.appendChild(companyTd);
+
+        const emailTd = document.createElement('td');
+        emailTd.textContent = client.email1 || 'N/A';
+        row.appendChild(emailTd);
+
+        const phoneTd = document.createElement('td');
+        phoneTd.textContent = client.phone1 || 'N/A';
+        row.appendChild(phoneTd);
+
+        const createdDateTd = document.createElement('td');
+        createdDateTd.textContent = client.vcardCreatedDate || 'N/A';
+        row.appendChild(createdDateTd);
+
+        const activeMonthsTd = document.createElement('td');
+        activeMonthsTd.textContent = client.activeMonths || 'N/A';
+        row.appendChild(activeMonthsTd);
+
+        const statusTd = document.createElement('td');
+        const statusSpan = document.createElement('span');
+        statusSpan.className = `status-badge status-${clientStatus.replace(/\s/g, '')}`;
+        statusSpan.textContent = clientStatus;
+        statusTd.appendChild(statusSpan);
+        row.appendChild(statusTd);
+
+        const actionsTd = document.createElement('td');
+        const editButton = document.createElement('button');
+        editButton.textContent = 'View/Edit';
+        editButton.style.padding = '0.5rem 1rem';
+        editButton.onclick = () => {
+          window.location.href = `admin-form.html?id=${client._id}`;
         };
+        actionsTd.appendChild(editButton);
+        row.appendChild(actionsTd);
 
-        const filterClients = () => {
-            const searchTerm = searchInput.value.toLowerCase();
-            const selectedStatus = statusFilter.value;
+        clientTableBody.appendChild(row);
+      });
+    };
 
-            const filtered = allClients.filter(client => {
-                const matchesSearch = searchTerm === '' || 
-                    (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
-                    (client.email1 && client.email1.toLowerCase().includes(searchTerm)) ||
-                    (client.phone1 && client.phone1.toLowerCase().includes(searchTerm));
-                
-                const matchesStatus = selectedStatus === '' || client.status === selectedStatus;
-                
-                return matchesSearch && matchesStatus;
-            });
-            renderTable(filtered);
-        };
+    const debounce = (func, delay) => {
+      let timeoutId;
+      return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => { func.apply(this, args); }, delay);
+      };
+    };
 
-        const fetchClients = async () => {
-            loadingMessage.style.display = 'block';
-            try {
-                const response = await fetch(`${API_BASE}/clients/all`);
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to fetch clients.');
-                }
-                
-                allClients = data;
-                filterClients();
-                showToast('Client data loaded successfully!', 'success');
-            } catch (error) {
-                console.error('Fetch error:', error);
-                showToast(`Fetch error: ${error.message}`, 'error');
-                noResultsMessage.style.display = 'block';
-            } finally {
-                loadingMessage.style.display = 'none';
-            }
-        };
+    const fetchClients = async () => {
+      const searchTerm = searchInput.value;
+      const status = statusFilter.value;
+      loadingMessage.style.display = 'block';
+      clientTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #FFD700;">
+        <div class="loading-spinner"></div><p>Loading client data...</p></td></tr>`;
+      try {
+        const apiUrl = `${API_BASE}/api/clients/all?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(status)}`;
+        const response = await fetch(apiUrl);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Failed to fetch clients.');
+        renderTable(Array.isArray(result.data) ? result.data : []);
+        showToast('Client data loaded successfully!', 'success');
+      } catch (error) {
+        console.error('Fetch error:', error);
+        showToast(`Fetch error: ${error.message}`, 'error');
+        noResultsMessage.style.display = 'block';
+        clientTableBody.innerHTML = '';
+      } finally {
+        loadingMessage.style.display = 'none';
+      }
+    };
 
-        searchInput.addEventListener('input', filterClients);
-        statusFilter.addEventListener('change', filterClients);
-        searchBtn.addEventListener('click', filterClients);
+    const debouncedFetchClients = debounce(fetchClients, 300);
+    const resetFilters = () => { searchInput.value = ''; statusFilter.value = ''; fetchClients(); };
 
-        window.addEventListener('pageshow', fetchClients);
-    </script>
+    searchInput.addEventListener('input', debouncedFetchClients);
+    statusFilter.addEventListener('change', fetchClients);
+    searchBtn.addEventListener('click', fetchClients);
+    resetBtn.addEventListener('click', resetFilters);
+
+    document.addEventListener('DOMContentLoaded', fetchClients);
+  </script>
 </body>
 </html>

@@ -1,659 +1,541 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SmartCardLink Admin Form</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 1rem;
-            background: none;
-            position: relative;
-            color: white;
-        }
-        #bg-video {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            min-width: 100%;
-            min-height: 100%;
-            z-index: -100;
-            filter: brightness(0.4) saturate(1.2);
-            object-fit: cover;
-        }
-        .form-card {
-            background-color: #111;
-            border-radius: 1rem;
-            padding: 2rem;
-            width: 100%;
-            max-width: 750px;
-            border: 1px solid #333;
-            box-shadow: 0 0 20px rgba(0,0,0,0.4);
-            overflow-y: auto;
-        }
-        h1.title {
-            color: #FFD700;
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-        }
-        button, .file-input-label {
-            transition: background-color 0.3s, color 0.3s;
-            font-weight: 600;
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 1rem;
-            text-align: center;
-            border: 1px solid transparent;
-        }
-        .section-header {
-            background-color: #1f2937;
-            color: #FFD700;
-            padding: 0.5rem;
-            text-align: center;
-            border-radius: 0.375rem;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-        }
-        label {
-            color: white;
-            font-size: 0.9rem;
-            margin-bottom: 0.25rem;
-            display: block;
-        }
-        input, textarea {
-            width: 100%;
-            padding: 0.5rem;
-            border-radius: 0.375rem;
-            border: 1px solid #ccc;
-            resize: vertical;
-            box-sizing: border-box;
-            background-color: white;
-            color: black;
-        }
-        .grid-2col {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-        .top-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-        .top-buttons button {
-            flex: 1 1 45%;
-            margin-top: 0;
-        }
-        .action-button {
-            background-color: black;
-            color: white;
-            border: 1px solid #FFD700;
-        }
-        .action-button:hover {
-            background-color: #FFD700;
-            color: black;
-        }
-        .btn-view-pdf {
-            background-color: #fff;
-            color: black;
-            border: 1px solid #FFD700;
-        }
-        .btn-view-pdf:hover, .btn-view-pdf.pressed {
-            background-color: #2563eb;
-            color: white;
-            border-color: #2563eb;
-        }
-        .btn-create-vcard {
-            background-color: black;
-            color: white;
-            border: 1px solid #FFD700;
-        }
-        .btn-create-vcard:hover, .btn-create-vcard.pressed {
-            background-color: #22c55e;
-            color: white;
-            border-color: #22c55e;
-        }
-        .photo-upload-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        .photo-upload-container .url-input-container {
-            flex: 1;
-        }
-        .file-input-label {
-            background-color: #ef4444;
-            color: white;
-            border: none;
-            flex: 0 0 120px;
-            margin-top: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: 600;
-        }
-        .file-input-label:hover {
-            background-color: #3b82f6;
-            color: white;
-        }
-        #photoFile {
-            display: none;
-        }
-        .btn-save-info {
-            background-color: black;
-            color: white;
-            border: 1px solid #FFD700;
-        }
-        .btn-save-info:hover {
-            background-color: #FFD700;
-            color: black;
-        }
-        .toast-message {
-            position: fixed;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #FFD700;
-            color: black;
-            padding: 1rem 2rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            z-index: 1000;
-            display: none;
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: white;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 10px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        @media (min-width: 768px) {
-            .photo-upload-container {
-                flex-direction: row;
-                align-items: flex-end;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink Admin Form</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 1rem;
+      background: none;
+      position: relative;
+      color: white;
+    }
+    #bg-video {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      z-index: -100;
+      filter: brightness(0.4) saturate(1.2);
+      object-fit: cover;
+    }
+    .form-card {
+      background-color: #111;
+      border-radius: 1rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 750px;
+      border: 1px solid #333;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      overflow-y: auto;
+    }
+    h1.title {
+      color: #FFD700;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    button, .file-input-label {
+      transition: background-color 0.3s, color 0.3s;
+      font-weight: 600;
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+      text-align: center;
+      border: 1px solid transparent;
+    }
+    .section-header {
+      background-color: #1f2937;
+      color: #FFD700;
+      padding: 0.5rem;
+      text-align: center;
+      border-radius: 0.375rem;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    label {
+      color: white;
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 0.375rem;
+      border: 1px solid #ccc;
+      resize: vertical;
+      box-sizing: border-box;
+      background-color: white;
+      color: black;
+    }
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .top-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .top-buttons button {
+      flex: 1 1 45%;
+      margin-top: 0;
+    }
+    .action-button {
+      background-color: black;
+      color: white;
+      border: 1px solid #FFD700;
+    }
+    .action-button:hover {
+      background-color: #FFD700;
+      color: black;
+    }
+    .btn-view-pdf {
+      background-color: #fff;
+      color: black;
+      border: 1px solid #FFD700;
+    }
+    .btn-view-pdf:hover, .btn-view-pdf.pressed {
+      background-color: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+    .btn-create-vcard {
+      background-color: black;
+      color: white;
+      border: 1px solid #FFD700;
+    }
+    .btn-create-vcard:hover, .btn-create-vcard.pressed {
+      background-color: #22c55e;
+      color: white;
+      border-color: #22c55e;
+    }
+    .photo-upload-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .photo-upload-container .url-input-container {
+      flex: 1;
+    }
+    .file-input-label {
+      background-color: #ef4444;
+      color: white;
+      border: none;
+      flex: 0 0 120px;
+      margin-top: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 600;
+    }
+    .file-input-label:hover {
+      background-color: #3b82f6;
+      color: white;
+    }
+    #photoFile { display: none; }
+    .btn-save-info {
+      background-color: black;
+      color: white;
+      border: 1px solid #FFD700;
+    }
+    .btn-save-info:hover {
+      background-color: #FFD700;
+      color: black;
+    }
+    .toast-message {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #FFD700;
+      color: black;
+      padding: 1rem 2rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: none;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: white;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @media (min-width: 768px) {
+      .photo-upload-container {
+        flex-direction: row;
+        align-items: flex-end;
+      }
+    }
+  </style>
 </head>
 <body>
-    <video autoplay muted loop playsinline id="bg-video">
-        <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-    </video>
-    <div class="form-card">
-        <h1 class="title">SmartCardLink Admin Form</h1>
-        <div class="top-buttons">
-            <button id="view-pdf-btn" class="btn-view-pdf">View Client Info PDF</button>
-            <button id="create-vcard-btn" class="btn-create-vcard">Create vCard</button>
-        </div>
-        <form id="adminForm" autocomplete="off">
-            <div class="section-header">Personal Details</div>
-            <div class="grid-2col">
-                <div>
-                    <label for="fullName">Full Name</label>
-                    <input type="text" id="fullName" name="fullName" required />
-                </div>
-                <div>
-                    <label for="title">Title/Position</label>
-                    <input type="text" id="title" name="title" />
-                </div>
-            </div>
-            <div class="grid-2col">
-                <div>
-                    <label for="phone1">Phone Number 1 (Main/Default)</label>
-                    <input type="tel" id="phone1" name="phone1" required />
-                </div>
-                <div>
-                    <label for="phone2">Phone Number 2</label>
-                    <input type="tel" id="phone2" name="phone2" />
-                </div>
-            </div>
-            <div>
-                <label for="phone3">Phone Number 3</label>
-                <input type="tel" id="phone3" name="phone3" />
-            </div>
-            <div class="grid-2col">
-                <div>
-                    <label for="email1">Email 1 (Main/Default)</label>
-                    <input type="email" id="email1" name="email1" required />
-                </div>
-                <div>
-                    <label for="email2">Email 2</label>
-                    <input type="email" id="email2" name="email2" />
-                </div>
-            </div>
-            <div>
-                <label for="email3">Email 3</label>
-                <input type="email" id="email3" name="email3" />
-            </div>
-            <div class="section-header">Business Details</div>
-            <div class="grid-2col">
-                <div>
-                    <label for="companyName">Company Name</label>
-                    <input type="text" id="companyName" name="companyName" />
-                </div>
-                <div>
-                    <label for="businessWebsite">Business Website</label>
-                    <input type="url" id="businessWebsite" name="businessWebsite" />
-                </div>
-            </div>
-            <div class="grid-2col">
-                <div>
-                    <label for="portfolioWebsite">Portfolio Website</label>
-                    <input type="url" id="portfolioWebsite" name="portfolioWebsite" />
-                </div>
-                <div>
-                    <label for="locationMapUrl">Location Map URL</label>
-                    <input type="url" id="locationMapUrl" name="locationMapUrl" />
-                </div>
-            </div>
-            <div class="section-header">Photo Upload</div>
-            <div class="photo-upload-container">
-                <div class="url-input-container">
-                    <label for="photoUrl">Photo URL</label>
-                    <small style="color:#FFD700; display:block; margin-bottom:0.25rem;">
-                        (Auto-populated after a successful image upload)
-                    </small>
-                    <input type="url" id="photoUrl" name="photoUrl" readonly />
-                </div>
-                <label for="photoFile" id="photo-upload-label" class="file-input-label">
-                    Photo Upload
-                </label>
-                <input type="file" id="photoFile" accept="image/*" />
-            </div>
-            <div id="photo-preview-container" style="margin-top: 1rem; text-align: center; display: none;">
-                <img id="photo-preview" src="#" alt="Photo Preview" style="max-width: 150px; height: 150px; object-fit: cover; border-radius: 50%; border: 2px solid #FFD700;"/>
-            </div>
-            <div class="section-header">Working Hours</div>
-            <div class="grid-2col">
-                <div>
-                    <label for="monFriStart">Mon-Fri Start</label>
-                    <input type="time" id="monFriStart" name="monFriStart" value="08:00" />
-                </div>
-                <div>
-                    <label for="monFriEnd">Mon-Fri End</label>
-                    <input type="time" id="monFriEnd" name="monFriEnd" value="17:00" />
-                </div>
-                <div>
-                    <label for="satStart">Saturday Start</label>
-                    <input type="time" id="satStart" name="satStart" value="09:00" />
-                </div>
-                <div>
-                    <label for="satEnd">Saturday End</label>
-                    <input type="time" id="satEnd" name="satEnd" value="12:00" />
-                </div>
-                <div>
-                    <label for="sunStart">Sunday Start</label>
-                    <input type="time" id="sunStart" name="sunStart" value="" />
-                </div>
-                <div>
-                    <label for="sunEnd">Sunday End</label>
-                    <input type="time" id="sunEnd" name="sunEnd" value="" />
-                </div>
-            </div>
-            <div class="section-header">Social Links</div>
-            <div class="grid-2col">
-                <div>
-                    <label for="facebook">Facebook</label>
-                    <input type="url" id="facebook" name="facebook" />
-                </div>
-                <div>
-                    <label for="instagram">Instagram</label>
-                    <input type="url" id="instagram" name="instagram" />
-                </div>
-                <div>
-                    <label for="twitter">X (Twitter)</label>
-                    <input type="url" id="twitter" name="twitter" />
-                </div>
-                <div>
-                    <label for="linkedin">LinkedIn</label>
-                    <input type="url" id="linkedin" name="linkedin" />
-                </div>
-                <div>
-                    <label for="tiktok">TikTok</label>
-                    <input type="url" id="tiktok" name="tiktok" />
-                </div>
-                <div>
-                    <label for="youtube">YouTube</label>
-                    <input type="url" id="youtube" name="youtube" />
-                </div>
-            </div>
-            <div class="section-header">Bio</div>
-            <textarea id="bio" name="bio" rows="4"></textarea>
-            <div class="section-header">Address</div>
-            <input type="text" id="address" name="address" />
-            <button type="submit" id="save-btn" class="btn-save-info">Save Info</button>
-        </form>
-        <div id="toast-message" class="toast-message"></div>
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+  <div class="form-card">
+    <h1 class="title">SmartCardLink Admin Form</h1>
+    <div class="top-buttons">
+      <button id="view-pdf-btn" class="btn-view-pdf">View Client Info PDF</button>
+      <button id="create-vcard-btn" class="btn-create-vcard">Create vCard</button>
     </div>
-    <script>
-        const API_BASE = window.location.origin;
-        const API_URL = `${API_BASE}/api`;
-        const params = new URLSearchParams(window.location.search);
-        const clientId = params.get('id');
+    <form id="adminForm" autocomplete="off">
+      <div class="section-header">Personal Details</div>
+      <div class="grid-2col">
+        <div><label for="fullName">Full Name</label><input type="text" id="fullName" name="fullName" required /></div>
+        <div><label for="title">Title/Position</label><input type="text" id="title" name="title" /></div>
+      </div>
+      <div class="grid-2col">
+        <div><label for="phone1">Phone Number 1 (Main/Default)</label><input type="tel" id="phone1" name="phone1" required /></div>
+        <div><label for="phone2">Phone Number 2</label><input type="tel" id="phone2" name="phone2" /></div>
+      </div>
+      <div><label for="phone3">Phone Number 3</label><input type="tel" id="phone3" name="phone3" /></div>
+      <div class="grid-2col">
+        <div><label for="email1">Email 1 (Main/Default)</label><input type="email" id="email1" name="email1" required /></div>
+        <div><label for="email2">Email 2</label><input type="email" id="email2" name="email2" /></div>
+      </div>
+      <div><label for="email3">Email 3</label><input type="email" id="email3" name="email3" /></div>
 
-        const form = document.getElementById('adminForm');
-        const viewPdfBtn = document.getElementById('view-pdf-btn');
-        const createVcardBtn = document.getElementById('create-vcard-btn');
-        const photoUploadInput = document.getElementById('photoFile');
-        const photoUrlInput = document.getElementById('photoUrl');
-        const photoUploadLabel = document.getElementById('photo-upload-label');
-        const photoPreviewContainer = document.getElementById('photo-preview-container');
-        const photoPreview = document.getElementById('photo-preview');
-        const saveBtn = document.getElementById('save-btn');
-        const toastMessage = document.getElementById('toast-message');
+      <div class="section-header">Business Details</div>
+      <div class="grid-2col">
+        <div><label for="companyName">Company Name</label><input type="text" id="companyName" name="companyName" /></div>
+        <div><label for="businessWebsite">Business Website</label><input type="url" id="businessWebsite" name="businessWebsite" /></div>
+      </div>
+      <div class="grid-2col">
+        <div><label for="portfolioWebsite">Portfolio Website</label><input type="url" id="portfolioWebsite" name="portfolioWebsite" /></div>
+        <div><label for="locationMapUrl">Location Map URL</label><input type="url" id="locationMapUrl" name="locationMapUrl" /></div>
+      </div>
 
-        let isSaving = false;
+      <div class="section-header">Photo Upload</div>
+      <div class="photo-upload-container">
+        <div class="url-input-container">
+          <label for="photoUrl">Photo URL</label>
+          <small style="color:#FFD700; display:block; margin-bottom:0.25rem;">(Auto-populated after upload)</small>
+          <input type="url" id="photoUrl" name="photoUrl" readonly />
+        </div>
+        <label for="photoFile" id="photo-upload-label" class="file-input-label">Photo Upload</label>
+        <input type="file" id="photoFile" accept="image/*" />
+      </div>
+      <div id="photo-preview-container" style="margin-top: 1rem; text-align: center; display: none;">
+        <img id="photo-preview" src="#" alt="Photo Preview" style="max-width: 150px; height: 150px; object-fit: cover; border-radius: 50%; border: 2px solid #FFD700;"/>
+      </div>
 
-        const showToast = (message, isError = false) => {
-            toastMessage.textContent = message;
-            toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
-            toastMessage.style.color = isError ? 'white' : 'black';
-            toastMessage.style.display = 'block';
-            setTimeout(() => {
-                toastMessage.style.display = 'none';
-            }, 3000);
+      <div class="section-header">Working Hours</div>
+      <div class="grid-2col">
+        <div><label for="monFriStart">Mon-Fri Start</label><input type="time" id="monFriStart" name="monFriStart" value="08:00" /></div>
+        <div><label for="monFriEnd">Mon-Fri End</label><input type="time" id="monFriEnd" name="monFriEnd" value="17:00" /></div>
+        <div><label for="satStart">Saturday Start</label><input type="time" id="satStart" name="satStart" value="09:00" /></div>
+        <div><label for="satEnd">Saturday End</label><input type="time" id="satEnd" name="satEnd" value="12:00" /></div>
+        <div><label for="sunStart">Sunday Start</label><input type="time" id="sunStart" name="sunStart" /></div>
+        <div><label for="sunEnd">Sunday End</label><input type="time" id="sunEnd" name="sunEnd" /></div>
+      </div>
+
+      <div class="section-header">Social Links</div>
+      <div class="grid-2col">
+        <div><label for="facebook">Facebook</label><input type="url" id="facebook" name="facebook" /></div>
+        <div><label for="instagram">Instagram</label><input type="url" id="instagram" name="instagram" /></div>
+        <div><label for="twitter">X (Twitter)</label><input type="url" id="twitter" name="twitter" /></div>
+        <div><label for="linkedin">LinkedIn</label><input type="url" id="linkedin" name="linkedin" /></div>
+        <div><label for="tiktok">TikTok</label><input type="url" id="tiktok" name="tiktok" /></div>
+        <div><label for="youtube">YouTube</label><input type="url" id="youtube" name="youtube" /></div>
+      </div>
+
+      <div class="section-header">Bio</div>
+      <textarea id="bio" name="bio" rows="4"></textarea>
+
+      <div class="section-header">Address</div>
+      <input type="text" id="address" name="address" />
+
+      <button type="submit" id="save-btn" class="btn-save-info">Save Info</button>
+    </form>
+    <div id="toast-message" class="toast-message"></div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const API_URL = `${API_BASE}/api`;
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get('id');
+
+    const form = document.getElementById('adminForm');
+    const viewPdfBtn = document.getElementById('view-pdf-btn');
+    const createVcardBtn = document.getElementById('create-vcard-btn');
+    const photoUploadInput = document.getElementById('photoFile');
+    const photoUrlInput = document.getElementById('photoUrl');
+    const photoUploadLabel = document.getElementById('photo-upload-label');
+    const photoPreviewContainer = document.getElementById('photo-preview-container');
+    const photoPreview = document.getElementById('photo-preview');
+    const saveBtn = document.getElementById('save-btn');
+    const toastMessage = document.getElementById('toast-message');
+
+    let isSaving = false;
+
+    const showToast = (message, isError = false) => {
+      toastMessage.textContent = message;
+      toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
+      toastMessage.style.color = isError ? 'white' : 'black';
+      toastMessage.style.display = 'block';
+      setTimeout(() => { toastMessage.style.display = 'none'; }, 3000);
+    };
+
+    const populateForm = (data) => {
+      document.getElementById('fullName').value = data.fullName || '';
+      document.getElementById('title').value = data.title || '';
+      document.getElementById('phone1').value = data.phone1 || '';
+      document.getElementById('phone2').value = data.phone2 || '';
+      document.getElementById('phone3').value = data.phone3 || '';
+      document.getElementById('email1').value = data.email1 || '';
+      document.getElementById('email2').value = data.email2 || '';
+      document.getElementById('email3').value = data.email3 || '';
+
+      document.getElementById('companyName').value = data.company || '';
+      document.getElementById('businessWebsite').value = data.businessWebsite || '';
+      document.getElementById('portfolioWebsite').value = data.portfolioWebsite || '';
+      document.getElementById('locationMapUrl').value = data.locationMap || '';
+
+      if (data.photoUrl) {
+        photoUrlInput.value = data.photoUrl;
+        photoPreview.src = data.photoUrl;
+        photoPreviewContainer.style.display = 'block';
+        photoUploadLabel.textContent = 'Photo Uploaded';
+        photoUploadLabel.style.backgroundColor = '#22c55e';
+      }
+
+      if (data.workingHours) {
+        document.getElementById('monFriStart').value = data.workingHours.monFriStart || '';
+        document.getElementById('monFriEnd').value = data.workingHours.monFriEnd || '';
+        document.getElementById('satStart').value = data.workingHours.satStart || '';
+        document.getElementById('satEnd').value = data.workingHours.satEnd || '';
+        document.getElementById('sunStart').value = data.workingHours.sunStart || '';
+        document.getElementById('sunEnd').value = data.workingHours.sunEnd || '';
+      }
+
+      if (data.socialLinks) {
+        document.getElementById('facebook').value = data.socialLinks.facebook || '';
+        document.getElementById('instagram').value = data.socialLinks.instagram || '';
+        document.getElementById('twitter').value = data.socialLinks.twitter || '';
+        document.getElementById('linkedin').value = data.socialLinks.linkedin || '';
+        document.getElementById('tiktok').value = data.socialLinks.tiktok || '';
+        document.getElementById('youtube').value = data.socialLinks.youtube || '';
+      }
+
+      document.getElementById('bio').value = data.bio || '';
+      document.getElementById('address').value = data.address || '';
+    };
+
+    const fetchClientData = async (id) => {
+      try {
+        const response = await fetch(`${API_URL}/clients/${id}`);
+        if (!response.ok) throw new Error(`Failed to fetch client data for ID: ${id}`);
+        const data = await response.json();
+        populateForm(data);
+      } catch (error) {
+        console.error('Error fetching client data:', error);
+        showToast(`Error fetching data: ${error.message}`, true);
+      }
+    };
+
+    const uploadPhoto = async (file) => {
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('photo', file);
+      try {
+        photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
+        photoUploadLabel.style.backgroundColor = '#3b82f6';
+
+        const response = await fetch(`${API_URL}/upload-photo`, { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.message || 'Photo upload failed.');
+
+        const photoUrl = data.photoUrl;
+        photoUrlInput.value = photoUrl;
+        showToast('Photo uploaded successfully!');
+        photoPreview.src = photoUrl;
+        photoPreviewContainer.style.display = 'block';
+        photoUploadLabel.textContent = 'Photo Uploaded';
+        photoUploadLabel.style.backgroundColor = '#22c55e';
+        return photoUrl;
+      } catch (error) {
+        console.error('Photo upload error:', error);
+        showToast(`Photo upload failed: ${error.message}`, true);
+        photoUploadLabel.textContent = 'Photo Upload Failed';
+        photoUploadLabel.style.backgroundColor = '#ef4444';
+        return null;
+      }
+    };
+
+    window.onload = () => { if (clientId) fetchClientData(clientId); };
+
+    photoUploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          photoPreview.src = event.target.result;
+          photoPreviewContainer.style.display = 'block';
         };
+        reader.readAsDataURL(file);
+        await uploadPhoto(file);
+      }
+    });
 
-        const populateForm = (data) => {
-            document.getElementById('fullName').value = data.fullName || '';
-            document.getElementById('title').value = data.title || '';
-            document.getElementById('phone1').value = data.phone1 || '';
-            document.getElementById('phone2').value = data.phone2 || '';
-            document.getElementById('phone3').value = data.phone3 || '';
-            document.getElementById('email1').value = data.email1 || '';
-            document.getElementById('email2').value = data.email2 || '';
-            document.getElementById('email3').value = data.email3 || '';
-            
-            document.getElementById('companyName').value = data.company || '';
-            document.getElementById('businessWebsite').value = data.businessWebsite || '';
-            document.getElementById('portfolioWebsite').value = data.portfolioWebsite || '';
-            document.getElementById('locationMapUrl').value = data.locationMap || '';
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isSaving) return;
+      isSaving = true;
+      saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
+      saveBtn.disabled = true;
 
-            if (data.photoUrl) {
-                photoUrlInput.value = data.photoUrl;
-                photoPreview.src = data.photoUrl;
-                photoPreviewContainer.style.display = 'block';
-                photoUploadLabel.textContent = 'Photo Uploaded';
-                photoUploadLabel.style.backgroundColor = '#22c55e';
-            }
+      const formData = new FormData(form);
+      const payload = {};
+      for (const [key, value] of formData.entries()) {
+        if (value) payload[key] = value.trim();
+      }
 
-            if (data.workingHours) {
-                document.getElementById('monFriStart').value = data.workingHours.monFriStart || '';
-                document.getElementById('monFriEnd').value = data.workingHours.monFriEnd || '';
-                document.getElementById('satStart').value = data.workingHours.satStart || '';
-                document.getElementById('satEnd').value = data.workingHours.satEnd || '';
-                document.getElementById('sunStart').value = data.workingHours.sunStart || '';
-                document.getElementById('sunEnd').value = data.workingHours.sunEnd || '';
-            }
+      // Normalize companyName → company
+      if (payload.companyName) {
+        payload.company = payload.companyName;
+        delete payload.companyName;
+      }
 
-            if (data.socialLinks) {
-                document.getElementById('facebook').value = data.socialLinks.facebook || '';
-                document.getElementById('instagram').value = data.socialLinks.instagram || '';
-                document.getElementById('twitter').value = data.socialLinks.twitter || '';
-                document.getElementById('linkedin').value = data.socialLinks.linkedin || '';
-                document.getElementById('tiktok').value = data.socialLinks.tiktok || '';
-                document.getElementById('youtube').value = data.socialLinks.youtube || '';
-            }
+      const workingHours = {};
+      const socialLinks = {};
+      const workingHoursKeys = ['monFriStart','monFriEnd','satStart','satEnd','sunStart','sunEnd'];
+      const socialLinksKeys = ['facebook','instagram','twitter','linkedin','tiktok','youtube'];
 
-            document.getElementById('bio').value = data.bio || '';
-            document.getElementById('address').value = data.address || '';
-        };
+      for (const key of workingHoursKeys) {
+        if (payload[key] && payload[key] !== '--:--') {
+          workingHours[key] = payload[key];
+          delete payload[key];
+        }
+      }
+      for (const key of socialLinksKeys) {
+        if (payload[key]) {
+          socialLinks[key] = payload[key];
+          delete payload[key];
+        }
+      }
 
-        const fetchClientData = async (id) => {
-            try {
-                const response = await fetch(`${API_URL}/clients/${id}`);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch client data for ID: ${id}`);
-                }
-                const data = await response.json();
-                populateForm(data);
-                console.log(`Form populated with client data for ID: ${id}`);
-            } catch (error) {
-                console.error('Error fetching client data:', error);
-                showToast(`Error fetching data: ${error.message}`, true);
-            }
-        };
+      if (Object.keys(workingHours).length > 0) payload.workingHours = workingHours;
+      if (Object.keys(socialLinks).length > 0) payload.socialLinks = socialLinks;
 
-        const uploadPhoto = async (file) => {
-            if (!file) return;
+      try {
+        const url = clientId ? `${API_URL}/clients/${clientId}` : `${API_URL}/clients`;
+        const method = clientId ? 'PUT' : 'POST';
 
-            const formData = new FormData();
-            formData.append('photo', file);
-
-            try {
-                photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
-                photoUploadLabel.style.backgroundColor = '#3b82f6';
-
-                const response = await fetch(`${API_URL}/upload-photo`, {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    throw new Error('Photo upload failed on the server.');
-                }
-
-                const data = await response.json();
-                const photoUrl = data.photoUrl;
-                photoUrlInput.value = photoUrl;
-                showToast('Photo uploaded successfully!');
-                
-                photoPreview.src = photoUrl;
-                photoPreviewContainer.style.display = 'block';
-
-                photoUploadLabel.textContent = 'Photo Uploaded';
-                photoUploadLabel.style.backgroundColor = '#22c55e';
-                return photoUrl;
-            } catch (error) {
-                console.error('Photo upload error:', error);
-                showToast(`Photo upload failed: ${error.message}`, true);
-                photoUploadLabel.textContent = 'Photo Upload Failed';
-                photoUploadLabel.style.backgroundColor = '#ef4444';
-                return null;
-            }
-        };
-
-        window.onload = () => {
-            if (clientId) {
-                fetchClientData(clientId);
-            }
-        };
-
-        photoUploadInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    photoPreview.src = event.target.result;
-                    photoPreviewContainer.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-                await uploadPhoto(file);
-            }
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
         });
-        
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (isSaving) return;
-            isSaving = true;
-            saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
-            saveBtn.disabled = true;
 
-            const formData = new FormData(form);
-            const payload = {};
-            for (const [key, value] of formData.entries()) {
-                if (value) {
-                    payload[key] = value.trim();
-                }
-            }
-            
-            const workingHours = {};
-            const socialLinks = {};
-            const workingHoursKeys = ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'];
-            const socialLinksKeys = ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'];
+        if (!response.ok) throw new Error('Failed to save client info.');
 
-            for (const key of workingHoursKeys) {
-                if (payload[key] && payload[key] !== '--:--') {
-                    workingHours[key] = payload[key];
-                    delete payload[key];
-                }
-            }
-            for (const key of socialLinksKeys) {
-                if (payload[key]) {
-                    socialLinks[key] = payload[key];
-                    delete payload[key];
-                }
-            }
+        showToast('Client info saved successfully!');
+        const data = await response.json();
 
-            if (Object.keys(workingHours).length > 0) payload.workingHours = workingHours;
-            if (Object.keys(socialLinks).length > 0) payload.socialLinks = socialLinks;
+        if (!clientId && data.recordId) {
+          // FIX: redirect correctly
+          window.location.href = `admin-form.html?id=${data.recordId}`;
+        }
+      } catch (error) {
+        console.error('Save error:', error);
+        showToast(`Save failed: ${error.message}`, true);
+      } finally {
+        isSaving = false;
+        saveBtn.innerHTML = 'Save Info';
+        saveBtn.disabled = false;
+      }
+    });
 
-            try {
-                const url = clientId ? `${API_URL}/clients/${clientId}` : `${API_URL}/clients`;
-                const method = clientId ? 'PUT' : 'POST';
+    viewPdfBtn.addEventListener('click', async () => {
+      if (!clientId) return showToast('Please save client info first.', true);
+      viewPdfBtn.classList.add('pressed');
+      viewPdfBtn.innerHTML = 'Generating... <span class="spinner"></span>';
+      viewPdfBtn.disabled = true;
 
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                });
+      try {
+        const response = await fetch(`${API_URL}/clients/${clientId}/pdf`, { headers: { 'X-Origin-Dashboard': 'true' } });
+        if (response.ok) {
+          window.open(response.url, '_blank');
+          showToast('PDF opened successfully!');
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to retrieve PDF.');
+        }
+      } catch (error) {
+        console.error('PDF retrieval error:', error);
+        showToast(`PDF retrieval failed: ${error.message}`, true);
+      } finally {
+        viewPdfBtn.innerHTML = 'View Client Info PDF';
+        viewPdfBtn.classList.remove('pressed');
+        viewPdfBtn.disabled = false;
+      }
+    });
 
-                if (!response.ok) {
-                    throw new Error('Failed to save client info.');
-                }
-                
-                showToast('Client info saved successfully!');
-                
-                const data = await response.json();
-                if (!clientId && data.recordId) {
-                    window.location.href = `/admin?id=${data.recordId}`;
-                }
-                
-            } catch (error) {
-                console.error('Save error:', error);
-                showToast(`Save failed: ${error.message}`, true);
-            } finally {
-                isSaving = false;
-                saveBtn.innerHTML = 'Save Info';
-                saveBtn.disabled = false;
-            }
-        });
+    createVcardBtn.addEventListener('click', async () => {
+      if (!clientId) return showToast('Please save client info first.', true);
+      createVcardBtn.classList.add('pressed');
+      createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
+      createVcardBtn.disabled = true;
 
-        viewPdfBtn.addEventListener('click', async () => {
-            if (!clientId) {
-                showToast('Please save client info first.', true);
-                return;
-            }
-            
-            viewPdfBtn.classList.add('pressed');
-            viewPdfBtn.innerHTML = 'Generating... <span class="spinner"></span>';
-            viewPdfBtn.disabled = true;
+      try {
+        const response = await fetch(`${API_URL}/clients/${clientId}/vcard`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create vCard.');
+        }
+        const data = await response.json();
+        showToast('vCard and QR code created successfully! Email sent.', false);
 
-            try {
-                const response = await fetch(`${API_URL}/clients/${clientId}/pdf`, {
-                    headers: { 
-                        'X-Origin-Dashboard': 'true'
-                    }
-                });
-
-                if (response.ok) {
-                    window.open(response.url, '_blank');
-                    showToast('PDF opened successfully!');
-                } else {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to retrieve PDF.');
-                }
-            } catch (error) {
-                console.error('PDF retrieval error:', error);
-                showToast(`PDF retrieval failed: ${error.message}`, true);
-            } finally {
-                viewPdfBtn.innerHTML = 'View Client Info PDF';
-                viewPdfBtn.classList.remove('pressed');
-                viewPdfBtn.disabled = false;
-            }
-        });
-        
-        createVcardBtn.addEventListener('click', async () => {
-            if (!clientId) {
-                showToast('Please save client info first.', true);
-                return;
-            }
-            
-            createVcardBtn.classList.add('pressed');
-            createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
-            createVcardBtn.disabled = true;
-
-            try {
-                const response = await fetch(`${API_URL}/clients/${clientId}/vcard`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to create vCard or send email.');
-                }
-
-                const data = await response.json();
-                showToast('vCard and QR code created successfully! Email sent to client.', false);
-                
-                if (data.vcardUrl) {
-                    window.open(data.vcardUrl, '_blank');
-                }
-                if (data.qrCodeUrl) {
-                    const qrCodeWindow = window.open('', '_blank');
-                    qrCodeWindow.document.write(`
-                        <html>
-                        <head>
-                            <title>QR Code</title>
-                            <style>body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f0f0f0; }</style>
-                        </head>
-                        <body>
-                            <img src="${data.qrCodeUrl}" alt="QR Code" style="max-width: 90%; max-height: 90vh;">
-                        </body>
-                        </html>
-                    `);
-                    qrCodeWindow.document.close();
-                }
-                
-            } catch (error) {
-                console.error('vCard creation error:', error);
-                showToast(`vCard creation failed: ${error.message}`, true);
-            } finally {
-                createVcardBtn.innerHTML = 'Create vCard';
-                createVcardBtn.classList.remove('pressed');
-                createVcardBtn.disabled = false;
-            }
-        });
-    </script>
+        if (data.vcardUrl) window.open(data.vcardUrl, '_blank');
+        if (data.qrCodeUrl) {
+          const qrCodeWindow = window.open('', '_blank');
+          qrCodeWindow.document.write(`
+            <html><head><title>QR Code</title>
+            <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f0f0;}</style>
+            </head><body>
+              <img src="${data.qrCodeUrl}" alt="QR Code" style="max-width:90%;max-height:90vh;">
+            </body></html>
+          `);
+          qrCodeWindow.document.close();
+        }
+      } catch (error) {
+        console.error('vCard creation error:', error);
+        showToast(`vCard creation failed: ${error.message}`, true);
+      } finally {
+        createVcardBtn.innerHTML = 'Create vCard';
+        createVcardBtn.classList.remove('pressed');
+        createVcardBtn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-// dashboard.js - Full replacement for live testing
-const API_BASE = "http://localhost:5000";  // Use local server for testing CORS
-const ADMIN_FORM_PATH = "/AdminForm.html";
+// dashboard.js - Production-ready Admin Dashboard
+const API_BASE = window.SCL_CONFIG?.API_BASE || "http://localhost:8080";
+const ADMIN_FORM_PATH = "/admin-form.html";  // corrected path
 
 const $ = (sel) => document.querySelector(sel);
 const tbody = $('#clientTableBody');
@@ -41,7 +41,6 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
                    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
-
 function statusClassName(status) {
   if (!status) return 'status-pending';
   const s = status.toLowerCase();
@@ -52,11 +51,10 @@ function statusClassName(status) {
   return 'status-pending';
 }
 
-// --- Table row ---
+// --- Row creation ---
 function createRow(profile) {
   const tr = document.createElement('tr');
   tr.dataset.id = profile._id || '';
-
   const photoUrl = profile.photoUrl || 'https://via.placeholder.com/16x16.png';
   const fullName = profile.fullName || '-';
   const phone = profile.phone1 || profile.phone2 || profile.phone3 || '-';
@@ -81,29 +79,24 @@ function createRow(profile) {
   return tr;
 }
 
-// --- Button listeners ---
 function attachRowListeners(tr, profile) {
   if (!tr) return;
-
   const processBtn = tr.querySelector('.btn-process');
   if (processBtn) processBtn.onclick = () => {
     if (!profile) return showModal('Profile data missing.');
     const dataStr = encodeURIComponent(JSON.stringify(profile));
     window.open(`${ADMIN_FORM_PATH}?data=${dataStr}`, '_blank');
   };
-
   const disableBtn = tr.querySelector('.btn-disable');
   if (disableBtn) disableBtn.onclick = async () => {
     if (!profile._id) return showModal('Profile ID missing.');
     if (await showModal('Disable this profile?', true)) await updateStatus(profile._id, 'disabled');
   };
-
   const reactivateBtn = tr.querySelector('.btn-reactivate');
   if (reactivateBtn) reactivateBtn.onclick = async () => {
     if (!profile._id) return showModal('Profile ID missing.');
     if (await showModal('Reactivate this profile?', true)) await updateStatus(profile._id, 'approved');
   };
-
   const deleteBtn = tr.querySelector('.btn-delete');
   if (deleteBtn) deleteBtn.onclick = async () => {
     if (!profile._id) return showModal('Profile ID missing.');
@@ -111,7 +104,6 @@ function attachRowListeners(tr, profile) {
   };
 }
 
-// --- Update status ---
 async function updateStatus(id, status) {
   try {
     const res = await fetch(`${API_BASE}/api/profiles/${id}`, {
@@ -119,42 +111,36 @@ async function updateStatus(id, status) {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error('Failed to update status');
-    const updated = await res.json();
-    profilesCache = profilesCache.map(p => p._id === id ? (updated.profile || {...p, status}) : p);
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || 'Failed to update status');
+    profilesCache = profilesCache.map(p => p._id === id ? (result.profile || {...p, status}) : p);
     filterAndRender(searchInput.value.trim());
-  } catch (err) {
-    showModal('Error updating status. Check console.');
-    console.error(err);
-  }
+  } catch (err) { showModal('Error updating status.'); console.error(err); }
 }
 
-// --- Delete profile ---
 async function deleteProfile(id) {
   try {
     const res = await fetch(`${API_BASE}/api/profiles/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete profile');
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || 'Failed to delete profile');
     profilesCache = profilesCache.filter(p => p._id !== id);
     filterAndRender(searchInput.value.trim());
+  } catch (err) { showModal('Error deleting profile.'); console.error(err); }
+}
+
+async function fetchProfiles() {
+  try {
+    const res = await fetch(`${API_BASE}/api/profiles`);
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || `Failed to fetch profiles (${res.status})`);
+    profilesCache = Array.isArray(result.data) ? result.data : [];
+    filterAndRender('');
   } catch (err) {
-    showModal('Error deleting profile. Check console.');
+    showModal('Failed to fetch profiles.');
     console.error(err);
   }
 }
 
-// --- Refresh client photo ---
-async function refreshClientPhoto(clientId) {
-  try {
-    const res = await fetch(`${API_BASE}/api/profiles/${clientId}`);
-    const data = await res.json();
-    const imgEl = document.getElementById(`client-photo-${clientId}`);
-    if(imgEl && data.photoUrl) imgEl.src = data.photoUrl;
-  } catch(err) {
-    console.error("Failed to refresh client photo:", err);
-  }
-}
-
-// --- Render table ---
 function renderTable(profiles) {
   tbody.innerHTML = '';
   if (!profiles || profiles.length === 0) {
@@ -162,16 +148,9 @@ function renderTable(profiles) {
     return;
   }
   noResults.style.display = 'none';
-  profiles.sort((a, b) => {
-    const aPending = a.status.toLowerCase() === 'pending' ? 0 : 1;
-    const bPending = b.status.toLowerCase() === 'pending' ? 0 : 1;
-    if (aPending !== bPending) return aPending - bPending;
-    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-  });
   profiles.forEach(profile => tbody.appendChild(createRow(profile)));
 }
 
-// --- Search filter ---
 function filterAndRender(query) {
   if (!query) filteredProfiles = [...profilesCache];
   else {
@@ -190,48 +169,19 @@ function filterAndRender(query) {
   renderTable(filteredProfiles);
 }
 
-// --- Fetch profiles ---
-async function fetchProfiles() {
-  try {
-    const res = await fetch(`${API_BASE}/api/profiles`);
-    if (!res.ok) throw new Error(`Failed to fetch profiles (${res.status})`);
-    const data = await res.json();
-    profilesCache = Array.isArray(data) ? data : [];
-    filterAndRender('');
-  } catch (err) {
-    showModal('Failed to fetch profiles. Check console.');
-    console.error(err);
-  }
-}
-
-// --- Export CSV ---
 function exportCSV() {
   if (!filteredProfiles.length) return showModal('No data to export.');
   const headers = ['_id','fullName','phone1','email1','company','status','createdAt'];
-  const csvRows = [
-    headers.join(','),
-    ...filteredProfiles.map(p => headers.map(h => {
-      let val = p[h] || '';
-      if (typeof val === 'string' && val.includes(',')) val = `"${val.replace(/"/g,'""')}"`;
-      return val;
-    }).join(','))
-  ];
-  const csvString = csvRows.join('\n');
-  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const csvRows = [ headers.join(','), ...filteredProfiles.map(p=> headers.map(h=>p[h]||'').join(',')) ];
+  const blob = new Blob([csvRows.join('\n')], { type:'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `smartcardlink_clients_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = `clients_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-// --- Event listeners ---
-searchBtn.addEventListener('click', () => filterAndRender(searchInput.value.trim()));
-searchInput.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); filterAndRender(searchInput.value.trim()); } });
+searchBtn.addEventListener('click', ()=> filterAndRender(searchInput.value.trim()));
+searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); filterAndRender(searchInput.value.trim()); } });
 exportBtn.addEventListener('click', exportCSV);
 
-// --- Init ---
 fetchProfiles();

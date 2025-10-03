@@ -182,48 +182,69 @@
             border-radius: 0.375rem;
             font-weight: 600;
         }
-        .notes-container {
-            background-color: #1a1a1a;
-            border-radius: 0.5rem;
-            padding: 1rem;
+        /* Modal styles */
+        .modal {
             display: none;
-            flex-direction: column;
-            gap: 1rem;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding-top: 50px;
         }
-        .notes-list {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #444;
-            border-radius: 0.5rem;
-            padding: 0.5rem;
+        .modal-content {
+            background-color: #1a1a1a;
+            margin: 5% auto;
+            padding: 2rem;
+            border: 1px solid #333;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 1rem;
+            position: relative;
+            animation: modalFadeIn 0.3s ease-in-out;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+        }
+        .close-btn:hover,
+        .close-btn:focus {
+            color: #FFD700;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .modal h2 {
+            color: #FFD700;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .modal textarea {
+            width: 100%;
+            height: 150px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+            border: 1px solid #555;
+            border-radius: 0.375rem;
             background-color: #222;
-        }
-        .note-item {
-            border-bottom: 1px solid #444;
-            padding-bottom: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-        .note-item:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-        }
-        .note-timestamp {
-            font-size: 0.75rem;
-            color: #999;
-        }
-        .notes-input-area {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .notes-save-btn {
-            background-color: black;
             color: white;
-            border: 1px solid #FFD700;
+            resize: vertical;
         }
-        .notes-save-btn:hover {
-            background-color: #FFD700;
-            color: black;
+        .modal button {
+            width: 100%;
         }
         .toast-container {
             position: fixed;
@@ -301,20 +322,20 @@
             </table>
         </div>
         
-        <div id="notesSection" class="notes-container">
-            <h2 class="section-header">Client Notes</h2>
-            <div id="notesList" class="notes-list"></div>
-            <div class="notes-input-area">
-                <textarea id="notesTextarea" placeholder="Add a new note..."></textarea>
-                <button id="saveNoteBtn">Save Note</button>
-            </div>
-        </div>
     </div>
     
+    <div id="notesModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modalTitle">Reason for Action</h2>
+            <textarea id="modalTextarea" placeholder="Please provide a reason for this action (e.g., 'Duplicate entry', 'Client requested deactivation')."></textarea>
+            <button id="modalConfirmBtn">Confirm</button>
+        </div>
+    </div>
     <div class="toast-container" id="toast-container"></div>
 
     <script>
-        const API_BASE_URL = 'https://smartcardlink-flyio-fallback.fly.dev/api';
+        const API_BASE_URL = window.SCL_CONFIG.API_BASE;
         
         // DOM Elements
         const clientTableBody = document.getElementById('clientTableBody');
@@ -322,14 +343,15 @@
         const statusFilter = document.getElementById('statusFilter');
         const searchBtn = document.getElementById('searchBtn');
         const refreshBtn = document.getElementById('refreshBtn');
-        const notesSection = document.getElementById('notesSection');
-        const notesList = document.getElementById('notesList');
-        const notesTextarea = document.getElementById('notesTextarea');
-        const saveNoteBtn = document.getElementById('saveNoteBtn');
         const toastContainer = document.getElementById('toast-container');
         
+        const notesModal = document.getElementById('notesModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalTextarea = document.getElementById('modalTextarea');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const modalCloseBtn = document.querySelector('.close-btn');
+
         let allClients = [];
-        let selectedClientId = null;
         
         // --- Helper Functions ---
 
@@ -365,9 +387,6 @@
             clients.forEach(client => {
                 const row = document.createElement('tr');
                 row.dataset.clientId = client._id;
-                if (client._id === selectedClientId) {
-                    row.classList.add('selected');
-                }
 
                 const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
                 const clientStatus = client.status || 'Pending';
@@ -376,14 +395,14 @@
                 if (clientStatus === 'Pending') {
                     actionsHtml += `<button class="btn-action-process" onclick="processClient('${client._id}')">Process</button>`;
                 }
-                if (clientStatus === 'Active') {
-                    actionsHtml += `<button class="btn-action-disable" onclick="updateStatus('${client._id}', 'Disabled')">Disable</button>`;
+                if (clientStatus === 'Active' || clientStatus === 'Processed') {
+                    actionsHtml += `<button class="btn-action-disable" onclick="showStatusModal('${client._id}', 'Disabled')">Disable</button>`;
                 }
-                if (clientStatus === 'Disabled' || clientStatus === 'Processed') {
-                    actionsHtml += `<button class="btn-action-reactivate" onclick="updateStatus('${client._id}', 'Active')">Reactivate</button>`;
+                if (clientStatus === 'Disabled') {
+                    actionsHtml += `<button class="btn-action-reactivate" onclick="showStatusModal('${client._id}', 'Active')">Reactivate</button>`;
                 }
                 if (clientStatus !== 'Deleted') {
-                    actionsHtml += `<button class="btn-action-delete" onclick="updateStatus('${client._id}', 'Deleted')">Delete</button>`;
+                    actionsHtml += `<button class="btn-action-delete" onclick="showDeleteModal('${client._id}')">Delete</button>`;
                 }
 
                 row.innerHTML = `
@@ -395,49 +414,34 @@
                     <td class="actions-cell">${actionsHtml}</td>
                 `;
                 
-                row.addEventListener('click', (event) => {
-                    // Prevent row selection when clicking action buttons
-                    if (event.target.tagName !== 'BUTTON') {
-                        selectClient(client._id);
-                    }
-                });
-                
                 clientTableBody.appendChild(row);
             });
         };
         
         /**
-         * Filters the allClients array based on search and status inputs and then renders the table.
+         * Fetches filtered client data from the API.
          */
-        const filterClients = () => {
-            const searchTerm = filterInput.value.toLowerCase();
+        const fetchFilteredClients = async () => {
+            const searchTerm = filterInput.value.trim();
             const selectedStatus = statusFilter.value;
             
-            const filtered = allClients.filter(client => {
-                const matchesSearch = searchTerm === '' || 
-                    (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
-                    (client.email1 && client.email1.toLowerCase().includes(searchTerm)) ||
-                    (client.phone1 && client.phone1.toLowerCase().includes(searchTerm));
-                
-                const matchesStatus = selectedStatus === '' || client.status === selectedStatus;
-                
-                return matchesSearch && matchesStatus;
-            });
-            renderTable(filtered);
-        };
-        
-        /**
-         * Fetches all client data from the API.
-         */
-        const fetchClients = async () => {
             clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading client data...</td></tr>';
+            
+            const url = new URL(`${API_BASE_URL}/api/admin/clients`);
+            if (searchTerm) {
+                url.searchParams.append('q', searchTerm);
+            }
+            if (selectedStatus) {
+                url.searchParams.append('status', selectedStatus);
+            }
+
             try {
-                const response = await fetch(`${API_BASE_URL}/clients`);
+                const response = await fetch(url.toString());
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Failed to fetch clients.');
                 
                 allClients = data;
-                filterClients();
+                renderTable(allClients);
                 showToast('Client data loaded successfully!');
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -447,29 +451,24 @@
         };
 
         /**
-         * Updates the status of a specific client on the server and locally.
+         * Updates the status of a specific client on the server.
          * @param {string} clientId The ID of the client to update.
          * @param {string} newStatus The new status to set.
+         * @param {string} notes The reason for the status change.
          */
-        const updateStatus = async (clientId, newStatus) => {
+        const updateClientStatus = async (clientId, newStatus, notes) => {
             try {
-                const response = await fetch(`${API_BASE_URL}/clients/${clientId}/status/${newStatus}`, {
-                    method: 'PUT'
+                const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/status/${newStatus}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
                 });
                 
                 if (!response.ok) throw new Error('Failed to update status.');
                 
-                // Update the local state
-                const clientToUpdate = allClients.find(client => client._id === clientId);
-                if (clientToUpdate) {
-                    clientToUpdate.status = newStatus;
-                    filterClients(); // Re-render the table with the updated data
-                    if (newStatus === 'Deleted') {
-                        selectClient(null); // Unselect the client if it's deleted
-                    }
-                }
-                
                 showToast(`Client status updated to '${newStatus}'.`);
+                hideModal();
+                fetchFilteredClients();
             } catch (error) {
                 console.error("Error updating status:", error);
                 showToast(`Failed to update status: ${error.message}`, 'error');
@@ -477,107 +476,93 @@
         };
 
         /**
-         * Fetches and renders the notes for the currently selected client.
+         * Deletes a client on the server.
+         * @param {string} clientId The ID of the client to delete.
+         * @param {string} notes The reason for the deletion.
          */
-        const renderNotes = async () => {
-            notesList.innerHTML = '';
-            if (!selectedClientId) {
-                notesSection.style.display = 'none';
-                return;
-            }
-            
-            notesSection.style.display = 'flex';
-            
+        const deleteClient = async (clientId, notes) => {
             try {
-                const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`);
-                
-                if (!response.ok) throw new Error('Failed to fetch notes.');
-                
-                const notes = await response.json();
-                notes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                
-                notes.forEach(note => {
-                    const noteItem = document.createElement('div');
-                    noteItem.classList.add('note-item');
-                    const date = new Date(note.timestamp);
-                    const formattedDate = date.toLocaleString();
-                    noteItem.innerHTML = `
-                        <div class="note-timestamp">${formattedDate}</div>
-                        <div class="note-text">${note.text}</div>
-                    `;
-                    notesList.appendChild(noteItem);
+                const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
                 });
+
+                if (!response.ok) throw new Error('Failed to delete client.');
+                
+                showToast('Client deleted successfully.');
+                hideModal();
+                fetchFilteredClients();
             } catch (error) {
-                console.error("Error fetching notes:", error);
-                showToast("Failed to load notes.", 'error');
+                console.error("Error deleting client:", error);
+                showToast(`Failed to delete client: ${error.message}`, 'error');
             }
         };
         
         /**
-         * Manages the selection of a client row.
-         * @param {string} clientId The ID of the client to select, or null to unselect.
+         * Shows the notes modal for a status update.
+         * @param {string} clientId The ID of the client.
+         * @param {string} newStatus The new status.
          */
-        const selectClient = (clientId) => {
-            const allRows = document.querySelectorAll('tbody tr');
-            allRows.forEach(row => row.classList.remove('selected'));
-            
-            if (selectedClientId === clientId) {
-                selectedClientId = null;
-                notesSection.style.display = 'none';
-            } else {
-                selectedClientId = clientId;
-                const selectedRow = document.querySelector(`tr[data-client-id="${clientId}"]`);
-                if (selectedRow) {
-                    selectedRow.classList.add('selected');
+        const showStatusModal = (clientId, newStatus) => {
+            modalTitle.innerText = `Reason for ${newStatus} Action`;
+            modalConfirmBtn.onclick = () => {
+                const notes = modalTextarea.value.trim();
+                if (notes === '') {
+                    showToast('A reason is required.', 'error');
+                    return;
                 }
-                renderNotes();
-            }
+                updateClientStatus(clientId, newStatus, notes);
+            };
+            modalTextarea.value = '';
+            notesModal.style.display = 'block';
+        };
+
+        /**
+         * Shows the notes modal for a client deletion.
+         * @param {string} clientId The ID of the client.
+         */
+        const showDeleteModal = (clientId) => {
+            modalTitle.innerText = `Reason for Deleting Client`;
+            modalConfirmBtn.onclick = () => {
+                const notes = modalTextarea.value.trim();
+                if (notes === '') {
+                    showToast('A reason is required.', 'error');
+                    return;
+                }
+                deleteClient(clientId, notes);
+            };
+            modalTextarea.value = '';
+            notesModal.style.display = 'block';
+        };
+
+        /**
+         * Hides the notes modal.
+         */
+        const hideModal = () => {
+            notesModal.style.display = 'none';
         };
 
         // --- Event Handlers ---
-
         const processClient = (clientId) => {
             window.open(`/admin_form.html?id=${clientId}`, '_blank');
         };
         
         // --- Event Listeners ---
-        filterInput.addEventListener('input', filterClients);
-        statusFilter.addEventListener('change', filterClients);
-        searchBtn.addEventListener('click', filterClients);
-        refreshBtn.addEventListener('click', fetchClients);
+        searchBtn.addEventListener('click', fetchFilteredClients);
+        refreshBtn.addEventListener('click', fetchFilteredClients);
+        statusFilter.addEventListener('change', fetchFilteredClients);
         
-        saveNoteBtn.addEventListener('click', async () => {
-            const noteText = notesTextarea.value.trim();
-            if (noteText === '') {
-                showToast('Note cannot be empty.', 'error');
-                return;
-            }
-            
-            if (!selectedClientId) {
-                showToast('Please select a client first.', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/clients/${selectedClientId}/notes`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: noteText })
-                });
-                
-                if (!response.ok) throw new Error('Failed to save note.');
-                
-                notesTextarea.value = '';
-                showToast('Note saved successfully!');
-                renderNotes();
-            } catch (error) {
-                console.error("Error saving note:", error);
-                showToast(`Failed to save note: ${error.message}`, 'error');
+        // Hide modal on close button click or outside click
+        modalCloseBtn.addEventListener('click', hideModal);
+        window.addEventListener('click', (event) => {
+            if (event.target === notesModal) {
+                hideModal();
             }
         });
         
         // Initial setup
-        document.addEventListener('DOMContentLoaded', fetchClients);
+        document.addEventListener('DOMContentLoaded', fetchFilteredClients);
     </script>
 </body>
 </html>
