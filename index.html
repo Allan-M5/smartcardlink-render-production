@@ -4,8 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SmartCardLink Clients</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Content Security Policy allowing Google Fonts, backend API, and self styles -->
+  <meta http-equiv="Content-Security-Policy"
+    content="
+      default-src 'self';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' https://your-backend-api.com;
+      img-src 'self' data: https://res.cloudinary.com;
+      script-src 'self' 'unsafe-inline';
+    "
+  />
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Local CSS -->
   <link rel="stylesheet" href="style.css" />
+
   <style>
     /* Popup overlay */
     #popup-container {
@@ -19,18 +36,12 @@
       z-index: 9999;
     }
     #popup-container.hidden { display: none; }
-    .popup-content {
-      width: 90%;
-      max-width: 500px;
-    }
+    .popup-content { width: 90%; max-width: 500px; }
   </style>
 </head>
 <body>
-  <div id="clients-container">
-    <!-- Dynamic client list will be inserted here if needed -->
-  </div>
+  <div id="clients-container"></div>
 
-  <!-- Popup container for popup1 & popup2 -->
   <div id="popup-container" class="hidden">
     <div id="popup-content" class="popup-content"></div>
   </div>
@@ -38,22 +49,19 @@
   <script>
     const API_BASE_URL = window.SCL_CONFIG?.API_BASE || "https://your-backend-api.com";
 
-    // Utility: fetch client by ID or first available
     async function fetchClient(clientId) {
       try {
         const url = clientId ? `${API_BASE_URL}/clients/${clientId}` : `${API_BASE_URL}/clients/all`;
         const res = await fetch(url);
         const data = await res.json();
         if (!res.ok || !data) return null;
-        if (Array.isArray(data)) return data[0]; // fallback: first client
-        return data;
+        return Array.isArray(data) ? data[0] : data;
       } catch (err) {
         console.error("Error fetching client:", err);
         return null;
       }
     }
 
-    // Show popup1
     function showPopup1(client) {
       if (!client) return;
       const photo = client.photoUrl || 'https://via.placeholder.com/150';
@@ -74,12 +82,9 @@
       `;
       document.getElementById("popup-container").classList.remove("hidden");
 
-      document.getElementById("more-info-btn").addEventListener("click", () => {
-        showPopup2(client);
-      });
+      document.getElementById("more-info-btn").addEventListener("click", () => showPopup2(client));
     }
 
-    // Show popup2 (uses popup2.html structure dynamically)
     function showPopup2(client) {
       if (!client) return;
 
@@ -89,7 +94,7 @@
       const email = client.email || "Not provided";
       const address = client.address || "Not provided";
 
-      // Socials dynamically
+      // Social buttons
       const socialPlatforms = ['facebook','instagram','twitter','linkedin','tiktok','youtube'];
       const socialButtons = socialPlatforms
         .filter(p => client[p])
@@ -101,7 +106,7 @@
       const mapBtn = client.locationMap ? `<button onclick="window.open('${client.locationMap}','_blank')">View Location</button>` : '';
       const scheduleBtn = client.calendar || client.schedule ? `<button onclick="window.open('${client.calendar || client.schedule}','_blank')">Schedule Appointment</button>` : '';
 
-      // Working hours table
+      // Working hours
       const workingHours = client.workingHours || {};
       let whTable = '<table id="working-hours-table" style="display:none;width:90%;margin:10px auto;background:rgba(255,255,0,0.3);border-collapse:collapse;color:white;"><tr><th>Day</th><th>Hours</th></tr>';
       Object.entries(workingHours).forEach(([day,hours]) => {
@@ -136,30 +141,23 @@
         </div>
       `;
 
-      // Back button
-      document.getElementById("back-btn").addEventListener("click", () => {
-        showPopup1(client);
-      });
+      document.getElementById("back-btn").addEventListener("click", () => showPopup1(client));
 
-      // Working hours toggle
       const whBtn = document.getElementById('working-hours-btn');
       const whTableEl = document.getElementById('working-hours-table');
-      whBtn.addEventListener('click', (e) => {
+      whBtn.addEventListener('click', e => {
         e.stopPropagation();
         whTableEl.style.display = whTableEl.style.display === 'none' ? 'table' : 'none';
       });
-      document.addEventListener('click', (e) => {
+      document.addEventListener('click', e => {
         if (!whBtn.contains(e.target) && !whTableEl.contains(e.target)) whTableEl.style.display = 'none';
       });
 
       // DateTime updater
       const dtEl = document.getElementById('datetime');
-      setInterval(() => {
-        dtEl.textContent = new Date().toLocaleString();
-      }, 1000);
+      setInterval(() => dtEl.textContent = new Date().toLocaleString(), 1000);
     }
 
-    // Initialize: fetch first client or dynamic ID
     document.addEventListener("DOMContentLoaded", async () => {
       const clientId = new URLSearchParams(window.location.search).get('id');
       const client = await fetchClient(clientId);
