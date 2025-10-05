@@ -146,16 +146,19 @@
   <h1 class="title">SmartCardLink Client Form</h1>
 
   <form id="clientForm" autocomplete="off">
-    <!-- all your form fields remain exactly the same -->
-    <!-- … (unchanged fields) … -->
+    <!-- Your existing form fields -->
     <button type="submit">Submit Form</button>
   </form>
 
   <div class="form-message" id="formMessage"></div>
 </div>
 
+<!-- ✅ Inject backend base URL -->
 <script>
-  // Use dynamic API base (respects environment or fallback to localhost:8080)
+  window.SCL_CONFIG = { API_BASE: "https://smartcardlink-flyio.fly.dev" };
+</script>
+
+<script>
   const API_BASE_URL = window.SCL_CONFIG?.API_BASE || "http://localhost:8080";
 
   const form = document.getElementById("clientForm");
@@ -171,7 +174,6 @@
     const formData = new FormData(form);
     const payload = Object.fromEntries(formData.entries());
 
-    // Build socialLinks & workingHours properly
     payload.socialLinks = {};
     ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k=>{
       if(formData.get(k)) payload.socialLinks[k]=formData.get(k).trim();
