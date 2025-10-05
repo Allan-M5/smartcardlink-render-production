@@ -77,11 +77,13 @@
                         return res.text();
                     })
                     .then(html => {
-                        document.getElementById(id).innerHTML = html;
+                        const el = document.getElementById(id);
+                        if (el) el.innerHTML = html;
                     })
                     .catch(err => console.error(`Error loading ${file}:`, err));
             };
 
+            // Load fragment placeholders as quick initial content (fragments may contain static fallback/dummy markup)
             loadSection('header-placeholder', 'popup1/popup1-header.html');
             loadSection('profile-placeholder', 'popup1/popup1-profile.html');
             loadSection('name-business-title-placeholder', 'popup1/popup1-name-business-title.html');
@@ -89,21 +91,41 @@
             loadSection('buttons-placeholder', 'popup1/popup1-buttons.html');
             loadSection('moreinfo-placeholder', 'popup1/popup1-moreinfo.html');
 
+            // Keep existing fragment click behavior (phone/email toggles, open more info)
             document.addEventListener('click', e => {
                 if (e.target.classList.contains('phone-expand-btn')) {
-                    const extraList = e.target.closest('.contact-box').querySelector('.contact-extra-list');
-                    extraList.classList.toggle('open');
+                    const extraList = e.target.closest('.contact-box')?.querySelector('.contact-extra-list');
+                    if (extraList) extraList.classList.toggle('open');
                 }
                 if (e.target.classList.contains('email-expand-btn')) {
-                    const extraList = e.target.closest('.contact-box').querySelector('.email-extra-list');
-                    extraList.classList.toggle('open');
+                    const extraList = e.target.closest('.contact-box')?.querySelector('.email-extra-list');
+                    if (extraList) extraList.classList.toggle('open');
                 }
                 if (e.target.classList.contains('more-info-btn')) {
                     e.preventDefault();
-                    window.location.href = 'popup2.html';
+                    // fade-out existing popup then navigate to popup2 (preserves query param if present)
+                    const popupContainer = document.querySelector('.popup-container');
+                    if (popupContainer) {
+                        popupContainer.style.transition = 'opacity 0.5s ease';
+                        popupContainer.style.opacity = '0';
+                        setTimeout(() => {
+                            const params = new URLSearchParams(window.location.search);
+                            const key = params.get('id') || params.get('slug') || '';
+                            const param = key ? `?id=${encodeURIComponent(key)}` : '';
+                            window.location.href = `popup2.html${param}`;
+                        }, 500);
+                    } else {
+                        const params = new URLSearchParams(window.location.search);
+                        const key = params.get('id') || params.get('slug') || '';
+                        const param = key ? `?id=${encodeURIComponent(key)}` : '';
+                        window.location.href = `popup2.html${param}`;
+                    }
                 }
             });
         });
     </script>
+
+    <!-- IMPORTANT: include popup1 script so index (/) runs the same dynamic population logic as popup1.html -->
+    <script src="popup1/popup1-script.js"></script>
 </body>
 </html>
