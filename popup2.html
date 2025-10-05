@@ -126,42 +126,27 @@
   </style>
 </head>
 <body>
-  <div class="popup-container">
-    <h2>More About Me</h2>
+  <div class="popup-container" id="popup2-container">
+    <h2 id="popup2-name">More About Me</h2>
     <h3>BIO</h3>
-    <p>Hello, I am Jane Doe, a digital strategist and designer at SmartCardLink, passionate about creating seamless digital experiences for businesses and individuals.</p>
+    <p id="popup2-bio">Loading...</p>
 
-    <div class="popup-buttons">
-      <button class="facebook" onclick="window.open('https://facebook.com','_blank')">Facebook</button>
-      <button class="instagram" onclick="window.open('https://instagram.com','_blank')">Instagram</button>
-      <button class="twitter" onclick="window.open('https://x.com','_blank')">X (Twitter)</button>
-      <button class="linkedin" onclick="window.open('https://linkedin.com','_blank')">LinkedIn</button>
-      <button class="tiktok" onclick="window.open('https://tiktok.com','_blank')">TikTok</button>
-      <button class="youtube" onclick="window.open('https://youtube.com','_blank')">YouTube</button>
+    <div class="popup-buttons" id="popup2-socials">
+      <!-- Social buttons populated dynamically -->
     </div>
 
-    <div class="popup-morebuttons">
-      <button onclick="window.open('https://www.smartcardlink.perfectparcelsstore.com','_blank')">Visit My Website</button>
-      <button onclick="window.open('https://maps.google.com','_blank')">View Location</button>
-      <button id="working-hours-btn">Working Hours</button>
-      <button onclick="window.open('https://calendar.google.com','_blank')">Schedule Appointment</button>
+    <div class="popup-morebuttons" id="popup2-actions">
+      <!-- Action buttons populated dynamically -->
     </div>
 
     <table id="working-hours-table">
       <tr><th>Day</th><th>Hours</th></tr>
-      <tr><td>Monday</td><td>9:00 AM - 5:00 PM</td></tr>
-      <tr><td>Tuesday</td><td>9:00 AM - 5:00 PM</td></tr>
-      <tr><td>Wednesday</td><td>9:00 AM - 5:00 PM</td></tr>
-      <tr><td>Thursday</td><td>9:00 AM - 5:00 PM</td></tr>
-      <tr><td>Friday</td><td>9:00 AM - 5:00 PM</td></tr>
-      <tr><td>Saturday</td><td>10:00 AM - 2:00 PM</td></tr>
-      <tr><td>Sunday</td><td>Closed</td></tr>
     </table>
 
-    <button class="back-button" onclick="goBack()">Back</button>
+    <button class="back-button" id="popup2-back">Back</button>
 
     <div class="popup-footer">
-      <p style="color: gold;"><a href="https://www.smartcardlink.perfectparcelsstore.com" target="_blank" style="color: gold; text-decoration: none;">www.smartcardlink.perfectparcelsstore.com</a></p>
+      <p style="color: gold;"><a href="#" target="_blank" id="popup2-website" style="color: gold; text-decoration: none;">Website</a></p>
       <p style="color: lightblue; font-size: 12px;">Powered by</p>
       <p style="color: white; font-weight: bold;">Perfect Parcels Store</p>
       <p style="color: white; font-size: 12px;">Nairobi, Kenya</p>
@@ -172,32 +157,70 @@
   <script>
     // DateTime updater
     const dtElement = document.getElementById('datetime');
-    if (dtElement) {
-      setInterval(() => {
-        const now = new Date();
-        dtElement.textContent = now.toLocaleString();
-      }, 1000);
-    }
+    setInterval(() => {
+      dtElement.textContent = new Date().toLocaleString();
+    }, 1000);
 
-    // Correct Back button handler
-    function goBack() {
-      // CORRECTED: Points directly to index.html at the root
-      window.location.href = 'index.html'; 
-    }
+    // Back button dynamically toggles to Popup1
+    const backBtn = document.getElementById('popup2-back');
+    backBtn.addEventListener('click', () => {
+      const event = new CustomEvent('popup2-back');
+      document.dispatchEvent(event);
+    });
 
-    // Working Hours Dropdown Toggle
-    const workingHoursBtn = document.getElementById('working-hours-btn');
-    const workingHoursTable = document.getElementById('working-hours-table');
-    if (workingHoursBtn && workingHoursTable) { // Ensure elements exist
-      workingHoursBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        workingHoursTable.style.display = workingHoursTable.style.display === 'none' ? 'table' : 'none';
-      });
-      document.addEventListener('click', (e) => {
-        if (!workingHoursBtn.contains(e.target) && !workingHoursTable.contains(e.target)) {
-          workingHoursTable.style.display = 'none';
+    // Working Hours toggle
+    const workingHoursBtn = document.createElement('button');
+    workingHoursBtn.textContent = "Working Hours";
+    workingHoursBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const table = document.getElementById('working-hours-table');
+      table.style.display = table.style.display === 'none' ? 'table' : 'none';
+    });
+    const actionsDiv = document.getElementById('popup2-actions');
+    actionsDiv.appendChild(workingHoursBtn);
+
+    // Click outside closes working hours
+    document.addEventListener('click', (e) => {
+      const table = document.getElementById('working-hours-table');
+      if (!workingHoursBtn.contains(e.target) && !table.contains(e.target)) {
+        table.style.display = 'none';
+      }
+    });
+
+    // Function to populate popup2 dynamically from MongoDB client object
+    function populatePopup2(client) {
+      document.getElementById('popup2-name').textContent = client.name || "Not provided";
+      document.getElementById('popup2-bio').textContent = client.bio || "Not provided";
+      document.getElementById('popup2-website').href = client.website || "#";
+      
+      // Social buttons
+      const socials = document.getElementById('popup2-socials');
+      socials.innerHTML = '';
+      const socialPlatforms = ['facebook','instagram','twitter','linkedin','tiktok','youtube'];
+      socialPlatforms.forEach(platform => {
+        if(client[platform]){
+          const btn = document.createElement('button');
+          btn.textContent = platform.charAt(0).toUpperCase() + platform.slice(1);
+          btn.className = platform;
+          btn.onclick = () => window.open(client[platform], '_blank');
+          socials.appendChild(btn);
         }
       });
+
+      // Working hours table
+      const table = document.getElementById('working-hours-table');
+      table.innerHTML = '<tr><th>Day</th><th>Hours</th></tr>';
+      if(client.workingHours){
+        Object.entries(client.workingHours).forEach(([day,hours]) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${day}</td><td>${hours}</td>`;
+          table.appendChild(tr);
+        });
+      } else {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="2">Not provided</td>`;
+        table.appendChild(tr);
+      }
     }
   </script>
 </body>

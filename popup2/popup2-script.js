@@ -97,28 +97,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBio(client);
   })();
 
-  // robust delegated click handler for back button (works if the click target is inner icon/span etc.)
+  // fix back button navigation
   document.addEventListener('click', (e) => {
-    const backEl = e.target.closest('.back-button, .back-btn, .btn-back, [data-action="back"], .popup-back');
-    if (!backEl) return;
-
-    // Prefer history.back() so we truly "toggle back" to the previous page state (preserves search params if present)
-    try {
-      if (window.history && window.history.length > 1) {
-        // go back in history (this will restore the previous popup1 state if user navigated there)
-        window.history.back();
-        return;
-      }
-    } catch (err) {
-      // swallow and fallback below
-      console.warn('history.back() failed, falling back to direct navigation', err);
+    if (e.target.classList.contains('back-button')) {
+      e.preventDefault();
+      const param = key ? `?id=${encodeURIComponent(key)}` : '';
+      window.location.href = `popup1.html${param}`;
     }
-
-    // fallback: direct navigation to root or to popup1 with preserved id/slug param
-    const param = key ? `?id=${encodeURIComponent(key)}` : '';
-    // prefer popup1.html if present (explicit file) else root
-    const fallbackPath = '/popup1.html';
-    // try to navigate to popup1.html first; if not set up, root will still work
-    window.location.href = `${fallbackPath}${param}` || `/${param}`;
   });
 });

@@ -1,131 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>SmartCardLink - Home vCard</title>
-
-    <!-- Popup1 styles -->
-    <link rel="stylesheet" href="popup1/popup1-header.css"/>
-    <link rel="stylesheet" href="popup1/popup1-profile.css"/>
-    <link rel="stylesheet" href="popup1/popup1-name-business-title.css"/>
-    <link rel="stylesheet" href="popup1/popup1-contact.css"/>
-    <link rel="stylesheet" href="popup1/popup1-buttons.css"/>
-    <link rel="stylesheet" href="popup1/popup1-moreinfo.css"/>
-    <link rel="stylesheet" href="popup1/popup1-container.css"/>
-    <link rel="stylesheet" href="popup1/popup1-border-animation.css"/>
-
-    <style>
-        /*
-         * Corrected CSS from your working popup2.html to fix alignment and background issues.
-         * The body background is set to a solid dark color to ensure consistency.
-         */
-        body {
-            margin: 0;
-            background: #111; /* Set the background to the same dark color as popup2.html */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        /* The main popup container */
-        .popup-container {
-            position: relative;
-            width: 80%;
-            max-width: 450px;
-            padding: 15px;
-            box-sizing: border-box;
-            background: black;
-            border: 4px solid gold;
-            border-radius: 20px;
-            animation: popup-bounce-in 0.9s ease, glow-border 3s ease-in-out infinite;
-            box-shadow: 0 0 25px gold;
-            overflow: hidden;
-        }
-
-        @keyframes popup-bounce-in {
-            0% { transform: scale(0.3); opacity: 0; }
-            50% { transform: scale(1.1); opacity: 1; }
-            70% { transform: scale(0.95); }
-            100% { transform: scale(1); }
-        }
-
-        @keyframes glow-border {
-            0% { box-shadow: 0 0 8px gold, 0 0 16px gold; }
-            50% { box-shadow: 0 0 24px gold, 0 0 48px gold; }
-            100% { box-shadow: 0 0 8px gold, 0 0 16px gold; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink Clients</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Popup overlay */
+    #popup-container {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #popup-container.hidden { display: none; }
+    .popup-content {
+      width: 90%;
+      max-width: 500px;
+    }
+  </style>
 </head>
 <body>
-    <div class="popup-container gold-border">
-        <div id="header-placeholder"></div>
-        <div id="profile-placeholder"></div>
-        <div id="name-business-title-placeholder"></div>
-        <div id="contact-placeholder"></div>
-        <div id="buttons-placeholder"></div>
-        <div id="moreinfo-placeholder"></div>
-    </div>
+  <div id="clients-container">
+    <!-- Dynamic client list will be inserted here if needed -->
+  </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const loadSection = (id, file) => {
-                fetch(file)
-                    .then(res => {
-                        if (!res.ok) throw new Error(`Failed to load ${file}`);
-                        return res.text();
-                    })
-                    .then(html => {
-                        const el = document.getElementById(id);
-                        if (el) el.innerHTML = html;
-                    })
-                    .catch(err => console.error(`Error loading ${file}:`, err));
-            };
+  <!-- Popup container for popup1 & popup2 -->
+  <div id="popup-container" class="hidden">
+    <div id="popup-content" class="popup-content"></div>
+  </div>
 
-            // Load fragment placeholders as quick initial content (fragments may contain static fallback/dummy markup)
-            loadSection('header-placeholder', 'popup1/popup1-header.html');
-            loadSection('profile-placeholder', 'popup1/popup1-profile.html');
-            loadSection('name-business-title-placeholder', 'popup1/popup1-name-business-title.html');
-            loadSection('contact-placeholder', 'popup1/popup1-contact.html');
-            loadSection('buttons-placeholder', 'popup1/popup1-buttons.html');
-            loadSection('moreinfo-placeholder', 'popup1/popup1-moreinfo.html');
+  <script>
+    const API_BASE_URL = window.SCL_CONFIG?.API_BASE || "https://your-backend-api.com";
 
-            // Keep existing fragment click behavior (phone/email toggles, open more info)
-            document.addEventListener('click', e => {
-                if (e.target.classList.contains('phone-expand-btn')) {
-                    const extraList = e.target.closest('.contact-box')?.querySelector('.contact-extra-list');
-                    if (extraList) extraList.classList.toggle('open');
-                }
-                if (e.target.classList.contains('email-expand-btn')) {
-                    const extraList = e.target.closest('.contact-box')?.querySelector('.email-extra-list');
-                    if (extraList) extraList.classList.toggle('open');
-                }
-                if (e.target.classList.contains('more-info-btn')) {
-                    e.preventDefault();
-                    // fade-out existing popup then navigate to popup2 (preserves query param if present)
-                    const popupContainer = document.querySelector('.popup-container');
-                    if (popupContainer) {
-                        popupContainer.style.transition = 'opacity 0.5s ease';
-                        popupContainer.style.opacity = '0';
-                        setTimeout(() => {
-                            const params = new URLSearchParams(window.location.search);
-                            const key = params.get('id') || params.get('slug') || '';
-                            const param = key ? `?id=${encodeURIComponent(key)}` : '';
-                            window.location.href = `popup2.html${param}`;
-                        }, 500);
-                    } else {
-                        const params = new URLSearchParams(window.location.search);
-                        const key = params.get('id') || params.get('slug') || '';
-                        const param = key ? `?id=${encodeURIComponent(key)}` : '';
-                        window.location.href = `popup2.html${param}`;
-                    }
-                }
-            });
-        });
-    </script>
+    // Utility: fetch client by ID or first available
+    async function fetchClient(clientId) {
+      try {
+        const url = clientId ? `${API_BASE_URL}/clients/${clientId}` : `${API_BASE_URL}/clients/all`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok || !data) return null;
+        if (Array.isArray(data)) return data[0]; // fallback: first client
+        return data;
+      } catch (err) {
+        console.error("Error fetching client:", err);
+        return null;
+      }
+    }
 
-    <!-- IMPORTANT: include popup1 script so index (/) runs the same dynamic population logic as popup1.html -->
-    <script src="popup1/popup1-script.js"></script>
+    // Show popup1
+    function showPopup1(client) {
+      if (!client) return;
+      const photo = client.photoUrl || 'https://via.placeholder.com/150';
+      const name = client.name || "Not provided";
+      const phone = client.phone || "Not provided";
+      const email = client.email || "Not provided";
+
+      document.getElementById("popup-content").innerHTML = `
+        <div class="popup1 gold-border">
+          <img src="${photo}" alt="${name}" style="width:150px;display:block;margin:0 auto;border-radius:50%;" />
+          <h2 style="text-align:center;color:gold;">${name}</h2>
+          <p style="text-align:center;color:white;">Phone: ${phone}</p>
+          <p style="text-align:center;color:white;">Email: ${email}</p>
+          <div style="text-align:center;margin-top:10px;">
+            <button id="more-info-btn" style="padding:10px 20px;font-weight:bold;cursor:pointer;">More info</button>
+          </div>
+        </div>
+      `;
+      document.getElementById("popup-container").classList.remove("hidden");
+
+      document.getElementById("more-info-btn").addEventListener("click", () => {
+        showPopup2(client);
+      });
+    }
+
+    // Show popup2 (uses popup2.html structure dynamically)
+    function showPopup2(client) {
+      if (!client) return;
+
+      const photo = client.photoUrl || 'https://via.placeholder.com/150';
+      const name = client.name || "Not provided";
+      const phone = client.phone || "Not provided";
+      const email = client.email || "Not provided";
+      const address = client.address || "Not provided";
+
+      // Socials dynamically
+      const socialPlatforms = ['facebook','instagram','twitter','linkedin','tiktok','youtube'];
+      const socialButtons = socialPlatforms
+        .filter(p => client[p])
+        .map(p => `<button class="${p}" onclick="window.open('${client[p]}','_blank')">${p.charAt(0).toUpperCase()+p.slice(1)}</button>`)
+        .join('');
+
+      // Actions
+      const websiteBtn = client.website ? `<button onclick="window.open('${client.website}','_blank')">Visit Website</button>` : '';
+      const mapBtn = client.locationMap ? `<button onclick="window.open('${client.locationMap}','_blank')">View Location</button>` : '';
+      const scheduleBtn = client.calendar || client.schedule ? `<button onclick="window.open('${client.calendar || client.schedule}','_blank')">Schedule Appointment</button>` : '';
+
+      // Working hours table
+      const workingHours = client.workingHours || {};
+      let whTable = '<table id="working-hours-table" style="display:none;width:90%;margin:10px auto;background:rgba(255,255,0,0.3);border-collapse:collapse;color:white;"><tr><th>Day</th><th>Hours</th></tr>';
+      Object.entries(workingHours).forEach(([day,hours]) => {
+        whTable += `<tr><td>${day}</td><td>${hours}</td></tr>`;
+      });
+      whTable += '</table>';
+
+      document.getElementById("popup-content").innerHTML = `
+        <div class="popup2 gold-border">
+          <img src="${photo}" alt="${name}" style="width:150px;display:block;margin:0 auto;border-radius:50%;" />
+          <h2 style="text-align:center;color:gold;">${name}</h2>
+          <p style="text-align:center;color:white;">Phone: ${phone}</p>
+          <p style="text-align:center;color:white;">Email: ${email}</p>
+          <p style="text-align:center;color:white;">Address: ${address}</p>
+
+          <div class="popup-buttons">${socialButtons || '<div style="color:#ddd">No socials</div>'}</div>
+          <div class="popup-morebuttons">${websiteBtn}${mapBtn}${scheduleBtn}</div>
+
+          <button id="working-hours-btn" style="display:block;margin:10px auto;padding:10px;background:gold;color:black;border:none;border-radius:5px;cursor:pointer;font-weight:bold;">Working Hours</button>
+
+          ${whTable}
+
+          <button id="back-btn" style="display:block;margin:10px auto;padding:10px 20px;background:red;color:white;font-weight:bold;border:none;border-radius:5px;cursor:pointer;">Back</button>
+
+          <div class="popup-footer" style="text-align:center;margin-top:15px;color:white;">
+            <p style="color:gold;"><a href="${client.website || '#'}" target="_blank" style="color:gold;text-decoration:none;">${client.website || 'Website'}</a></p>
+            <p style="color:lightblue;font-size:12px;">Powered by</p>
+            <p style="color:white;font-weight:bold;">Perfect Parcels Store</p>
+            <p style="color:white;font-size:12px;">Nairobi, Kenya</p>
+            <p style="color:white;font-size:12px;" id="datetime"></p>
+          </div>
+        </div>
+      `;
+
+      // Back button
+      document.getElementById("back-btn").addEventListener("click", () => {
+        showPopup1(client);
+      });
+
+      // Working hours toggle
+      const whBtn = document.getElementById('working-hours-btn');
+      const whTableEl = document.getElementById('working-hours-table');
+      whBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        whTableEl.style.display = whTableEl.style.display === 'none' ? 'table' : 'none';
+      });
+      document.addEventListener('click', (e) => {
+        if (!whBtn.contains(e.target) && !whTableEl.contains(e.target)) whTableEl.style.display = 'none';
+      });
+
+      // DateTime updater
+      const dtEl = document.getElementById('datetime');
+      setInterval(() => {
+        dtEl.textContent = new Date().toLocaleString();
+      }, 1000);
+    }
+
+    // Initialize: fetch first client or dynamic ID
+    document.addEventListener("DOMContentLoaded", async () => {
+      const clientId = new URLSearchParams(window.location.search).get('id');
+      const client = await fetchClient(clientId);
+      if (client) showPopup1(client);
+    });
+  </script>
 </body>
 </html>

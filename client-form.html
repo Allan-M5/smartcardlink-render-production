@@ -124,6 +124,16 @@
       grid-template-columns: 1fr;
     }
   }
+  .result {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 0.5rem;
+    color: #e2e8f0;
+    display: none;
+  }
+  .result a { color: #FFD700; word-break: break-all; }
   .form-message {
     text-align: center;
     padding: 1rem;
@@ -146,20 +156,123 @@
   <h1 class="title">SmartCardLink Client Form</h1>
 
   <form id="clientForm" autocomplete="off">
-    <!-- Your existing form fields -->
+    <div class="section-header">Personal Details</div>
+    <div class="grid-2col">
+      <div>
+        <label for="fullName">Full Name</label>
+        <input type="text" name="fullName" id="fullName" autocomplete="name" required />
+      </div>
+      <div>
+        <label for="title">Title/Position</label>
+        <input type="text" name="title" id="title" autocomplete="organization-title" />
+      </div>
+    </div>
+    <div class="grid-2col">
+      <div>
+        <label for="phone1">Phone Number 1 (Main/Default)</label>
+        <input type="tel" name="phone1" id="phone1" autocomplete="tel" required />
+      </div>
+      <div>
+        <label for="phone2">Phone Number 2</label>
+        <input type="tel" name="phone2" id="phone2" autocomplete="tel-alternate" />
+      </div>
+    </div>
+    <div>
+      <label for="phone3">Phone Number 3</label>
+      <input type="tel" name="phone3" id="phone3" autocomplete="tel-extension" />
+    </div>
+    <div class="grid-2col">
+      <div>
+        <label for="email1">Email 1 (Main/Default)</label>
+        <input type="email" name="email1" id="email1" autocomplete="email" required />
+      </div>
+      <div>
+        <label for="email2">Email 2</label>
+        <input type="email" name="email2" id="email2" autocomplete="new-email2" />
+      </div>
+    </div>
+    <div>
+      <label for="email3">Email 3</label>
+      <input type="email" name="email3" id="email3" autocomplete="new-email3" />
+    </div>
+
+    <div class="section-header">Business Details</div>
+    <div class="grid-2col">
+      <div>
+        <label for="company">Company Name</label>
+        <input type="text" name="company" id="company" autocomplete="organization" required />
+      </div>
+      <div>
+        <label for="businessWebsite">Business Website</label>
+        <input type="url" name="businessWebsite" id="businessWebsite" autocomplete="url" />
+       </div>
+    </div>
+    <div class="grid-2col">
+      <div>
+        <label for="portfolioWebsite">Portfolio Website</label>
+        <input type="url" name="portfolioWebsite" id="portfolioWebsite" autocomplete="url" />
+      </div>
+      <div>
+        <label for="locationMap">Location Map URL</label>
+        <input type="url" name="locationMap" id="locationMap" autocomplete="url" />
+      </div>
+    </div>
+
+    <div class="section-header">Working Hours</div>
+    <div class="grid-2col">
+      <div><label for="monFriStart">Mon-Fri Start</label><input type="time" name="monFriStart" id="monFriStart" value="08:00" /></div>
+      <div><label for="monFriEnd">Mon-Fri End</label><input type="time" name="monFriEnd" id="monFriEnd" value="17:00" /></div>
+      <div><label for="satStart">Saturday Start</label><input type="time" name="satStart" id="satStart" value="09:00" /></div>
+      <div><label for="satEnd">Saturday End</label><input type="time" name="satEnd" id="satEnd" value="12:00" /></div>
+      <div><label for="sunStart">Sunday Start</label><input type="time" name="sunStart" id="sunStart" disabled /></div>
+      <div><label for="sunEnd">Sunday End</label><input type="time" name="sunEnd" id="sunEnd" disabled /></div>
+    </div>
+
+    <div class="section-header">Social Links</div>
+    <div class="grid-2col">
+      <div><label for="facebook">Facebook</label><input type="url" name="facebook" id="facebook" autocomplete="off" /></div>
+      <div><label for="instagram">Instagram</label><input type="url" name="instagram" id="instagram" autocomplete="off" /></div>
+      <div><label for="twitter">X (Twitter)</label><input type="url" name="twitter" id="twitter" autocomplete="off" /></div>
+      <div><label for="linkedin">LinkedIn</label><input type="url" name="linkedin" id="linkedin" autocomplete="off" /></div>
+      <div><label for="tiktok">TikTok</label><input type="url" name="tiktok" id="tiktok" autocomplete="off" /></div>
+      <div><label for="youtube">YouTube</label><input type="url" name="youtube" id="youtube" autocomplete="off" /></div>
+    </div>
+
+    <div class="section-header">Bio</div>
+    <textarea name="bio" id="bio" rows="4" autocomplete="off"></textarea>
+
+    <div>
+      <label for="address">Address</label>
+      <input type="text" name="address" id="address" autocomplete="street-address" />
+    </div>
+
+    <div class="payment-info">
+      <h3 style="color:#FFD700; margin-top:0;">Payment (MPESA)</h3>
+      <p style="font-size: 1.2rem; font-weight: bold;">Pochi La Biashara: 0702444552</p>
+    </div>
+
+    <div class="disclaimer">
+      <h3 style="color:#FFD700;">Disclaimer</h3>
+      <ul>
+        <li>I certify that the information provided is accurate and truthful.</li>
+        <li>I understand that payment is required for this service to be activated.</li>
+        <li>I acknowledge that SmartCardLink is not liable for inaccurate details I have submitted.</li>
+      </ul>
+    </div>
+
     <button type="submit">Submit Form</button>
   </form>
 
   <div class="form-message" id="formMessage"></div>
 </div>
 
-<!-- ✅ Inject backend base URL -->
 <script>
-  window.SCL_CONFIG = { API_BASE: "https://smartcardlink-flyio.fly.dev" };
-</script>
-
-<script>
-  const API_BASE_URL = window.SCL_CONFIG?.API_BASE || "http://localhost:8080";
+  // Primary and fallback API endpoints.
+  // These follow your provided .env values: main = APP_BASE_URL, fallback = APP_FALLBACK_URL.
+  // If you wish to override at runtime, set window.SCL_CONFIG = { API_BASE: "https://..." } before this script runs.
+  const MAIN_API = window.SCL_CONFIG?.API_BASE || "https://server.smartcardlink.perfectparcelsstore.com";
+  const FALLBACK_API = "https://smartcardlink-flyio-fallback.fly.dev";
+  const LOCAL_API = "http://localhost:8080";
 
   const form = document.getElementById("clientForm");
   const formMessage = document.getElementById("formMessage");
@@ -170,35 +283,97 @@
     formMessage.style.display = 'block';
   }
 
+  async function tryPost(apiBase, payload) {
+    try {
+      const resp = await fetch(`${apiBase.replace(/\/$/, '')}/api/clients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      // attempt to parse JSON (some errors may return html)
+      let json = null;
+      try { json = await resp.json(); } catch (e) { /* ignore parse errors */ }
+      return { ok: resp.ok, status: resp.status, json, resp };
+    } catch (err) {
+      return { ok: false, error: err };
+    }
+  }
+
   async function submitForm() {
     const formData = new FormData(form);
-    const payload = Object.fromEntries(formData.entries());
 
-    payload.socialLinks = {};
-    ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k=>{
-      if(formData.get(k)) payload.socialLinks[k]=formData.get(k).trim();
+    // assemble payload matching your server.js Client schema exactly
+    const payload = {
+      fullName: formData.get('fullName')?.trim() || '',
+      title: formData.get('title')?.trim() || '',
+      company: formData.get('company')?.trim() || '',
+      phone1: formData.get('phone1')?.trim() || '',
+      phone2: formData.get('phone2')?.trim() || '',
+      phone3: formData.get('phone3')?.trim() || '',
+      email1: formData.get('email1')?.trim() || '',
+      email2: formData.get('email2')?.trim() || '',
+      email3: formData.get('email3')?.trim() || '',
+      businessWebsite: formData.get('businessWebsite')?.trim() || '',
+      portfolioWebsite: formData.get('portfolioWebsite')?.trim() || '',
+      locationMap: formData.get('locationMap')?.trim() || '',
+      bio: formData.get('bio')?.trim() || '',
+      address: formData.get('address')?.trim() || '',
+      socialLinks: {},
+      workingHours: {}
+    };
+
+    // social links
+    ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k => {
+      const v = formData.get(k)?.trim();
+      if (v) payload.socialLinks[k] = v;
     });
 
-    payload.workingHours = {};
-    ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k=>{
-      if(formData.get(k)) payload.workingHours[k]=formData.get(k).trim();
+    // working hours (server expects monFriStart etc.)
+    ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
+      const v = formData.get(k);
+      if (v && v.trim && v.trim() !== "") payload.workingHours[k] = v;
     });
 
+    // validation (keep same message)
     if (!payload.fullName || !payload.phone1 || !payload.email1 || !payload.company) {
       throw new Error("Please fill in all required fields: Full Name, Phone 1, Email 1, and Company.");
     }
 
-    const resp = await fetch(`${API_BASE_URL}/api/clients`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!resp.ok) {
-      const errData = await resp.json().catch(()=>({}));
-      throw new Error(errData.message || `Server error: ${resp.status}`);
+    // Try main -> fallback -> local
+    let res = await tryPost(MAIN_API, payload);
+    if (!res.ok) {
+      // attempt fallback
+      res = await tryPost(FALLBACK_API, payload);
     }
-    return await resp.json();
+    if (!res.ok) {
+      // attempt local dev
+      res = await tryPost(LOCAL_API, payload);
+    }
+
+    // handle final result
+    if (res && res.ok) {
+      // server wraps result: { success:true, data: { recordId: '...' }, message: '...' }
+      const json = res.json || {};
+      const recordId =
+        (json && json.data && (json.data.recordId || json.data._id)) ||
+        json.recordId ||
+        json.id ||
+        (json && json.data && typeof json.data === 'string' ? json.data : null) ||
+        "N/A";
+
+      return { success: true, recordId, raw: json, message: json?.message || "Saved. Pending admin processing." };
+    } else {
+      // construct a friendly error message
+      if (res && res.json && res.json.message) {
+        throw new Error(res.json.message);
+      } else if (res && res.status) {
+        throw new Error(`Server error: status ${res.status}`);
+      } else if (res && res.error) {
+        throw new Error(String(res.error));
+      } else {
+        throw new Error("Submission failed. Please try again later.");
+      }
+    }
   }
 
   form.addEventListener("submit", async (e) => {
@@ -207,9 +382,8 @@
     btn.disabled = true;
     try {
       showMessage("Submitting form…", "info");
-      const data = await submitForm();
-      const recordId = data.recordId || data.id || "N/A";
-      showMessage(`✔ Success! Record ID: ${recordId}`, "success");
+      const result = await submitForm();
+      showMessage(`✔ Success! Your Record ID: ${result.recordId}`, "success");
       form.reset();
     } catch (err) {
       showMessage(`❌ ${err.message}`, "error");
