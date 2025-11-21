@@ -1,168 +1,130 @@
-<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SmartCardLink Clients</title>
-
-  <!-- Content Security Policy allowing Google Fonts, backend API, and self styles -->
-  <meta http-equiv="Content-Security-Policy"
-    content="
-      default-src 'self';
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      font-src 'self' https://fonts.gstatic.com;
-      connect-src 'self' https://your-backend-api.com;
-      img-src 'self' data: https://res.cloudinary.com;
-      script-src 'self' 'unsafe-inline';
-    "
-  />
-
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-
-  <!-- Local CSS -->
-  <link rel="stylesheet" href="style.css" />
-
-  <style>
-    /* Popup overlay */
-    #popup-container {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-    #popup-container.hidden { display: none; }
-    .popup-content { width: 90%; max-width: 500px; }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SmartCardLink — vCard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/libs/fontawesome/all.min.css" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div id="clients-container"></div>
+  <div class="app-bg">
+    <main class="vcard" id="vcard">
 
-  <div id="popup-container" class="hidden">
-    <div id="popup-content" class="popup-content"></div>
+      <div class="card-surface" id="popup1">
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner">
+          <div class="photo-area" id="photoArea"></div>
+          
+          <div class="personal-info">
+            <div id="fullName" class="full-name"></div>
+            <div id="jobName" class="job-name"></div>
+            <div id="titlePosition" class="title-position"></div>
+          </div>
+
+          <div class="contact-section">
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Phone:</div>
+                <div class="contact-primary-wrap">
+                  <span id="phoneMain" class="contact-primary"></span>
+                  <button id="phoneDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="phoneList" class="box-list" hidden></div>
+            </div>
+
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Email:</div>
+                <div class="contact-primary-wrap">
+                  <span id="emailMain" class="contact-primary"></span>
+                  <button id="emailDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="emailList" class="box-list" hidden></div>
+            </div>
+          </div>
+
+          <div class="actions-grid">
+            <div class="col">
+              <button id="callBtn" class="action-btn"><i class="fa fa-phone"></i> Call</button>
+              <button id="smsBtn" class="action-btn"><i class="fa fa-comment"></i> Message</button>
+              <button id="waBtn" class="action-btn"><i class="fa-brands fa-whatsapp"></i> Whatsapp</button>
+            </div>
+            <div class="col">
+              <button id="mailBtn" class="action-btn"><i class="fa fa-envelope"></i> Email</button>
+              <button id="printBtn" class="action-btn"><i class="fa fa-print"></i> Print</button>
+              <button id="saveBtn" class="action-btn"><i class="fa fa-address-card"></i> Save</button>
+            </div>
+          </div>
+
+          <div class="nav-row">
+            <button id="moreInfoBtn" class="more-info-btn">More Info</button>
+          </div>
+        </div>
+      </div>
+
+      <section id="popup2" class="popup" hidden>
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner card-scroll">
+          
+          <div class="about-header">
+            <div class="about-title">More About Me</div>
+            <div class="about-bio-box">
+              <div class="bio-label">Bio</div>
+              <div id="bioText" class="bio-text"></div>
+            </div>
+          </div>
+
+          <div class="links-grid-4">
+            <div class="links-col">
+              <button id="businessWebsite" class="link-btn">Business URL</button>
+              <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+            </div>
+            <div class="links-col">
+              <button id="locationMap" class="link-btn">Location Map</button>
+              <button id="physicalAddress" class="link-btn">Physical Address</button>
+            </div>
+          </div>
+
+          <div class="hours-section">
+            <table class="hours-table" id="hoursTable">
+              <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
+
+          <div class="social-grid">
+            <div class="col">
+              <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
+              <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
+              <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
+            </div>
+            <div class="col">
+              <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
+              <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
+              <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
+            </div>
+          </div>
+
+          <div class="nav-row">
+            <button id="backBtn" class="back-btn">Back</button>
+          </div>
+
+          <footer class="popup-footer">
+            <div class="powered">Powered by</div>
+            <div class="store">Perfect Parcels Store</div>
+            <div class="location-time">Nairobi, KENYA — <span id="liveTime"></span></div>
+          </footer>
+        </div>
+      </section>
+
+    </main>
   </div>
-
-  <script>
-    const API_BASE_URL = window.SCL_CONFIG?.API_BASE || "https://your-backend-api.com";
-
-    async function fetchClient(clientId) {
-      try {
-        const url = clientId ? `${API_BASE_URL}/clients/${clientId}` : `${API_BASE_URL}/clients/all`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!res.ok || !data) return null;
-        return Array.isArray(data) ? data[0] : data;
-      } catch (err) {
-        console.error("Error fetching client:", err);
-        return null;
-      }
-    }
-
-    function showPopup1(client) {
-      if (!client) return;
-      const photo = client.photoUrl || 'https://via.placeholder.com/150';
-      const name = client.name || "Not provided";
-      const phone = client.phone || "Not provided";
-      const email = client.email || "Not provided";
-
-      document.getElementById("popup-content").innerHTML = `
-        <div class="popup1 gold-border">
-          <img src="${photo}" alt="${name}" style="width:150px;display:block;margin:0 auto;border-radius:50%;" />
-          <h2 style="text-align:center;color:gold;">${name}</h2>
-          <p style="text-align:center;color:white;">Phone: ${phone}</p>
-          <p style="text-align:center;color:white;">Email: ${email}</p>
-          <div style="text-align:center;margin-top:10px;">
-            <button id="more-info-btn" style="padding:10px 20px;font-weight:bold;cursor:pointer;">More info</button>
-          </div>
-        </div>
-      `;
-      document.getElementById("popup-container").classList.remove("hidden");
-
-      document.getElementById("more-info-btn").addEventListener("click", () => showPopup2(client));
-    }
-
-    function showPopup2(client) {
-      if (!client) return;
-
-      const photo = client.photoUrl || 'https://via.placeholder.com/150';
-      const name = client.name || "Not provided";
-      const phone = client.phone || "Not provided";
-      const email = client.email || "Not provided";
-      const address = client.address || "Not provided";
-
-      // Social buttons
-      const socialPlatforms = ['facebook','instagram','twitter','linkedin','tiktok','youtube'];
-      const socialButtons = socialPlatforms
-        .filter(p => client[p])
-        .map(p => `<button class="${p}" onclick="window.open('${client[p]}','_blank')">${p.charAt(0).toUpperCase()+p.slice(1)}</button>`)
-        .join('');
-
-      // Actions
-      const websiteBtn = client.website ? `<button onclick="window.open('${client.website}','_blank')">Visit Website</button>` : '';
-      const mapBtn = client.locationMap ? `<button onclick="window.open('${client.locationMap}','_blank')">View Location</button>` : '';
-      const scheduleBtn = client.calendar || client.schedule ? `<button onclick="window.open('${client.calendar || client.schedule}','_blank')">Schedule Appointment</button>` : '';
-
-      // Working hours
-      const workingHours = client.workingHours || {};
-      let whTable = '<table id="working-hours-table" style="display:none;width:90%;margin:10px auto;background:rgba(255,255,0,0.3);border-collapse:collapse;color:white;"><tr><th>Day</th><th>Hours</th></tr>';
-      Object.entries(workingHours).forEach(([day,hours]) => {
-        whTable += `<tr><td>${day}</td><td>${hours}</td></tr>`;
-      });
-      whTable += '</table>';
-
-      document.getElementById("popup-content").innerHTML = `
-        <div class="popup2 gold-border">
-          <img src="${photo}" alt="${name}" style="width:150px;display:block;margin:0 auto;border-radius:50%;" />
-          <h2 style="text-align:center;color:gold;">${name}</h2>
-          <p style="text-align:center;color:white;">Phone: ${phone}</p>
-          <p style="text-align:center;color:white;">Email: ${email}</p>
-          <p style="text-align:center;color:white;">Address: ${address}</p>
-
-          <div class="popup-buttons">${socialButtons || '<div style="color:#ddd">No socials</div>'}</div>
-          <div class="popup-morebuttons">${websiteBtn}${mapBtn}${scheduleBtn}</div>
-
-          <button id="working-hours-btn" style="display:block;margin:10px auto;padding:10px;background:gold;color:black;border:none;border-radius:5px;cursor:pointer;font-weight:bold;">Working Hours</button>
-
-          ${whTable}
-
-          <button id="back-btn" style="display:block;margin:10px auto;padding:10px 20px;background:red;color:white;font-weight:bold;border:none;border-radius:5px;cursor:pointer;">Back</button>
-
-          <div class="popup-footer" style="text-align:center;margin-top:15px;color:white;">
-            <p style="color:gold;"><a href="${client.website || '#'}" target="_blank" style="color:gold;text-decoration:none;">${client.website || 'Website'}</a></p>
-            <p style="color:lightblue;font-size:12px;">Powered by</p>
-            <p style="color:white;font-weight:bold;">Perfect Parcels Store</p>
-            <p style="color:white;font-size:12px;">Nairobi, Kenya</p>
-            <p style="color:white;font-size:12px;" id="datetime"></p>
-          </div>
-        </div>
-      `;
-
-      document.getElementById("back-btn").addEventListener("click", () => showPopup1(client));
-
-      const whBtn = document.getElementById('working-hours-btn');
-      const whTableEl = document.getElementById('working-hours-table');
-      whBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        whTableEl.style.display = whTableEl.style.display === 'none' ? 'table' : 'none';
-      });
-      document.addEventListener('click', e => {
-        if (!whBtn.contains(e.target) && !whTableEl.contains(e.target)) whTableEl.style.display = 'none';
-      });
-
-      // DateTime updater
-      const dtEl = document.getElementById('datetime');
-      setInterval(() => dtEl.textContent = new Date().toLocaleString(), 1000);
-    }
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      const clientId = new URLSearchParams(window.location.search).get('id');
-      const client = await fetchClient(clientId);
-      if (client) showPopup1(client);
-    });
-  </script>
+  <script src="/js/vcard.js" defer></script>
 </body>
 </html>

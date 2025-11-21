@@ -3,7 +3,7 @@
 // --- Global Variables ---
 let allClientData = [];
 // CRITICAL: Hardcode the production URL here. This file is on the frontend.
-const API_BASE_URL = 'https://server.smartcardlink.perfectparcelsstore.com/api';
+const API_URL = window.RENDER_API_BASE_URL;
 
 // --- DOM Elements ---
 const clientTableBody = document.getElementById('clientTableBody');

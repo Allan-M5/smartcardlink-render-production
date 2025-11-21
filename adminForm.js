@@ -2,7 +2,7 @@
 
 // --- Global Variables and Constants ---
 // CRITICAL: Hardcode the production URL here as per the blueprint
-const API_URL = 'https://server.smartcardlink.perfectparcelsstore.com/api';
+const API_URL = window.RENDER_API_BASE_URL;
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get('id');
 

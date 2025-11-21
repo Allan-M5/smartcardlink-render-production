@@ -4,7 +4,7 @@
   "description": "A Node.js backend for the SmartCardLink application.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "nodemon server.js",
     "dev": "nodemon server.js",
     "create-admin-hash": "node generate-hash.js",
     "create-admin-user": "node create-admin-user.js"
@@ -31,6 +31,7 @@
     "nodemon": "^3.1.4",
     "pdfkit": "^0.15.0",
     "pino": "^10.0.0",
+    "pino-pretty": "^11.2.2",
     "puppeteer": "^24.23.0",
     "qrcode": "^1.5.4",
     "slugify": "^1.6.6",

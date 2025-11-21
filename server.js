@@ -35,8 +35,13 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
+
+// CORRECTION 1: Use APP_BASE_URL for API URL and remove APP_FALLBACK_URL.
 const APP_BASE_URL = process.env.APP_BASE_URL || process.env.APP_BASE || `http://localhost:${PORT}`;
-const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL || "";
+
+// NEW VARIABLE: Essential for CORS (the URL of the Static Site/Frontend)
+const APP_FRONTEND_URL = process.env.APP_FRONTEND_URL || ""; 
+
 const BACKEND_API_URL = APP_BASE_URL.startsWith("http") ? new URL(APP_BASE_URL).origin : APP_BASE_URL;
 
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -49,33 +54,47 @@ const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
-// 6. Miscellaneous: Review ALLOWED_ORIGINS default - Removed GitHub Pages example
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://smartcardlink.perfectparcelsstore.com").split(",").map(s => s.trim()).filter(Boolean);
+// -----------------------------------------------------------------------------
+// NOTE: expanded default ALLOWED_ORIGINS to include local dev (localhost/127.0.0.1)
+// -----------------------------------------------------------------------------
+const defaultOrigins = [
+  "http://localhost:8080",
+  "http://127.0.0.1:8080"
+];
+
+// CORRECTION 2: Refactor ALLOWED_ORIGINS to combine default, APP_BASE_URL, and the new APP_FRONTEND_URL
+const allowedEnvOrigins = [APP_BASE_URL, APP_FRONTEND_URL, process.env.ALLOWED_ORIGINS]
+  .filter(Boolean)
+  .flatMap(s => s.split(','))
+  .map(s => s.trim());
+
+const ALLOWED_ORIGINS = [...new Set([...defaultOrigins, ...allowedEnvOrigins])];
+
 
 // 5. Error Logging: Pino Logger setup
 const logger = pino({
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
-    transport: process.env.NODE_ENV === "production" ? undefined : {
-        target: "pino-pretty",
-        options: { colorize: true }
-    }
+    level: process.env.NODE_ENV === "production" ? "info" : "debug",
+    transport: process.env.NODE_ENV === "production" ? undefined : {
+        target: "pino-pretty",
+        options: { colorize: true }
+    }
 });
 
 // Basic required env check
 const required = ["MONGODB_URI", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
 for (const k of required) {
-    if (!process.env[k]) {
-        logger.warn(`⚠️ Warning - environment variable ${k} is not set.`);
-    }
+    if (!process.env[k]) {
+        logger.warn(`⚠️ Warning - environment variable ${k} is not set.`);
+    }
 }
 
 // ------------------------
 // Cloudinary config
 // ------------------------
 cloudinary.config({
-    cloud_name: CLOUDINARY_CLOUD_NAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
 });
 
 // ------------------------
@@ -84,66 +103,106 @@ cloudinary.config({
 // Use morgan, but pipe output through Pino in production (or keep simple for now)
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-// 3. CSP & Security: Improved CSP - Removed 'unsafe-inline' from scriptSrc
+// ------------------------
+// CSP & Security
+// ------------------------
 app.use(
-    helmet.contentSecurityPolicy({
-        directives: {
-            defaultSrc: ["'self'"],
-            // 3. CSP: Removed 'unsafe-inline'. Added potential third-party analytics/scripts.
-            scriptSrc: ["'self'", "*.googletagmanager.com", "*.google-analytics.com"],
-            // 3. CSP: Added 'unsafe-hashes' or specific hashes if needed for inline scripts
-            // For now, only remove 'unsafe-inline' and trust the frontend build.
-            // If you need specific inline scripts, you must use hashes.
-            styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'"], // Keeping 'unsafe-inline' for style due to potential runtime styles
-            imgSrc: ["'self'", "data:", "res.cloudinary.com"],
-            connectSrc: ["'self'", BACKEND_API_URL, "res.cloudinary.com", "https://api.cloudinary.com", APP_FALLBACK_URL, "*.google-analytics.com", "*.analytics.google.com"],
-            fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com"],
-            frameAncestors: ["'self'"], // Prevents clickjacking via iframe
-        },
-    })
+    helmet.contentSecurityPolicy({
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "*.googletagmanager.com", "*.google-analytics.com"],
+            styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+            styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+            imgSrc: ["'self'", "data:", "res.cloudinary.com"],
+            // CORRECTION 3: Remove APP_FALLBACK_URL from connectSrc. BACKEND_API_URL handles the API URL.
+            connectSrc: ["'self'", BACKEND_API_URL, "res.cloudinary.com", "https://api.cloudinary.com", "*.google-analytics.com", "*.analytics.google.com", "https://ab.reasonlabsapi.com"],
+            fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
+            frameAncestors: ["'self'"],
+        },
+    })
 );
 
 // CORS (restrict to allowed origins)
 app.use(
-    cors({
-        origin: (origin, callback) => {
-            if (!origin) return callback(null, true);
-            if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.some(a => origin.startsWith(a))) {
-                return callback(null, true);
-            }
-            logger.warn({ origin }, "CORS rejected request from unauthorized origin");
-            return callback(new Error("CORS not allowed"), false);
-        },
-    })
+    cors({
+        origin: (origin, callback) => {
+            if (!origin) return callback(null, true);
+
+            if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.some(a => origin.startsWith(a))) {
+                return callback(null, true);
+            }
+
+            logger.warn({ origin }, "CORS rejected request from unauthorized origin");
+            return callback(new Error("CORS not allowed"), false);
+        },
+    })
 );
 
 // JSON parser with size limit
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 
-// Static serving setup
-const staticPath = path.join(__dirname);
-app.use(express.static(staticPath, {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css');
+
+// ----------------- CRITICAL FIX START: Correct Static File Serving -----------------
+
+// 1. Serve files from 'public' (where 'js' and 'libs' folders live)
+// This maps /js/* and /libs/* to C:\...\smartcardlink-app\public\
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath, {
+    setHeaders: (res, filePath) => {
+        const ext = path.extname(filePath).toLowerCase();
+        // Explicitly set correct MIME types for assets
+        if (ext === '.css') {
+            res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+        } else if (ext === '.js') {
+            res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+        } else if (['.woff2', '.woff', '.ttf', '.eot', '.svg'].includes(ext)) {
+             // Handle fonts
+             const mime = { '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.eot': 'application/vnd.ms-fontobject', '.svg': 'image/svg+xml' }[ext];
+             res.setHeader('Content-Type', mime);
+             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else if (ext === '.json') {
+            res.setHeader('Content-Type', 'application/json');
         }
     }
 }));
 
+
+// 2. Static serving for ROOT files (index.html, style.css, favicon.ico)
+// This must be the directory where index.html and style.css live (project root).
+const staticPath = path.join(__dirname);
+app.use(express.static(staticPath, {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+        }
+    }
+}));
+
+// ----------------- CRITICAL FIX END -----------------
+
+
+// ------------------------
+// Quick favicon endpoint to avoid 404 noise
+// ------------------------
+app.get("/favicon.ico", (req, res) => {
+    const icoPath = path.join(staticPath, "favicon.ico");
+    if (fs.existsSync(icoPath)) return res.sendFile(icoPath);
+    return res.status(204).end();
+});
 
 // Rate limiter for public endpoints
 const publicLimiter = RateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
     message: "Too many requests, please try again later.",
-    legacyHeaders: false, // Security: Disable X-RateLimit-* headers
-    standardHeaders: true, // Security: Use standard RateLimit headers
+    legacyHeaders: false,
+    standardHeaders: true,
 });
 
 // Semaphore for concurrent heavy PDF operations (capacity 1)
 const pdfSemaphore = new Semaphore(1);
-const MAX_PDF_WAIT_MS = 3000; // Client wait time before queue full error
+const MAX_PDF_WAIT_MS = 3000;
 
 // ------------------------
 // Helpers: Standard response wrappers and Logger integration
@@ -169,7 +228,6 @@ const connectDB = async () => {
         logger.info("✅ MongoDB connected");
     } catch (err) {
         logger.fatal({ err }, "❌ MongoDB connection failed");
-        // In a production environment, you might want to exit the process
         // process.exit(1);
     }
 };
@@ -460,11 +518,9 @@ h1 { text-align:center; color: #111; }
         if (browser) await browser.close();
     }
 };
-
 // 2. PDF Streaming: Fetch wrapper with retry logic
 const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
     for (let i = 0; i < retries; i++) {
-        // 2. PDF Streaming: AbortController created inside the loop
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
@@ -485,7 +541,7 @@ const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
             } else {
                 logger.warn({ url, error, attempt: i + 1 }, "Cloudinary fetch failed, retrying...");
             }
-            await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
         }
     }
 };
@@ -498,7 +554,6 @@ app.get("/", (req, res) => {
     if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
     return res.send("SmartCardLink API - Frontend assets missing.");
 });
-
 // Health endpoint
 app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
@@ -521,7 +576,6 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
             status: "pending",
         });
 
-        // Use semaphore with graceful handling for initial PDF generation
         const release = await pdfSemaphore.acquire(MAX_PDF_WAIT_MS).catch(() => null);
         if (release) {
             try {
@@ -535,7 +589,6 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
         } else {
             logger.warn("PDF semaphore queue full. Skipping initial PDF generation.");
         }
-
         await clientDoc.save();
         await logAction("public", "CLIENT_CREATED", clientDoc._id, "Client submitted via public form", { snapshot: clientDoc });
 
@@ -551,7 +604,6 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
                 logger.warn({ err }, "⚠️ Admin email notify failed");
             }
         }
-
         return respSuccess(res, { recordId: clientDoc._id }, "Saved. Pending admin processing.", 201);
     } catch (err) {
         logger.error({ err }, "❌ POST /api/clients error");
@@ -559,10 +611,11 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
     }
 });
 
-// Public clients listing (lightweight)
+// Public clients listing (lightweight - fetches only the latest client)
 app.get("/api/clients/all", async (req, res) => {
     try {
-        const clients = await Client.find({}, "fullName company email1 phone1 status createdAt photoUrl slug").sort({ createdAt: -1 }).limit(200);
+        const client = await Client.findOne({}).sort({ createdAt: -1 }).select("-history -__v");
+        const clients = client ? [client] : [];
         return respSuccess(res, clients, "Public clients list");
     } catch (err) {
         logger.error({ err }, "❌ GET /api/clients/all error");
@@ -606,7 +659,6 @@ app.get("/api/clients/:id", async (req, res) => {
         return respError(res, "Server error fetching client.", 500, null, err);
     }
 });
-
 // Photo upload (general)
 app.post("/api/upload-photo", upload.single("photo"), async (req, res) => {
     try {
@@ -625,9 +677,8 @@ app.put("/api/clients/:id", upload.single("photo"), async (req, res) => {
         const id = req.params.id;
         const client = await Client.findById(id);
         if (!client) return respError(res, "Client not found.", 404);
-
         const incoming = { ...(req.body || {}) };
-
+        
         // Handle photo upload
         if (req.file) {
             const photoUrl = req.file.path || req.file.secure_url || req.file.url || "";
@@ -637,13 +688,14 @@ app.put("/api/clients/:id", upload.single("photo"), async (req, res) => {
                 await logAction("admin", "PHOTO_UPLOADED", client._id, "Photo uploaded", { photoUrl });
             }
         }
-
+        
         // Merge fields (only allow known fields)
         const allowedFields = [
             "fullName", "title", "phone1", "phone2", "phone3", "email1", "email2", "email3",
             "company", "businessWebsite", "portfolioWebsite", "locationMap", "bio",
-            "address", "photoUrl",
+            "address", "photoUrl", "status" // Added status here to allow admin updates
         ];
+        
         // SocialLinks and workingHours parsing
         if (incoming.socialLinks && typeof incoming.socialLinks === "string") {
             try { incoming.socialLinks = JSON.parse(incoming.socialLinks); } catch (e) {
@@ -655,7 +707,7 @@ app.put("/api/clients/:id", upload.single("photo"), async (req, res) => {
                 logger.warn("Failed to parse workingHours string");
             }
         }
-
+        
         // Apply changes
         for (const key of allowedFields) {
             if (Object.prototype.hasOwnProperty.call(incoming, key) && incoming[key] !== undefined) {
@@ -668,13 +720,34 @@ app.put("/api/clients/:id", upload.single("photo"), async (req, res) => {
         if (incoming.workingHours && typeof incoming.workingHours === "object") {
             client.workingHours = { ...client.workingHours, ...incoming.workingHours };
         }
-
+        
         // Update slug if necessary
         if ((!client.slug || client.slug.trim() === "") && client.fullName) {
             client.slug = await generateUniqueSlug(client.fullName);
         }
-
-        client.status = client.status === "pending" ? client.status : client.status;
+        
+        // --- PDF REGENERATION LOGIC (from previous partial fix) ---
+        const release = await pdfSemaphore.acquire(MAX_PDF_WAIT_MS).catch(() => null);
+        if (release) {
+            try {
+                // Use client.toObject() to get the latest DB state plus incoming changes
+                const pdfUrl = await generateAndUploadPdf({ ...client.toObject(), ...incoming });
+                client.pdfUrl = pdfUrl;
+                client.history.push({ action: "PDF_REGENERATED", notes: "PDF updated due to client data change", actor: "admin" });
+            } catch (err) {
+                logger.warn({ err }, "⚠️ PDF re-generation failed during client update");
+            } finally {
+                release();
+            }
+        } else {
+            logger.warn("PDF semaphore queue full. Skipping PDF re-generation.");
+        }
+        
+        // --- Status handling correction ---
+        // The unprovided code block's logic was slightly redundant/buggy:
+        // client.status = client.status === "pending" ? client.status : client.status;
+        // The status update is handled above by checking 'incoming.status' via 'allowedFields'.
+        
         client.history.push({ action: "CLIENT_UPDATED", notes: "Admin saved info", actor: "admin" });
 
         await client.save();
@@ -702,7 +775,6 @@ app.post("/api/clients/:id/vcard", async (req, res) => {
             client.slug = await generateUniqueSlug(client.fullName);
         }
 
-        // 6. Miscellaneous: publicVcardPage check (vcard.${slug}) -> Corrected to /vcard/slug
         const publicVcardPage = `${APP_BASE_URL.replace(/\/$/, "")}/vcard/${client.slug}`;
 
         // 1) Generate vCard content (.vcf)
@@ -800,7 +872,6 @@ app.get("/api/clients/:id/pdf", async (req, res) => {
 
         // Stream the final PDF
         if (!pdfResponse || !pdfResponse.ok) {
-             // This case should not be reached if fetchWithRetry works, but as a final safety check:
              throw new Error("Final PDF fetch failed or was empty.");
         }
 
@@ -877,7 +948,7 @@ app.get("/vcard/:idOrSlug", async (req, res) => {
 
         await logAction("public", "VCARD_DOWNLOADED", client._id, `vCard raw file requested by ${req.ip}`, null);
 
-        // Security: Ensure the redirect URL is valid (Cloudinary URL should be fine)
+        // Security: Ensure the redirect URL is valid
         if (!client.vcardFileUrl.startsWith('https://res.cloudinary.com')) {
              logger.error({ vcardFileUrl: client.vcardFileUrl }, "Attempted vCard redirect to non-Cloudinary URL");
              return res.status(500).send("Invalid vCard file URL.");
@@ -914,7 +985,20 @@ app.get("/api/vcard/:idOrSlug", async (req, res) => {
 });
 
 // ------------------------
-// Server Start
+// Catch-all Frontend Routing (CRITICAL FIX ADDED)
+// ------------------------
+app.get('*', (req, res) => {
+    const indexPath = path.join(staticPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+    }
+    logger.error(`❌ Frontend entry file missing at ${indexPath}`);
+    res.status(404).send("SmartCardLink API - Frontend application missing or route not found.");
+});
+
+
+// ------------------------
+// Server Startup
 // ------------------------
 app.listen(PORT, HOST, () => {
     logger.info(`🚀 Server running at http://${HOST}:${PORT}`);

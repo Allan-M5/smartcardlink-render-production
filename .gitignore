@@ -1,21 +1,138 @@
-# Node dependencies
-node_modules/
-**/node_modules/
+# ===========================================
+# SMARTCARDLINK-APP FINAL DOCKERIGNORE FILE
+# ===========================================
 
-# Environment variables
-.env
-
-# Log files
+# -------------------------------
+# Node Modules & Dependency Caches
+# -------------------------------
+node_modules
+**/node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
-# OS generated files
+# -------------------------------
+# Build & Distribution Folders
+# -------------------------------
+build
+dist
+.cache
+.temp
+.tmp
+.out
+.next
+coverage
+logs
+*.log
+
+# -------------------------------
+# Local Environment & Secrets
+# -------------------------------
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.enc
+
+# -------------------------------
+# Source Control & IDE Files
+# -------------------------------
+.git
+.gitignore
+.gitattributes
+.vscode
+.idea
+*.swp
+*.swo
+
+# -------------------------------
+# OS & Temporary Files
+# -------------------------------
 .DS_Store
 Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+*.bak
+*.tmp
+*.old
 
-# VS Code
-.vscode/
-
-# Vercel
+# -------------------------------
+# Platform Specific Artifacts
+# -------------------------------
 .vercel
+.netlify
+.fly
+.fly.io
+fly.toml.bak
+*.tar
+*.zip
+*.rar
+
+# -------------------------------
+# Admin / Client / Server Artifacts
+# -------------------------------
+admin/build
+admin/dist
+admin/.cache
+client/build
+client/dist
+client/.cache
+backend/build
+backend/dist
+backend/.cache
+server/build
+server/dist
+server/.cache
+
+# -------------------------------
+# Debug / Test Files
+# -------------------------------
+*.test.js
+*.spec.js
+*.test.ts
+*.spec.ts
+__tests__/
+__mocks__/
+jest.config.*
+cypress/
+playwright-report/
+test-results/
+
+# -------------------------------
+# Local Development Files
+# -------------------------------
+*.local
+*.example
+*.backup
+*.draft
+*.tmpfile
+
+# -------------------------------
+# Archive & Export Files
+# -------------------------------
+*.gz
+*.tar.gz
+*.zip
+*.7z
+*.rar
+*.bak
+*.old
+*.orig
+*.rej
+
+# -------------------------------
+# Miscellaneous
+# -------------------------------
+*.iml
+*.sublime-project
+*.sublime-workspace
+npm-shrinkwrap.json
+tsconfig.tsbuildinfo

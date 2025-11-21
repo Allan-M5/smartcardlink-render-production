@@ -1,40 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Popup 1 - SmartCardLink</title>
-
-  <link rel="stylesheet" href="popup1/popup1-header.css"/>
-  <link rel="stylesheet" href="popup1/popup1-profile.css"/>
-  <link rel="stylesheet" href="popup1/popup1-name-business-title.css"/>
-  <link rel="stylesheet" href="popup1/popup1-contact.css"/>
-  <link rel="stylesheet" href="popup1/popup1-buttons.css"/>
-  <link rel="stylesheet" href="popup1/popup1-moreinfo.css"/>
-  <link rel="stylesheet" href="popup1/popup1-container.css"/>
-  <link rel="stylesheet" href="popup1/popup1-border-animation.css"/>
-
-  <style>
-    body {
-      margin: 0;
-      background: #111;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <title>Popup1</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="popup-container gold-border">
-    <div id="header-placeholder"></div>
-    <div id="profile-placeholder"></div>
-    <div id="name-business-title-placeholder"></div>
-    <div id="contact-placeholder"></div>
-    <div id="buttons-placeholder"></div>
-    <div id="moreinfo-placeholder"></div>
+  <div class="vcard">
+      <div class="card-surface" id="popup1">
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner">
+          <div class="photo-area" id="photoArea"></div>
+          <div class="personal-info">
+            <div id="fullName" class="full-name"></div>
+            <div id="jobName" class="job-name"></div>
+            <div id="titlePosition" class="title-position"></div>
+          </div>
+          <div class="contact-section">
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Phone:</div>
+                <div class="contact-primary-wrap">
+                  <span id="phoneMain" class="contact-primary"></span>
+                  <button id="phoneDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="phoneList" class="box-list" hidden></div>
+            </div>
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Email:</div>
+                <div class="contact-primary-wrap">
+                  <span id="emailMain" class="contact-primary"></span>
+                  <button id="emailDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="emailList" class="box-list" hidden></div>
+            </div>
+          </div>
+          <div class="actions-grid">
+            <div class="col">
+              <button id="callBtn" class="action-btn"><i class="fa fa-phone"></i> Call</button>
+              <button id="smsBtn" class="action-btn"><i class="fa fa-comment"></i> Message</button>
+              <button id="waBtn" class="action-btn"><i class="fa-brands fa-whatsapp"></i> Whatsapp</button>
+            </div>
+            <div class="col">
+              <button id="mailBtn" class="action-btn"><i class="fa fa-envelope"></i> Email</button>
+              <button id="printBtn" class="action-btn"><i class="fa fa-print"></i> Print</button>
+              <button id="saveBtn" class="action-btn"><i class="fa fa-address-card"></i> Save</button>
+            </div>
+          </div>
+          <div class="nav-row">
+            <button id="moreInfoBtn" class="more-info-btn">More Info</button>
+          </div>
+        </div>
+      </div>
   </div>
-
-  <script src="popup1/popup1-script.js"></script>
 </body>
 </html>

@@ -1,227 +1,61 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Popup 2 - SmartCardLink</title>
-  <style>
-    body {
-      margin: 0;
-      background: #111;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    .popup-container {
-      position: relative;
-      width: 80%;
-      max-width: 450px;
-      background: black;
-      border: 4px solid gold;
-      border-radius: 20px;
-      padding: 15px;
-      animation: popup-bounce-in 0.9s ease, glow-border 3s ease-in-out infinite;
-      box-shadow: 0 0 25px gold;
-      overflow: hidden;
-    }
-    @keyframes popup-bounce-in {
-      0% { transform: scale(0.3); opacity: 0; }
-      50% { transform: scale(1.1); opacity: 1; }
-      70% { transform: scale(0.95); }
-      100% { transform: scale(1); }
-    }
-    @keyframes glow-border {
-      0% { box-shadow: 0 0 8px gold, 0 0 16px gold; }
-      50% { box-shadow: 0 0 24px gold, 0 0 48px gold; }
-      100% { box-shadow: 0 0 8px gold, 0 0 16px gold; }
-    }
-    h2 {
-      color: black;
-      background: gold;
-      padding: 8px;
-      border-radius: 8px;
-      text-align: center;
-      margin: 0 0 10px 0;
-      font-weight: bold;
-    }
-    h3 {
-      color: gold;
-      text-align: center;
-      margin: 10px 0;
-    }
-    p {
-      color: white;
-      text-align: center;
-    }
-    .popup-buttons, .popup-morebuttons {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-      margin: 10px 0;
-    }
-    .popup-buttons button, .popup-morebuttons button, .back-button {
-      background: #f5f5f5;
-      color: black;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 5px;
-      cursor: pointer;
-      flex: 1 1 40%;
-      max-width: 45%;
-      font-weight: bold;
-      transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
-    }
-    .facebook:hover { background: #1877F2; color: white; }
-    .instagram:hover { background: #E4405F; color: white; }
-    .twitter:hover { background: #1DA1F2; color: white; }
-    .linkedin:hover { background: #0077B5; color: white; }
-    .tiktok:hover { background: #010101; color: white; }
-    .youtube:hover { background: #FF0000; color: white; }
-    .popup-morebuttons button:hover {
-      background: gold;
-      color: black;
-      transform: scale(1.05);
-      box-shadow: 0 0 10px gold;
-    }
-    .popup-buttons button:active, .popup-morebuttons button:active, .back-button:active {
-      transform: scale(0.95);
-      box-shadow: inset 0 0 8px black;
-    }
-    .back-button {
-      background: red;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 5px;
-      display: block;
-      width: 90%;
-      margin: 10px auto 0 auto;
-      font-weight: bold;
-    }
-    .back-button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 10px red;
-    }
-    .popup-footer {
-      text-align: center;
-      margin-top: 15px;
-    }
-    .popup-footer p {
-      margin: 3px 0;
-    }
-    #working-hours-table {
-      display: none;
-      width: 90%;
-      margin: 10px auto;
-      background: rgba(255, 255, 0, 0.3);
-      border-collapse: collapse;
-      color: white;
-    }
-    #working-hours-table td, #working-hours-table th {
-      border: 1px solid white;
-      padding: 5px;
-      text-align: center;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <title>Popup2</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="popup-container" id="popup2-container">
-    <h2 id="popup2-name">More About Me</h2>
-    <h3>BIO</h3>
-    <p id="popup2-bio">Loading...</p>
-
-    <div class="popup-buttons" id="popup2-socials">
-      <!-- Social buttons populated dynamically -->
-    </div>
-
-    <div class="popup-morebuttons" id="popup2-actions">
-      <!-- Action buttons populated dynamically -->
-    </div>
-
-    <table id="working-hours-table">
-      <tr><th>Day</th><th>Hours</th></tr>
-    </table>
-
-    <button class="back-button" id="popup2-back">Back</button>
-
-    <div class="popup-footer">
-      <p style="color: gold;"><a href="#" target="_blank" id="popup2-website" style="color: gold; text-decoration: none;">Website</a></p>
-      <p style="color: lightblue; font-size: 12px;">Powered by</p>
-      <p style="color: white; font-weight: bold;">Perfect Parcels Store</p>
-      <p style="color: white; font-size: 12px;">Nairobi, Kenya</p>
-      <p style="color: white; font-size: 12px;" id="datetime"></p>
-    </div>
+  <div class="vcard">
+      <section id="popup2" class="popup">
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner card-scroll">
+          <div class="about-header">
+            <div class="about-title">More About Me</div>
+            <div class="about-bio-box">
+              <div class="bio-label">Bio</div>
+              <div id="bioText" class="bio-text"></div>
+            </div>
+          </div>
+          <div class="links-grid-4">
+            <div class="links-col">
+              <button id="businessWebsite" class="link-btn">Business URL</button>
+              <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+            </div>
+            <div class="links-col">
+              <button id="locationMap" class="link-btn">Location Map</button>
+              <button id="physicalAddress" class="link-btn">Physical Address</button>
+            </div>
+          </div>
+          <div class="hours-section">
+            <table class="hours-table" id="hoursTable">
+              <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
+          <div class="social-grid">
+            <div class="col">
+              <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
+              <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
+              <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
+            </div>
+            <div class="col">
+              <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
+              <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
+              <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
+            </div>
+          </div>
+          <div class="nav-row">
+            <button id="backBtn" class="back-btn">Back</button>
+          </div>
+          <footer class="popup-footer">
+            <div class="powered">Powered by</div>
+            <div class="store">Perfect Parcels Store</div>
+            <div class="location-time">Nairobi, Kenya — <span id="liveTime"></span></div>
+          </footer>
+        </div>
+      </section>
   </div>
-
-  <script>
-    // DateTime updater
-    const dtElement = document.getElementById('datetime');
-    setInterval(() => {
-      dtElement.textContent = new Date().toLocaleString();
-    }, 1000);
-
-    // Back button dynamically toggles to Popup1
-    const backBtn = document.getElementById('popup2-back');
-    backBtn.addEventListener('click', () => {
-      const event = new CustomEvent('popup2-back');
-      document.dispatchEvent(event);
-    });
-
-    // Working Hours toggle
-    const workingHoursBtn = document.createElement('button');
-    workingHoursBtn.textContent = "Working Hours";
-    workingHoursBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const table = document.getElementById('working-hours-table');
-      table.style.display = table.style.display === 'none' ? 'table' : 'none';
-    });
-    const actionsDiv = document.getElementById('popup2-actions');
-    actionsDiv.appendChild(workingHoursBtn);
-
-    // Click outside closes working hours
-    document.addEventListener('click', (e) => {
-      const table = document.getElementById('working-hours-table');
-      if (!workingHoursBtn.contains(e.target) && !table.contains(e.target)) {
-        table.style.display = 'none';
-      }
-    });
-
-    // Function to populate popup2 dynamically from MongoDB client object
-    function populatePopup2(client) {
-      document.getElementById('popup2-name').textContent = client.name || "Not provided";
-      document.getElementById('popup2-bio').textContent = client.bio || "Not provided";
-      document.getElementById('popup2-website').href = client.website || "#";
-      
-      // Social buttons
-      const socials = document.getElementById('popup2-socials');
-      socials.innerHTML = '';
-      const socialPlatforms = ['facebook','instagram','twitter','linkedin','tiktok','youtube'];
-      socialPlatforms.forEach(platform => {
-        if(client[platform]){
-          const btn = document.createElement('button');
-          btn.textContent = platform.charAt(0).toUpperCase() + platform.slice(1);
-          btn.className = platform;
-          btn.onclick = () => window.open(client[platform], '_blank');
-          socials.appendChild(btn);
-        }
-      });
-
-      // Working hours table
-      const table = document.getElementById('working-hours-table');
-      table.innerHTML = '<tr><th>Day</th><th>Hours</th></tr>';
-      if(client.workingHours){
-        Object.entries(client.workingHours).forEach(([day,hours]) => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${day}</td><td>${hours}</td>`;
-          table.appendChild(tr);
-        });
-      } else {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="2">Not provided</td>`;
-        table.appendChild(tr);
-      }
-    }
-  </script>
 </body>
 </html>
