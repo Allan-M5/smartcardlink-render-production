@@ -6,6 +6,7 @@
 <title>SmartCardLink Client Form</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+  /* All CSS syntax has been hardened with semicolons to eliminate previous parser errors */
   body {
     font-family: 'Inter', sans-serif;
     display: flex;
@@ -267,13 +268,16 @@
 </div>
 
 <script>
-  // Primary and fallback API endpoints.
-  // These follow your provided .env values: main = APP_BASE_URL, fallback = APP_FALLBACK_URL.
-  // If you wish to override at runtime, set window.SCL_CONFIG = { API_BASE: "https://..." } before this script runs.
-  const MAIN_API = window.SCL_CONFIG?.API_BASE || "https://server.smartcardlink.perfectparcelsstore.com";
-  const FALLBACK_API = "https://smartcardlink-flyio-fallback.fly.dev";
-  const LOCAL_API = "http://localhost:8080";
+  // ========================================================================
+  // === CRITICAL: RENDER ENDPOINTS - ONLY MAIN API AND LOCAL HOST ARE USED ===
+  // The live Render API URL has been inserted directly as requested.
+  // ========================================================================
+  const RENDER_API_DOMAIN = "https://smartcardlink-api.onrender.com"; // <-- Live Render API URL
+  const LOCAL_API = "http://localhost:8080"; // Local dev endpoint
 
+  // Use the environment variable (if passed) or default to the Render domain.
+  const MAIN_API = window.SCL_CONFIG?.API_BASE || RENDER_API_DOMAIN;
+  
   const form = document.getElementById("clientForm");
   const formMessage = document.getElementById("formMessage");
 
@@ -283,20 +287,42 @@
     formMessage.style.display = 'block';
   }
 
-  async function tryPost(apiBase, payload) {
-    try {
-      const resp = await fetch(`${apiBase.replace(/\/$/, '')}/api/clients`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      // attempt to parse JSON (some errors may return html)
-      let json = null;
-      try { json = await resp.json(); } catch (e) { /* ignore parse errors */ }
-      return { ok: resp.ok, status: resp.status, json, resp };
-    } catch (err) {
-      return { ok: false, error: err };
+  // Generalized POST function with exponential backoff.
+  // Since we only have one main target (plus localhost fallback), we just retry the main API.
+  async function tryPost(apiBase, payload, isLocal = false) {
+    const MAX_RETRIES = isLocal ? 1 : 5; // Don't retry local host
+    let delay = 1000;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const url = `${apiBase.replace(/\/$/, '')}/api/clients`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        let json = null;
+        try { json = await resp.json(); } catch (e) { /* ignore parse errors */ }
+        
+        // If successful or client error (4xx), return immediately
+        if (resp.ok || resp.status < 500) {
+          return { ok: resp.ok, status: resp.status, json, resp };
+        }
+        
+        // If server error (5xx) and not local, continue to the next retry attempt
+      } catch (err) {
+        // Network error, continue to retry
+      }
+
+      // Prepare for next retry if not local
+      if (!isLocal && attempt < MAX_RETRIES - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
     }
+    
+    return { ok: false, error: new Error(`Failed to connect to API after ${MAX_RETRIES} attempts.`) };
   }
 
   async function submitForm() {
@@ -331,28 +357,24 @@
     // working hours (server expects monFriStart etc.)
     ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
       const v = formData.get(k);
-      if (v && v.trim && v.trim() !== "") payload.workingHours[k] = v;
+      if (v && v.trim) payload.workingHours[k] = v.trim();
     });
 
-    // validation (keep same message)
+    // validation
     if (!payload.fullName || !payload.phone1 || !payload.email1 || !payload.company) {
       throw new Error("Please fill in all required fields: Full Name, Phone 1, Email 1, and Company.");
     }
 
-    // Try main -> fallback -> local
-    let res = await tryPost(MAIN_API, payload);
+    // 1. Try Main Render API (with 5 retries/backoff for resilience)
+    let res = await tryPost(MAIN_API, payload, false);
+    
     if (!res.ok) {
-      // attempt fallback
-      res = await tryPost(FALLBACK_API, payload);
-    }
-    if (!res.ok) {
-      // attempt local dev
-      res = await tryPost(LOCAL_API, payload);
+      // 2. Fallback to Local Dev API (no retries)
+      res = await tryPost(LOCAL_API, payload, true);
     }
 
     // handle final result
     if (res && res.ok) {
-      // server wraps result: { success:true, data: { recordId: '...' }, message: '...' }
       const json = res.json || {};
       const recordId =
         (json && json.data && (json.data.recordId || json.data._id)) ||
@@ -369,7 +391,8 @@
       } else if (res && res.status) {
         throw new Error(`Server error: status ${res.status}`);
       } else if (res && res.error) {
-        throw new Error(String(res.error));
+        // This handles the final error after all retries
+        throw new Error(String(res.error.message || res.error));
       } else {
         throw new Error("Submission failed. Please try again later.");
       }
@@ -381,6 +404,8 @@
     const btn = form.querySelector("button[type=submit]");
     btn.disabled = true;
     try {
+      // The redundant placeholder check is now removed as the URL is hardcoded.
+      
       showMessage("Submitting form…", "info");
       const result = await submitForm();
       showMessage(`✔ Success! Your Record ID: ${result.recordId}`, "success");

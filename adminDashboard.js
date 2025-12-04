@@ -2,18 +2,16 @@
 
 // --- Global Variables ---
 let allClientData = [];
-// CRITICAL FIX: Use the consistent API_ROOT defined in adminDashboard.html config block (Finding F).
+const MAX_RETRIES = 3;
+let isFetching = false;
+
+// CRITICAL: Robust API_ROOT configuration using window.SCL_CONFIG
 const API_ROOT = window.SCL_CONFIG?.API_ROOT || `${window.location.origin}/api`;
 const ADMIN_FORM_URL = window.SCL_CONFIG?.ADMIN_FORM_URL || 'admin-form.html';
 
-// --- DOM Elements (Defensive access for elements that might be missing - Finding D) ---
-const loginCard = document.getElementById('loginCard');
-const adminLoginForm = document.getElementById('adminLoginForm');
-const emailInput = document.getElementById('emailInput');
-const passwordInput = document.getElementById('passwordInput');
+// --- DOM Elements (Defensive checks are kept) ---
 const dashboardContainer = document.getElementById('dashboardContainer');
 const clientTableBody = document.getElementById('clientTableBody');
-// FIX: Using 'filterInput' to match the corrected HTML ID
 const filterInput = document.getElementById('filterInput'); 
 const statusFilter = document.getElementById('statusFilter');
 const exportBtn = document.getElementById('exportBtn');
@@ -21,30 +19,114 @@ const noResultsDiv = document.getElementById('noResults');
 const totalsDiv = document.getElementById('totals');       
 const searchBtn = document.getElementById('searchBtn');
 
-// --- Helper Functions ---
-function getToken() {
-    return localStorage.getItem('adminToken');
+// --- Modal & Toast Elements (New) ---
+const notesModal = document.getElementById('notesModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalTextarea = document.getElementById('modalTextarea');
+const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+const modalCloseBtn = document.querySelector('.modal-content .close-btn'); 
+const toastContainer = document.getElementById('toast-container');
+
+
+// --- UI Feedback & Helper Functions ---
+
+function showToast(message, type = 'success') {
+    if (!toastContainer) return;
+    
+    // 1. Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // 2. Add message and close button
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button class="toast-close-btn" style="background: none; border: none; color: white; margin-left: 10px; cursor: pointer;">&times;</button>
+    `;
+    
+    // 3. Handle manual close
+    const closeBtn = toast.querySelector('.toast-close-btn');
+    const closeToast = () => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove());
+    };
+    closeBtn.addEventListener('click', closeToast);
+
+    // 4. Append and show
+    toastContainer.appendChild(toast);
+    setTimeout(() => { toast.classList.add('show'); }, 10);
+    
+    // 5. Auto-dismiss after 5 seconds
+    setTimeout(closeToast, 5000);
 }
 
-function saveToken(token) {
-    localStorage.setItem('adminToken', token);
+function hideModal() {
+    if (notesModal) {
+        notesModal.style.display = 'none';
+        modalTextarea.value = ''; // Clear notes when hiding
+    }
 }
 
-function removeToken() {
-    localStorage.removeItem('adminToken');
-}
-
-// FIX (Finding C): Standardize status badge formatting for consistent CSS class names.
 function getStatusBadge(status) {
-    // Ensures status is not null/undefined and capitalizes the first letter for consistency (e.g., 'pending' -> 'Pending')
     const statusClean = status 
         ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() 
         : 'Pending';
-    
-    // The class name only strips whitespace if any exists (e.g., 'In Review' -> 'InReview')
     const statusClass = statusClean.replace(/\s/g, ''); 
-    
     return `<span class="status-badge status-${statusClass}">${statusClean}</span>`;
+}
+
+function getLoadingHtml(attempt = 0) {
+    // Adding aria-live="polite" for accessibility announcement
+    const spinner = `<i class="fas fa-spinner fa-spin" style="margin-right: 10px;"></i>`;
+    const attemptMsg = attempt > 0 ? ` (Attempt ${attempt}/${MAX_RETRIES})` : '';
+    return `<span aria-live="polite">${spinner} Loading client data...${attemptMsg}</span>`;
+}
+
+function showFinalError(message) {
+    if (!clientTableBody) return;
+    
+    // Also show toast notification for better UX
+    showToast(`Failed to load data: ${message}`, 'error');
+    
+    clientTableBody.innerHTML = `
+        <tr>
+            <td colspan="9" style="text-align:center; color: #ef4444; padding: 20px;">
+                <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
+                Failed to load data: ${message}
+                <button onclick="fetchAllClients()" style="margin-left: 15px; background: #FFD700; color: black; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+function showNotesModal(action, clientId, newStatus) {
+    if (!notesModal || !modalTitle || !modalTextarea || !modalConfirmBtn) return;
+
+    modalTitle.innerText = `Reason for ${action} Action`;
+    modalTextarea.placeholder = `Please provide a MANDATORY reason for this ${action} action.`;
+    modalTextarea.value = '';
+
+    // UX Improvement: Focus on the textarea when modal opens
+    setTimeout(() => { modalTextarea.focus(); }, 10); 
+
+    modalConfirmBtn.onclick = () => {
+        const notes = modalTextarea.value.trim();
+        if (!notes) {
+            showToast('A reason is required to proceed.', 'error');
+            return;
+        }
+
+        hideModal(); 
+        
+        if (action === 'Process') {
+            processClient(clientId, notes); 
+        } else {
+            changeClientStatus(clientId, newStatus, notes);
+        }
+    };
+    
+    notesModal.style.display = 'block';
 }
 
 function renderTable(data) {
@@ -65,36 +147,44 @@ function renderTable(data) {
     
     data.forEach(client => {
         const tr = document.createElement('tr');
-        // Add click listener to row for opening the client form (Process/View logic)
+        tr.dataset.clientId = client._id; 
+        
+        // Row Click: Opens modal for Process/View
         tr.onclick = (e) => {
-             // Only open if the click target wasn't an action button
-             if (e.target.tagName !== 'BUTTON' && e.target.parentElement.tagName !== 'BUTTON') {
-                 processClient(client._id);
-             }
+             // CRITICAL: Ensure click target is not a button or part of a button
+             if (e.target.closest('button')) return; 
+             showNotesModal('Process', client._id, null);
         };
 
+        const currentStatus = client.status || 'Pending';
+        
+        // SECURITY NOTE: In a real-world scenario, all URL/text inputs injected via innerHTML
+        // (like photoUrl, vcardUrl, qrCodeUrl) should be sanitized if they can be
+        // user-submitted to prevent XSS. Assuming they are safe, backend-generated URLs here.
+        
         tr.innerHTML = `
             <td><img src="${client.photoUrl || 'https://placehold.co/50x50?text=No+Photo'}" alt="Client Photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
             <td>${client.fullName || 'N/A'}</td>
             <td>${client.company || 'N/A'}</td>
             <td>${client.email1 || 'N/A'}</td>
             <td>${client.phone1 || 'N/A'}</td>
-            <td>${getStatusBadge(client.status)}</td>
+            <td>${getStatusBadge(currentStatus)}</td>
             <td>${client.vcardUrl ? `<a href="${client.vcardUrl}" target="_blank" class="text-blue-500 hover:underline">View</a>` : 'N/A'}</td>
             <td>${client.qrCodeUrl ? `<a href="${client.qrCodeUrl}" download="qrcode.png"><img src="${client.qrCodeUrl}" alt="QR Code" class="qr-code mx-auto" /></a>` : 'N/A'}</td>
             <td class="actions-cell">
-                ${client.status === 'Pending' ? 
-                    `<button class="action-btn btn-process" onclick="event.stopPropagation(); processClient('${client._id}')">Process</button>` :
-                    `<button class="action-btn btn-view" onclick="event.stopPropagation(); processClient('${client._id}')">View</button>`
+                ${currentStatus === 'Pending' ? 
+                    // event.stopPropagation() is crucial to prevent tr.onclick
+                    `<button class="action-btn btn-process" onclick="event.stopPropagation(); showNotesModal('Process', '${client._id}', null)">Process</button>` :
+                    `<button class="action-btn btn-view" onclick="event.stopPropagation(); showNotesModal('Process', '${client._id}', null)">View</button>`
                 }
-                ${client.status === 'Active' ? 
-                    `<button class="action-btn btn-disable" onclick="event.stopPropagation(); changeClientStatus('${client._id}', 'Disabled')">Disable</button>` :
-                    client.status === 'Disabled' ?
-                    `<button class="action-btn btn-enable" onclick="event.stopPropagation(); changeClientStatus('${client._id}', 'Active')">Enable</button>` :
+                ${currentStatus === 'Active' ? 
+                    `<button class="action-btn btn-disable" onclick="event.stopPropagation(); showNotesModal('Disable', '${client._id}', 'Disabled')">Disable</button>` :
+                    currentStatus === 'Disabled' ?
+                    `<button class="action-btn btn-enable" onclick="event.stopPropagation(); showNotesModal('Enable', '${client._id}', 'Active')">Enable</button>` :
                     ''
                 }
-                ${client.status !== 'Deleted' ?
-                    `<button class="action-btn btn-delete" onclick="event.stopPropagation(); changeClientStatus('${client._id}', 'Deleted')">Delete</button>` :
+                ${currentStatus !== 'Deleted' ?
+                    `<button class="action-btn btn-delete" onclick="event.stopPropagation(); showNotesModal('Delete', '${client._id}', 'Deleted')">Delete</button>` :
                     ''
                 }
             </td>
@@ -132,7 +222,6 @@ function filterAndSearch() {
     const selectedStatus = statusFilter.value;
     
     const filteredData = allClientData.filter(client => {
-        // ENHANCEMENT (Finding B): Added company to the search filter
         const matchesSearch = 
             (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
             (client.phone1 && client.phone1.toLowerCase().includes(searchTerm)) ||
@@ -147,182 +236,147 @@ function filterAndSearch() {
     renderTable(filteredData);
 }
 
-// FIX (Finding A): Implemented placeholder function for export button
 function exportToCsv() {
     if (allClientData.length === 0) {
-        alert("No client data loaded to export.");
+        showToast("No client data loaded to export.", 'error');
         return;
     }
     
-    // Placeholder implementation (Server-side export is the best practice for production)
-    alert(`Initiating export of ${allClientData.length} client records... This functionality is currently a client-side placeholder. For a scalable and secure solution, it is recommended to implement server-side CSV generation.`);
-    console.log("Client data available for export:", allClientData);
+    const headers = ["ID", "Name", "Company", "Email", "Phone", "Status", "vCard URL", "QR Code URL"];
     
-    // A fully featured implementation would involve:
-    // 1. Fetching all data from an API endpoint designed for export.
-    // 2. Creating a Blob or using the response header to trigger a download.
+    const data = allClientData.map(client => [
+        client._id || '',
+        client.fullName || '',
+        client.company || '',
+        client.email1 || '',
+        client.phone1 || '',
+        client.status || 'Pending',
+        client.vcardUrl || '',
+        client.qrCodeUrl || ''
+    ]);
+
+    let csvContent = headers.join(",") + "\n";
+    data.forEach(row => {
+        const rowString = row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(",");
+        csvContent += rowString + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `smartcardlink_clients_${new Date().toISOString().slice(0, 10)}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Successfully generated and downloaded CSV for ${allClientData.length} clients.`);
 }
 
-async function changeClientStatus(clientId, newStatus, notes = 'Admin dashboard action') {
-    if (!API_ROOT) return alert('Configuration Error: API root not defined.');
+async function changeClientStatus(clientId, newStatus, notes) {
+    if (!API_ROOT) return showToast('Configuration Error: API root not defined.', 'error');
 
-    if (!confirm(`Are you sure you want to change this client's status to '${newStatus}'?`)) {
-        return;
-    }
-
-    const token = getToken();
-    if (!token) {
-        alert('Unauthorized. Please log in.');
-        removeToken();
-        window.location.reload();
-        return;
-    }
-    
     try {
-        // FIX: Using API_ROOT
         const response = await fetch(`${API_ROOT}/clients/${clientId}/status/${newStatus}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ notes })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes }) 
         });
         
         if (!response.ok) {
-            if (response.status === 401) {
-                alert('Session expired or unauthorized. Please log in.');
-                removeToken();
-                window.location.reload();
-                return;
-            }
             const errorData = await response.json();
             throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
         }
         
-        alert(`Status updated to ${newStatus}.`);
+        showToast(`Status updated to ${newStatus}. Reason: ${notes.substring(0, 30)}...`);
+        
+        const row = document.querySelector(`tr[data-client-id="${clientId}"]`);
+        if (row) {
+            row.classList.add('row-success');
+            setTimeout(() => { row.classList.remove('row-success'); }, 2000); 
+        }
+
         await fetchAllClients(); 
     } catch (error) {
         console.error("Error changing client status:", error);
-        alert(`Failed to change status: ${error.message}`);
+        showToast(`Failed to change status: ${error.message}`, 'error');
     }
 }
 
 async function fetchAllClients() {
-    if (!API_ROOT) return;
-
-    const token = getToken();
-    if (!token) return; // Login required, init() will handle it.
+    if (isFetching || !API_ROOT) return;
     
-    if (clientTableBody) clientTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Loading client data...</td></tr>';
+    isFetching = true;
     
-    try {
-        // FIX: Using API_ROOT
-        const response = await fetch(`${API_ROOT}/clients/all`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        if (clientTableBody) clientTableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">${getLoadingHtml(attempt)}</td></tr>`;
+        
+        try {
+            // CORRECTION: Use the Admin API route /admin/clients which should exist on the backend.
+            const response = await fetch(`${API_ROOT}/admin/clients`);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Server responded with error status.' }));
+                throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
             }
-        });
-        
-        if (response.status === 401) {
-            alert('Session expired or unauthorized. Please log in.');
-            removeToken();
-            window.location.reload();
-            return;
+            
+            allClientData = await response.json();
+            renderTable(allClientData);
+            isFetching = false;
+            return; 
+
+        } catch (error) {
+            console.error(`Attempt ${attempt} failed:`, error);
+            
+            if (attempt === MAX_RETRIES) {
+                // Final failure: show both inline error and toast
+                showFinalError(error.message); 
+                isFetching = false;
+                return;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1500 * attempt)); 
         }
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
-        }
-        
-        allClientData = await response.json();
-        renderTable(allClientData);
-    } catch (error) {
-        console.error("Error fetching all clients:", error);
-        if (clientTableBody) {
-             clientTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444;">Failed to load data. Please check network connection and API_ROOT configuration.</td></tr>';
-        }
-        alert(`Failed to fetch clients: ${error.message}`);
     }
 }
 
-function processClient(clientId) {
-    // Uses the robust ADMIN_FORM_URL configuration
+function processClient(clientId, notes = 'No reason provided') {
+    // Log notes for auditing purposes (e.g., in a separate audit service or log file)
+    console.log(`Processing client ${clientId}. Admin notes: ${notes}`); 
+    showToast(`Opening client form for ${clientId}. Notes logged.`);
+
     const url = new URL(ADMIN_FORM_URL, window.location.href);
     url.searchParams.set('id', clientId);
     window.open(url.toString(), '_blank');
 }
 
-async function adminLogin(email, password) {
-    if (!API_ROOT) return alert('Configuration Error: API root not defined.');
-
-    try {
-        // FIX: Using API_ROOT
-        const response = await fetch(`${API_ROOT}/admin/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Authentication failed');
-        }
-        
-        const data = await response.json();
-        saveToken(data.token);
-        
-        // Defensive check before manipulating styles
-        if (loginCard) loginCard.style.display = 'none';
-        if (dashboardContainer) dashboardContainer.style.display = 'block';
-        
-        await fetchAllClients();
-    } catch (error) {
-        alert('Login failed. Please check your credentials.');
-        console.error('Login error:', error);
-    }
-}
-
 // --- Event Listeners ---
-if (adminLoginForm) {
-    adminLoginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        // Defensive check for input elements
-        if (!emailInput || !passwordInput) {
-            console.error('Login input fields are missing from the HTML.');
-            return;
-        }
-        const email = emailInput.value;
-        const password = passwordInput.value;
-        await adminLogin(email, password);
-    });
-}
-
 if (searchBtn) searchBtn.addEventListener('click', filterAndSearch);
 if (filterInput) filterInput.addEventListener('keyup', filterAndSearch); 
 if (statusFilter) statusFilter.addEventListener('change', filterAndSearch);
 if (exportBtn) exportBtn.addEventListener('click', exportToCsv);
 
+// Modal close listeners
+if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideModal);
+if (notesModal) {
+    window.addEventListener('click', (event) => {
+        if (event.target === notesModal) hideModal();
+    });
+}
+
 // --- Initialization ---
 async function init() {
-    // Check for critical configuration early
     if (!API_ROOT) {
          console.error('CRITICAL: API_ROOT is not configured. Check the SCL_CONFIG block in adminDashboard.html.');
          if (clientTableBody) clientTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: red;">API Configuration Missing. Check Console.</td></tr>';
          return;
     }
 
-    if (getToken()) {
-        // Show dashboard if token exists
-        if (loginCard) loginCard.style.display = 'none';
-        if (dashboardContainer) dashboardContainer.style.display = 'block';
-        await fetchAllClients();
-    } else {
-        // Show login page
-        if (loginCard) loginCard.style.display = 'block';
-        if (dashboardContainer) dashboardContainer.style.display = 'none';
-    }
+    if (dashboardContainer) dashboardContainer.style.display = 'block';
+    
+    await fetchAllClients();
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -330,4 +384,6 @@ document.addEventListener('DOMContentLoaded', init);
 // Expose functions to the global scope for onclick attributes in HTML
 window.changeClientStatus = changeClientStatus;
 window.processClient = processClient;
+window.fetchAllClients = fetchAllClients;
 window.exportToCsv = exportToCsv;
+window.showNotesModal = showNotesModal;
