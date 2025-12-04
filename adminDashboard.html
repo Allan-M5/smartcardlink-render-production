@@ -285,12 +285,13 @@
     </div>
     <div class="toast-container" id="toast-container"></div>
 
-    <script>
-      window.SCL_CONFIG = { 
-        API_ROOT: "https://smartcardlink-flyio.fly.dev/api", 
+   <script>
+    // CRITICAL FIX: Directs all API calls to the live Render Backend URL.
+    window.SCL_CONFIG = { 
+        API_ROOT: "https://smartcardlink-api.onrender.com/api", 
         ADMIN_FORM_URL: "admin-form.html"
-      };
-    </script>
+    };
+</script>
     
     <script src="./js/adminDashboard.js"></script>
 </body>
