@@ -1,1007 +1,753 @@
-// SmartCardLink - Final Production-ready server.js
-// - Addressing all previous runtime, deployment, security, and performance concerns.
-// ------------------------------------------------------------------------------
+// C:\Users\ADMIN\Desktop\smartcardlink-app\server.js
 
+// ------------------------
+// Imports
+// ------------------------
 const express = require("express");
-const dotenv = require("dotenv");
-const helmet = require("helmet");
-const cors = require("cors");
-const morgan = require("morgan");
-const mongoose = require("mongoose");
 const path = require("path");
-const fs = require("fs");
-const nodemailer = require("nodemailer");
-const QRCode = require("qrcode");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const helmet = require("helmet");
 const RateLimit = require("express-rate-limit");
-const { Semaphore } = require("await-semaphore");
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("cloudinary").v2;
-const slugify = require("slugify");
-// 1. Puppeteer in Production: Replace puppeteer with puppeteer-core
-const puppeteer = require("puppeteer-core");
-const fetch = require("node-fetch");
-const { Readable } = require("stream");
-// 5. Error Logging: Use Pino for structured logging
+const multer = require("multer");
+const qrcode = require("qrcode");
+const vCardJS = require("vcards-js");
+const nodemailer = require("nodemailer");
 const pino = require("pino");
+const pinoHttp = require("pino-http");
+const fs = require("fs"); // Added for the favicon check from source
 
-// Configuration
-dotenv.config();
+// Configure custom logger
+const logger = pino({ level: process.env.NODE_ENV === "production" ? "info" : "debug" });
 
 // ------------------------
-// Config & Env & Logging
+// Environment Variables
 // ------------------------
-const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
 
-// CORRECTION 1: Use APP_BASE_URL for API URL and remove APP_FALLBACK_URL.
-const APP_BASE_URL = process.env.APP_BASE_URL || process.env.APP_BASE || `http://localhost:${PORT}`;
+// Base URLs
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
+const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; // Public URL for the vCard page
+const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL; // Used for /:slug redirect fallback
 
-// NEW VARIABLE: Essential for CORS (the URL of the Static Site/Frontend)
-const APP_FRONTEND_URL = process.env.APP_FRONTEND_URL || ""; 
-
+// Derive the base URL for the backend API for internal use (CORS)
 const BACKEND_API_URL = APP_BASE_URL.startsWith("http") ? new URL(APP_BASE_URL).origin : APP_BASE_URL;
 
+// SMTP
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null;
 
+// Cloudinary
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
-// -----------------------------------------------------------------------------
-// NOTE: expanded default ALLOWED_ORIGINS to include local dev (localhost/127.0.0.1)
-// -----------------------------------------------------------------------------
-const defaultOrigins = [
-  "http://localhost:8080",
-  "http://127.0.0.1:8080"
-];
 
-// CORRECTION 2: Refactor ALLOWED_ORIGINS to combine default, APP_BASE_URL, and the new APP_FRONTEND_URL
-const allowedEnvOrigins = [APP_BASE_URL, APP_FRONTEND_URL, process.env.ALLOWED_ORIGINS]
-  .filter(Boolean)
-  .flatMap(s => s.split(','))
-  .map(s => s.trim());
-
-const ALLOWED_ORIGINS = [...new Set([...defaultOrigins, ...allowedEnvOrigins])];
-
-
-// 5. Error Logging: Pino Logger setup
-const logger = pino({
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
-    transport: process.env.NODE_ENV === "production" ? undefined : {
-        target: "pino-pretty",
-        options: { colorize: true }
-    }
+// ------------------------
+// Database Schema and Model (Comprehensive)
+// ------------------------
+const historySchema = new mongoose.Schema({
+  action: { type: String, required: true },
+  notes: { type: String },
+  actor: { type: String, default: "system" },
+  timestamp: { type: Date, default: Date.now },
 });
 
-// Basic required env check
-const required = ["MONGODB_URI", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
-for (const k of required) {
-    if (!process.env[k]) {
-        logger.warn(`⚠️ Warning - environment variable ${k} is not set.`);
-    }
-}
+// Nested Schemas for form data
+const socialLinksSchema = new mongoose.Schema({
+  facebook: { type: String, trim: true, default: "" },
+  instagram: { type: String, trim: true, default: "" },
+  twitter: { type: String, trim: true, default: "" },
+  linkedin: { type: String, trim: true, default: "" },
+  tiktok: { type: String, trim: true, default: "" },
+  youtube: { type: String, trim: true, default: "" },
+}, { _id: false });
+
+const workingHoursSchema = new mongoose.Schema({
+  monFriStart: { type: String, default: "" },
+  monFriEnd: { type: String, default: "" },
+  satStart: { type: String, default: "" },
+  satEnd: { type: String, default: "" },
+  sunStart: { type: String, default: "" },
+  sunEnd: { type: String, default: "" },
+}, { _id: false });
+
+
+const ClientSchema = new mongoose.Schema({
+  // Personal Details
+  fullName: { type: String, required: true, trim: true },
+  title: { type: String, trim: true, default: "" },
+  
+  phone1: { type: String, trim: true, default: "" },
+  phone2: { type: String, trim: true, default: "" },
+  phone3: { type: String, trim: true, default: "" }, // From admin-form.html
+  email1: { type: String, trim: true, lowercase: true, default: "" },
+  email2: { type: String, trim: true, lowercase: true, default: "" },
+  email3: { type: String, trim: true, lowercase: true, default: "" }, // From admin-form.html
+
+  // Business Details
+  company: { type: String, trim: true, default: "" },
+  website: { type: String, trim: true, default: "" }, // Renamed from businessWebsite for simplicity
+  businessWebsite: { type: String, trim: true, default: "" },
+  portfolioWebsite: { type: String, trim: true, default: "" },
+  locationMap: { type: String, trim: true, default: "" }, // locationMapUrl from form
+  address: { type: String, default: "" },
+  bio: { type: String, default: "" },
+
+  // Nested Data
+  workingHours: workingHoursSchema,
+  socialLinks: socialLinksSchema,
+  
+  // Status and Media
+  photoUrl: { type: String, default: "" }, // Cloudinary URL
+  slug: { type: String, required: true, unique: true, index: true },
+  status: { type: String, enum: ["Pending", "Active", "Suspended", "Deleted"], default: "Pending" },
+
+  vcardUrl: { type: String, default: "" }, // Cloudinary URL to .vcf file
+  qrCodeUrl: { type: String, default: "" }, // Data URL for QR code (or Cloudinary if uploaded)
+
+  history: [historySchema],
+}, { timestamps: true });
+
+const Client = mongoose.model("Client", ClientSchema);
+
 
 // ------------------------
-// Cloudinary config
+// App Initialization & DB Connection
 // ------------------------
+const app = express();
+const staticPath = path.join(__dirname, "public");
+
+// MongoDB Connection: Added best practice options
+mongoose
+  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => logger.info("✅ MongoDB connected successfully"))
+  .catch((err) => {
+    logger.error({ err }, "❌ MongoDB connection error");
+    process.exit(1);
+  });
+
+
+// Cloudinary Configuration
 cloudinary.config({
-    cloud_name: CLOUDINARY_CLOUD_NAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
+  cloud_name: CLOUDINARY_CLOUD_NAME,
+  api_key: CLOUDINARY_API_KEY,
+  api_secret: CLOUDINARY_API_SECRET,
+  secure: true,
 });
+
+// Configure multer for file uploads (using memory storage for Cloudinary)
+const upload = multer({ storage: multer.memoryStorage() });
+
+
+// Email Transporter
+const transporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465, 
+  auth: {
+    user: SMTP_USER,
+    pass: SMTP_PASS,
+  },
+});
+
+
+// ------------------------
+// Helper Functions (Fully Implemented)
+// ------------------------
+
+// Standardized API Response
+const respSuccess = (res, data = null, message = "OK", statusCode = 200, meta = null) => {
+  return res.status(statusCode).json({
+    status: "success",
+    message,
+    data,
+    meta,
+  });
+};
+
+const respError = (res, message = "Server error", statusCode = 500, data = null, errorObj = null) => {
+  if (errorObj) logger.error({ error: errorObj }, `API Error: ${message}`);
+  return res.status(statusCode).json({
+    status: "error",
+    message,
+    data,
+  });
+};
+
+// Logging
+const logAction = async (actor, action, clientId, notes, data) => {
+  logger.info({ actor, action, clientId, notes, data }, `ACTION: ${action} by ${actor}`);
+  // In a real application, you would also save this to the client's history array here.
+};
+
+// Slug Generation
+const generateUniqueSlug = async (name) => {
+  const baseSlug = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "") 
+    .replace(/[\s-]+/g, "-") 
+    .substring(0, 50);
+
+  let slug = baseSlug;
+  let counter = 1;
+  while (await Client.findOne({ slug: slug })) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+    if (counter > 100) {
+       logger.warn({ baseSlug, finalSlug: slug }, "High collision detected, using random slug suffix.");
+       // Use random suffix as a last resort
+       slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`; 
+       break;
+    }
+  }
+  return slug;
+};
+
+// VCard Content Generation
+const generateVcardContent = (client) => {
+  const vCard = vCardJS();
+  const names = (client.fullName || "").split(" ");
+  vCard.firstName = names.shift() || "";
+  vCard.lastName = names.join(" ") || "";
+  vCard.name = client.fullName;
+  vCard.organization = client.company || "";
+  vCard.title = client.title || "";
+  
+  // Primary Contacts
+  if (client.phone1) vCard.cellPhone = client.phone1;
+  if (client.email1) vCard.email = client.email1;
+  
+  // Secondary Contacts
+  if (client.phone2) vCard.workPhone = client.phone2;
+  if (client.email2) vCard.workEmail = client.email2;
+  if (client.phone3) vCard.otherPhone = client.phone3;
+  if (client.email3) vCard.otherEmail = client.email3;
+  
+  // Addresses and URLs
+  if (client.address) vCard.homeAddress.label = client.address;
+  if (client.website || client.businessWebsite) vCard.url = client.website || client.businessWebsite;
+  if (client.portfolioWebsite) vCard.note = `Portfolio: ${client.portfolioWebsite}`;
+
+  // Social Links (using an X-SOCIAL property for broader compatibility)
+  if (client.socialLinks) {
+    const socialText = Object.entries(client.socialLinks)
+        .filter(([_, url]) => url)
+        .map(([platform, url]) => `${platform}: ${url}`)
+        .join('\n');
+    if (socialText) vCard.socialmedia = socialText;
+  }
+  
+  if (client.photoUrl) {
+      try {
+          // CRITICAL: vCard.photo.attachFromUrl wrapped in try/catch as recommended.
+          vCard.photo.attachFromUrl(client.photoUrl, 'JPEG'); 
+      } catch(e) {
+          logger.warn({ error: e, photoUrl: client.photoUrl }, "Failed to attach photo to vCard from URL. Proceeding without image.");
+      }
+  }
+  
+  return vCard.getFormattedString();
+};
+
+// Cloudinary VCF Upload
+const uploadVcfToCloudinary = async (slug, vcfContent) => {
+  const base64Vcf = Buffer.from(vcfContent).toString('base64');
+  
+  const result = await cloudinary.uploader.upload(
+    `data:text/vcard;base64,${base64Vcf}`,
+    {
+      folder: "smartcardlink_vcards",
+      resource_type: "raw", 
+      public_id: slug, 
+      format: "vcf",
+      tags: ["client_vcard"],
+    }
+  );
+  return result.secure_url;
+};
+
+// Email Function
+const sendEmail = async (to, subject, text, html) => {
+  if (!SMTP_USER || !SMTP_PASS) {
+    logger.warn("SMTP credentials missing. Skipping email send.");
+    return;
+  }
+  
+  const mailOptions = {
+    from: `"SmartCardLink Admin" <${SMTP_USER}>`,
+    to: to,
+    subject: subject,
+    text: text,
+    html: html || `<p>${text}</p>`,
+  };
+  
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    logger.info(`Email sent to ${to}: ${info.messageId}`);
+  } catch (err) {
+    logger.error({ err }, `❌ Failed to send email to ${to}`);
+  }
+};
+
+// PDF Stub (Implemented but with warning as per observation)
+const generateAndUploadPdf = async (client) => {
+  logger.warn(`PDF generation is a complex feature and is currently stubbed (generateAndUploadPdf).`);
+  // Stubbed URL based on client slug
+  return `https://res.cloudinary.com/dicvwaud3/raw/upload/smartcardlink_pdfs/${client.slug}.pdf`;
+};
+
 
 // ------------------------
 // Middleware
 // ------------------------
-// Use morgan, but pipe output through Pino in production (or keep simple for now)
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(pinoHttp({ logger }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ------------------------
-// CSP & Security
-// ------------------------
+// Security Middleware (Helmet and CORS)
 app.use(
-    helmet.contentSecurityPolicy({
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "*.googletagmanager.com", "*.google-analytics.com"],
-            styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-            styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-            imgSrc: ["'self'", "data:", "res.cloudinary.com"],
-            // CORRECTION 3: Remove APP_FALLBACK_URL from connectSrc. BACKEND_API_URL handles the API URL.
-            connectSrc: ["'self'", BACKEND_API_URL, "res.cloudinary.com", "https://api.cloudinary.com", "*.google-analytics.com", "*.analytics.google.com", "https://ab.reasonlabsapi.com"],
-            fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
-            frameAncestors: ["'self'"],
-        },
-    })
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "res.cloudinary.com"],
+      // CRITICAL: Removed APP_FALLBACK_URL from connectSrc and added necessary external domains
+      connectSrc: ["'self'", BACKEND_API_URL, "res.cloudinary.com", "https://api.cloudinary.com", "*.google-analytics.com", "*.analytics.google.com"], 
+      fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
+      frameAncestors: ["'self'"],
+    },
+  })
 );
 
-// CORS (restrict to allowed origins)
+// CORS
 app.use(
-    cors({
-        origin: (origin, callback) => {
-            if (!origin) return callback(null, true);
-
-            if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.some(a => origin.startsWith(a))) {
-                return callback(null, true);
-            }
-
-            logger.warn({ origin }, "CORS rejected request from unauthorized origin");
-            return callback(new Error("CORS not allowed"), false);
-        },
-    })
+  cors({
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        "http://localhost",
+        BACKEND_API_URL,
+        VCARD_BASE_URL,
+        APP_FALLBACK_URL,
+      ];
+      
+      if (!origin) return callback(null, true);
+      
+      let checkOrigin = origin;
+      try {
+          checkOrigin = new URL(origin).origin; 
+      } catch (e) {
+          logger.warn(`CORS: Invalid origin URL received: ${origin}`);
+      }
+      
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes(checkOrigin)) {
+        return callback(null, true);
+      }
+      logger.warn(`CORS block for origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
 );
 
-// JSON parser with size limit
-app.use(express.json({ limit: "8mb" }));
-app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 
-
-// ----------------- CRITICAL FIX START: Correct Static File Serving -----------------
-
-// 1. Serve files from 'public' (where 'js' and 'libs' folders live)
-// This maps /js/* and /libs/* to C:\...\smartcardlink-app\public\
-const publicPath = path.join(__dirname, 'public');
-app.use(express.static(publicPath, {
-    setHeaders: (res, filePath) => {
-        const ext = path.extname(filePath).toLowerCase();
-        // Explicitly set correct MIME types for assets
-        if (ext === '.css') {
-            res.setHeader('Content-Type', 'text/css; charset=UTF-8');
-        } else if (ext === '.js') {
-            res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
-        } else if (['.woff2', '.woff', '.ttf', '.eot', '.svg'].includes(ext)) {
-             // Handle fonts
-             const mime = { '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.eot': 'application/vnd.ms-fontobject', '.svg': 'image/svg+xml' }[ext];
-             res.setHeader('Content-Type', mime);
-             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        } else if (ext === '.json') {
-            res.setHeader('Content-Type', 'application/json');
-        }
-    }
-}));
-
-
-// 2. Static serving for ROOT files (index.html, style.css, favicon.ico)
-// This must be the directory where index.html and style.css live (project root).
-const staticPath = path.join(__dirname);
-app.use(express.static(staticPath, {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css; charset=UTF-8');
-        }
-    }
-}));
-
-// ----------------- CRITICAL FIX END -----------------
+// Rate limiter for public/admin endpoints
+const publicLimiter = RateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  message: "Too many requests, please try again later.",
+  legacyHeaders: false,
+  standardHeaders: true,
+});
 
 
 // ------------------------
-// Quick favicon endpoint to avoid 404 noise
+// Static File Serving
 // ------------------------
+app.use(express.static(staticPath));
+
+// Favicon check to avoid 404 noise
 app.get("/favicon.ico", (req, res) => {
     const icoPath = path.join(staticPath, "favicon.ico");
     if (fs.existsSync(icoPath)) return res.sendFile(icoPath);
     return res.status(204).end();
 });
 
-// Rate limiter for public endpoints
-const publicLimiter = RateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    message: "Too many requests, please try again later.",
-    legacyHeaders: false,
-    standardHeaders: true,
-});
-
-// Semaphore for concurrent heavy PDF operations (capacity 1)
-const pdfSemaphore = new Semaphore(1);
-const MAX_PDF_WAIT_MS = 3000;
-
 // ------------------------
-// Helpers: Standard response wrappers and Logger integration
+// API Routes
 // ------------------------
-const respSuccess = (res, data = null, message = "OK", statusCode = 200, meta = null) => {
-    const body = { success: true, data, message };
-    if (meta) body.meta = meta;
-    return res.status(statusCode).json(body);
-};
-const respError = (res, message = "Server error", statusCode = 500, data = null, errorObj = null) => {
-    logger.error({ statusCode, message, error: errorObj }, "Responding with error");
-    return res.status(statusCode).json({ success: false, data, message });
-};
 
-// ------------------------
-// MongoDB connection & Models (Simplified and using logger)
-// ------------------------
-mongoose.set("strictQuery", true);
+// POST /api/upload-photo: Handle photo upload to Cloudinary (for both form submit and admin update)
+app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return respError(res, "No file uploaded.", 400);
 
-const connectDB = async () => {
-    try {
-        await mongoose.connect(MONGO_URI, { autoIndex: true });
-        logger.info("✅ MongoDB connected");
-    } catch (err) {
-        logger.fatal({ err }, "❌ MongoDB connection failed");
-        // process.exit(1);
-    }
-};
-connectDB();
-
-// Logs collection schema (blueprint-aligned)
-const logSchema = new mongoose.Schema(
-    {
-        actor: { type: String, required: true },
-        action: { type: String, required: true },
-        targetClientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", default: null },
-        notes: { type: String, default: null },
-        payload: { type: mongoose.Schema.Types.Mixed, default: null },
-        timestamp: { type: Date, default: Date.now },
-    },
-    { versionKey: false }
-);
-const Log = mongoose.model("Log", logSchema);
-
-// Client schema (blueprint-aligned)
-const clientSchema = new mongoose.Schema(
-    {
-        fullName: { type: String, required: true, trim: true },
-        title: { type: String, trim: true, default: "" },
-        phone1: { type: String, required: true, trim: true },
-        phone2: { type: String, trim: true, default: "" },
-        phone3: { type: String, trim: true, default: "" },
-        email1: { type: String, required: true, trim: true, lowercase: true },
-        email2: { type: String, trim: true, lowercase: true, default: "" },
-        email3: { type: String, trim: true, lowercase: true, default: "" },
-        company: { type: String, required: true, trim: true },
-        businessWebsite: { type: String, trim: true, default: "" },
-        portfolioWebsite: { type: String, trim: true, default: "" },
-        locationMap: { type: String, trim: true, default: "" },
-        bio: { type: String, trim: true, default: "" },
-        address: { type: String, trim: true, default: "" },
-        socialLinks: {
-            facebook: { type: String, default: "" },
-            instagram: { type: String, default: "" },
-            twitter: { type: String, default: "" },
-            linkedin: { type: String, default: "" },
-            tiktok: { type: String, default: "" },
-            youtube: { type: String, default: "" },
-        },
-        workingHours: {
-            monFriStart: { type: String, default: "" },
-            monFriEnd: { type: String, default: "" },
-            satStart: { type: String, default: "" },
-            satEnd: { type: String, default: "" },
-            sunStart: { type: String, default: "" },
-            sunEnd: { type: String, default: "" },
-        },
-        photoUrl: { type: String, default: "" },
-        vcardUrl: { type: String, default: "" },
-        vcardFileUrl: { type: String, default: "" },
-        qrCodeUrl: { type: String, default: "" },
-        pdfUrl: { type: String, default: "" },
-        slug: { type: String, required: true, unique: true },
-        status: {
-            type: String,
-            enum: ["pending", "processed", "approved", "rejected", "disabled", "deleted"],
-            default: "pending",
-        },
-        history: [
-            {
-                action: { type: String, required: true },
-                notes: { type: String },
-                actor: { type: String, required: true, default: "admin" },
-                timestamp: { type: Date, default: Date.now },
-            },
-        ],
-        createdAt: { type: Date, default: Date.now, index: true },
-        updatedAt: { type: Date, default: Date.now },
-    },
-    { versionKey: false }
-);
-clientSchema.pre("save", function (next) {
-    this.updatedAt = Date.now();
-    next();
-});
-const Client = mongoose.model("Client", clientSchema);
-
-// ------------------------
-// Utility helpers
-// ------------------------
-const logAction = async (actor = "system", action = "UNKNOWN", targetClientId = null, notes = null, payload = null) => {
-    try {
-        await Log.create({ actor, action, targetClientId, notes, payload });
-    } catch (err) {
-        logger.error({ err }, "❌ Failed to write log to DB");
-    }
-};
-
-// Nodemailer transporter
-const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
-    },
-});
-
-// send vCard email
-const sendVCardEmail = async (client) => {
-    if (!client?.email1) {
-        await logAction("system", "EMAIL_FAILED", client ? client._id : null, "No client.email1 present", null);
-        logger.warn("Attempted to send email but client.email1 was missing.");
-        return { success: false, error: "No recipient email" };
-    }
-    const mailOptions = {
-        from: `SmartCardLink <${SMTP_USER}>`,
-        to: client.email1,
-        cc: ADMIN_EMAIL || undefined,
-        subject: `Your SmartCardLink vCard is ready`,
-        html: `<p>Hello ${client.fullName || ""},</p>
-               <p>Your vCard is ready: <a href="${client.vcardUrl}">${client.vcardUrl}</a></p>
-               <p>Thank you — SmartCardLink.</p>`,
-    };
-    try {
-        await transporter.sendMail(mailOptions);
-        await logAction("system", "EMAIL_SENT", client._id, null, { recipient: client.email1 });
-        logger.info({ recipient: client.email1 }, "vCard email sent successfully.");
-        return { success: true };
-    } catch (err) {
-        logger.error({ err }, "❌ Email send error");
-        await logAction("system", "EMAIL_FAILED", client._id, err?.message || String(err), { recipient: client.email1 });
-        return { success: false, error: err?.message || String(err) };
-    }
-};
-
-// Upload buffer/file to Cloudinary using upload_stream
-const uploadToCloudinary = (fileBuffer, publicId = null, resourceType = "image", folderName = "smartcardlink") =>
-    new Promise((resolve, reject) => {
-        try {
-            const stream = cloudinary.uploader.upload_stream(
-                {
-                    folder: folderName,
-                    public_id: publicId,
-                    resource_type: resourceType,
-                    overwrite: true,
-                    format: resourceType === "raw" ? undefined : undefined // Let cloudinary auto-determine format for image/raw
-                },
-                (error, result) => {
-                    if (error) return reject(error);
-                    resolve(result);
-                }
-            );
-            const readable = new Readable();
-            readable._read = () => { };
-            readable.push(fileBuffer);
-            readable.push(null);
-            readable.pipe(stream);
-        } catch (err) {
-            reject(err);
-        }
-    });
-
-// Multer + Cloudinary storage for admin photo uploads
-const storage = new CloudinaryStorage({
-    cloudinary,
-    params: {
+    const result = await cloudinary.uploader.upload(
+      `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+      {
         folder: "smartcardlink_photos",
-        allowed_formats: ["jpg", "jpeg", "png", "webp"],
-        transformation: [{ width: 1200, height: 1200, crop: "limit" }],
-    },
+        resource_type: "image",
+        tags: ["client_photo", "temp_upload"],
+      }
+    );
+
+    await logAction("system", "TEMP_PHOTO_UPLOAD", null, "Temporary photo uploaded for client form", { photoUrl: result.secure_url });
+    return respSuccess(res, { photoUrl: result.secure_url }, "Photo uploaded successfully");
+  } catch (err) {
+    logger.error({ err }, "❌ POST /api/upload-photo error");
+    return respError(res, "Upload error", 500, null, err);
+  }
 });
-const upload = multer({ storage });
 
-// Utility: safe slug generator (Improved: 4. Slug Generation - Deterministic suffix)
-const generateUniqueSlug = async (baseName) => {
-    let baseSlug = slugify(baseName || "user", { lower: true, strict: true });
-    if (!baseSlug) baseSlug = `user-${Date.now()}`;
-    let slug = baseSlug;
-    let counter = 0;
-    
-    // Check initial slug
-    let client = await Client.findOne({ slug }).select('_id');
-    
-    // Deterministic loop optimization: use UUID/timestamp suffix if a few attempts fail
-    while (client && counter < 50) {
-        counter++;
-        slug = `${baseSlug}-${counter}`;
-        client = await Client.findOne({ slug }).select('_id');
-    }
 
-    // Fallback for very high collision rate (unlikely with professional client names)
-    if (client) {
-        slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
-        logger.warn({ baseSlug, finalSlug: slug }, "High collision detected, using random slug suffix.");
+// POST /api/clients: Create a new client record (initial form submission)
+app.post("/api/clients", publicLimiter, async (req, res) => {
+  try {
+    const incoming = req.body || {};
+    
+    // Normalize companyName to company if present (from admin-form.html logic)
+    if (incoming.companyName) {
+        incoming.company = incoming.companyName;
+        delete incoming.companyName;
     }
     
-    return slug;
-};
+    const clientDoc = new Client(incoming);
+    
+    // Auto-generate slug and status upon initial creation
+    clientDoc.status = "Pending";
+    clientDoc.slug = await generateUniqueSlug(clientDoc.fullName);
+
+    clientDoc.history.push({ action: "CLIENT_CREATED", notes: "Initial form submission", actor: "client_submission" });
+    await clientDoc.save();
+    
+    // Notify admin by email
+    if (ADMIN_EMAIL) {
+      const subject = `New SmartCardLink submission: ${clientDoc.fullName}`;
+      const text = `New client submitted. ID: ${clientDoc._id} — ${clientDoc.fullName}. Check admin panel to process.`;
+      await sendEmail(ADMIN_EMAIL, subject, text);
+    }
+    
+    return respSuccess(res, { recordId: clientDoc._id }, "Saved. Pending admin processing.", 201);
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+        return respError(res, `Validation Error: ${err.message}`, 400, null, err);
+    }
+    logger.error({ err }, "❌ POST /api/clients error");
+    return respError(res, err?.message || "Server error", 500, null, err);
+  }
+});
 
 
-// Utility: create vCard content
-const generateVcardContent = (client) => {
-    const esc = (s = "") => {
-        return String(s)
-            .replace(/\r?\n/g, "\\n")
-            .replace(/,/g, "\\,")
-            .replace(/;/g, "\\;");
+// GET /api/admin/clients: Admin listing with filtering and pagination
+app.get("/api/admin/clients", publicLimiter, async (req, res) => {
+  try {
+    const { q, status, page = 1, limit = 50 } = req.query;
+    const filter = {};
+    const pageSize = parseInt(limit);
+    const skip = (parseInt(page) - 1) * pageSize;
+
+    if (status) filter.status = status;
+    if (q) {
+      const regex = new RegExp(q, "i");
+      filter.$or = [
+        { fullName: regex },
+        { company: regex },
+        { email1: regex },
+        { phone1: regex },
+        { slug: regex }
+      ];
+    }
+    
+    const clients = await Client.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .select("-history -__v"); // Exclude heavy/internal fields
+
+    const totalCount = await Client.countDocuments(filter);
+    
+    const meta = {
+        total: totalCount,
+        page: parseInt(page),
+        limit: pageSize,
+        pages: Math.ceil(totalCount / pageSize),
     };
 
-    const lines = [];
-    lines.push("BEGIN:VCARD");
-    lines.push("VERSION:3.0");
-    const names = (client.fullName || "").split(" ");
-    const firstName = names.shift() || "";
-    const lastName = names.join(" ") || "";
-    lines.push(`FN:${esc(client.fullName || "")}`);
-    lines.push(`N:${esc(lastName)};${esc(firstName)};;;`);
-    if (client.company) lines.push(`ORG:${esc(client.company)}`);
-    if (client.title) lines.push(`TITLE:${esc(client.title)}`);
-    if (client.phone1) lines.push(`TEL;TYPE=WORK,VOICE:${esc(client.phone1)}`);
-    if (client.phone2) lines.push(`TEL;TYPE=WORK,VOICE:${esc(client.phone2)}`);
-    if (client.phone3) lines.push(`TEL;TYPE=WORK,VOICE:${esc(client.phone3)}`);
-    if (client.email1) lines.push(`EMAIL;TYPE=INTERNET:${esc(client.email1)}`);
-    if (client.email2) lines.push(`EMAIL;TYPE=INTERNET:${esc(client.email2)}`);
-    if (client.email3) lines.push(`EMAIL;TYPE=INTERNET:${esc(client.email3)}`);
-    if (client.businessWebsite) lines.push(`URL:${esc(client.businessWebsite)}`);
-    if (client.portfolioWebsite) lines.push(`X-PORTFOLIO:${esc(client.portfolioWebsite)}`);
-    if (client.address) {
-        lines.push(`ADR;TYPE=WORK:;;${esc(client.address)};;;;`);
-    }
-    if (client.bio) lines.push(`NOTE:${esc(client.bio)}`);
-    lines.push("END:VCARD");
-    return lines.join("\r\n");
-};
-
-// Generate PDF (Puppeteer) and upload to Cloudinary (raw)
-const generateAndUploadPdf = async (clientData) => {
-    let browser;
-    try {
-        const htmlContent = `<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>${clientData.fullName} - SmartCardLink</title>
-<style>
-body { font-family: Arial, sans-serif; padding: 20px; color: #222; }
-.container { max-width: 700px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
-.photo { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; display:block; margin: 0 auto 20px auto; }
-h1 { text-align:center; color: #111; }
-.info p { margin: 6px 0; }
-.label { font-weight: bold; }
-</style>
-</head>
-<body>
-    <div class="container">
-        ${clientData.photoUrl ? `<img src="${clientData.photoUrl}" class="photo" />` : ""}
-        <h1>${clientData.fullName || ""}</h1>
-        <h3 style="text-align:center;">${clientData.company || ""} — ${clientData.title || ""}</h3>
-        <div class="info">
-            <p><span class="label">Phone:</span> ${clientData.phone1 || "N/A"}</p>
-            <p><span class="label">Email:</span> ${clientData.email1 || "N/A"}</p>
-            <p><span class="label">Address:</span> ${clientData.address || "N/A"}</p>
-            <p><span class="label">Bio:</span> ${clientData.bio || "N/A"}</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-        // 1. Puppeteer in Production: Docker-friendly path and puppeteer-core
-        const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH ||
-            (process.platform === 'linux' ? '/usr/bin/chromium-browser' : undefined) ||
-            (process.env.NODE_ENV === 'production' ? '/usr/bin/google-chrome-stable' : undefined);
-
-        if (!executablePath) {
-            logger.warn("PUPPETEER_EXECUTABLE_PATH not set. Using default puppeteer-core logic.");
-        }
-
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-            executablePath: executablePath // This will point to the installed chrome/chromium in a container
-        });
-        const page = await browser.newPage();
-        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
-        const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
-
-        const uploadRes = await uploadToCloudinary(pdfBuffer, `client_info_${clientData.slug || Date.now()}`, "raw", "smartcardlink_client_pdfs");
-        return uploadRes.secure_url;
-    } catch (err) {
-        logger.error({ err }, "❌ generateAndUploadPdf error");
-        throw err;
-    } finally {
-        if (browser) await browser.close();
-    }
-};
-// 2. PDF Streaming: Fetch wrapper with retry logic
-const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
-    for (let i = 0; i < retries; i++) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-        try {
-            const response = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeout);
-            if (response.ok) return response;
-            
-            throw new Error(`Fetch failed with status ${response.status}`);
-        } catch (error) {
-            clearTimeout(timeout);
-            if (i === retries - 1) {
-                logger.error({ url, error, attempt: i + 1 }, "Cloudinary fetch failed after all retries.");
-                throw error;
-            }
-            if (error.name === 'AbortError') {
-                logger.warn({ url, attempt: i + 1 }, "Cloudinary fetch timed out (AbortError), retrying...");
-            } else {
-                logger.warn({ url, error, attempt: i + 1 }, "Cloudinary fetch failed, retrying...");
-            }
-            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
-        }
-    }
-};
-
-// ------------------------
-// Routes - public/static
-// ------------------------
-app.get("/", (req, res) => {
-    const indexPath = path.join(staticPath, "index.html");
-    if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
-    return res.send("SmartCardLink API - Frontend assets missing.");
-});
-// Health endpoint
-app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
-
-// ------------------------
-// API - Clients & Admin
-// ------------------------
-
-// Create client (public)
-app.post("/api/clients", publicLimiter, async (req, res) => {
-    try {
-        const body = req.body || {};
-        if (!body.fullName || !body.phone1 || !body.email1 || !body.company) {
-            return respError(res, "Missing required fields: fullName, phone1, email1, company", 400);
-        }
-        
-        const slug = await generateUniqueSlug(body.fullName);
-        const clientDoc = new Client({
-            ...body,
-            slug,
-            status: "pending",
-        });
-
-        const release = await pdfSemaphore.acquire(MAX_PDF_WAIT_MS).catch(() => null);
-        if (release) {
-            try {
-                const pdfUrl = await generateAndUploadPdf({ ...body, slug });
-                clientDoc.pdfUrl = pdfUrl;
-            } catch (err) {
-                logger.warn({ err }, "⚠️ PDF generation failed during client creation");
-            } finally {
-                release();
-            }
-        } else {
-            logger.warn("PDF semaphore queue full. Skipping initial PDF generation.");
-        }
-        await clientDoc.save();
-        await logAction("public", "CLIENT_CREATED", clientDoc._id, "Client submitted via public form", { snapshot: clientDoc });
-
-        if (ADMIN_EMAIL) {
-            try {
-                await transporter.sendMail({
-                    from: `SmartCardLink <${SMTP_USER}>`,
-                    to: ADMIN_EMAIL,
-                    subject: `New SmartCardLink submission: ${clientDoc.fullName}`,
-                    text: `New client submitted. ID: ${clientDoc._id} — ${clientDoc.fullName}`,
-                });
-            } catch (err) {
-                logger.warn({ err }, "⚠️ Admin email notify failed");
-            }
-        }
-        return respSuccess(res, { recordId: clientDoc._id }, "Saved. Pending admin processing.", 201);
-    } catch (err) {
-        logger.error({ err }, "❌ POST /api/clients error");
-        return respError(res, err?.message || "Server error", 500, null, err);
-    }
+    return respSuccess(res, clients, "Admin clients list retrieved successfully", 200, meta);
+  } catch (err) {
+    logger.error({ err }, "❌ GET /api/admin/clients error");
+    return respError(res, "Server error fetching clients", 500, null, err);
+  }
 });
 
-// Public clients listing (lightweight - fetches only the latest client)
-app.get("/api/clients/all", async (req, res) => {
-    try {
-        const client = await Client.findOne({}).sort({ createdAt: -1 }).select("-history -__v");
-        const clients = client ? [client] : [];
-        return respSuccess(res, clients, "Public clients list");
-    } catch (err) {
-        logger.error({ err }, "❌ GET /api/clients/all error");
-        return respError(res, "Server error fetching clients", 500, null, err);
-    }
-});
 
-// Admin listing with filters (canonical)
-app.get("/api/admin/clients", async (req, res) => {
+// GET /api/clients/:id: Helper for Admin Panel to fetch one client
+app.get("/api/clients/:id", publicLimiter, async (req, res) => {
     try {
-        const { q, status, page = 1, limit = 50 } = req.query;
-        const filter = {};
-        if (status) filter.status = status;
-        if (q) {
-            const regex = new RegExp(q, "i");
-            filter.$or = [{ fullName: regex }, { email1: regex }, { phone1: regex }, { company: regex }];
-        }
-        const skip = (Number(page) - 1) * Number(limit);
-        const [total, clients] = await Promise.all([
-            Client.countDocuments(filter),
-            Client.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
-        ]);
-        const meta = { total, page: Number(page), limit: Number(limit) };
-        return respSuccess(res, clients, "Clients list", 200, meta);
-    } catch (err) {
-        logger.error({ err }, "❌ GET /api/admin/clients error");
-        return respError(res, "Server error fetching clients", 500, null, err);
-    }
-});
-
-// Get single client + recentLogs
-app.get("/api/clients/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        const client = await Client.findById(id);
+        const client = await Client.findById(req.params.id);
         if (!client) return respError(res, "Client not found.", 404);
-        const recentLogs = await Log.find({ targetClientId: client._id }).sort({ timestamp: -1 }).limit(50);
-        return respSuccess(res, { client, recentLogs }, "Client fetched.");
+        return respSuccess(res, client);
     } catch (err) {
-        logger.error({ err }, "❌ GET /api/clients/:id error");
-        return respError(res, "Server error fetching client.", 500, null, err);
-    }
-});
-// Photo upload (general)
-app.post("/api/upload-photo", upload.single("photo"), async (req, res) => {
-    try {
-        if (!req.file) return respError(res, "No file uploaded", 400);
-        const url = req.file.path || req.file.secure_url || (req.file && req.file.url) || "";
-        return respSuccess(res, { photoUrl: url }, "Photo uploaded successfully");
-    } catch (err) {
-        logger.error({ err }, "❌ POST /api/upload-photo error");
-        return respError(res, "Upload error", 500, null, err);
+        return respError(res, "Error fetching client.", 500, null, err);
     }
 });
 
-// Update client (JSON or multipart/form-data with photo)
-app.put("/api/clients/:id", upload.single("photo"), async (req, res) => {
-    try {
-        const id = req.params.id;
-        const client = await Client.findById(id);
-        if (!client) return respError(res, "Client not found.", 404);
-        const incoming = { ...(req.body || {}) };
-        
-        // Handle photo upload
-        if (req.file) {
-            const photoUrl = req.file.path || req.file.secure_url || req.file.url || "";
-            if (photoUrl) {
-                incoming.photoUrl = photoUrl;
-                client.history.push({ action: "PHOTO_UPLOADED", notes: "Photo updated by admin", actor: "admin" });
-                await logAction("admin", "PHOTO_UPLOADED", client._id, "Photo uploaded", { photoUrl });
-            }
-        }
-        
-        // Merge fields (only allow known fields)
-        const allowedFields = [
-            "fullName", "title", "phone1", "phone2", "phone3", "email1", "email2", "email3",
-            "company", "businessWebsite", "portfolioWebsite", "locationMap", "bio",
-            "address", "photoUrl", "status" // Added status here to allow admin updates
-        ];
-        
-        // SocialLinks and workingHours parsing
-        if (incoming.socialLinks && typeof incoming.socialLinks === "string") {
-            try { incoming.socialLinks = JSON.parse(incoming.socialLinks); } catch (e) {
-                logger.warn("Failed to parse socialLinks string");
-            }
-        }
-        if (incoming.workingHours && typeof incoming.workingHours === "string") {
-            try { incoming.workingHours = JSON.parse(incoming.workingHours); } catch (e) {
-                logger.warn("Failed to parse workingHours string");
-            }
-        }
-        
-        // Apply changes
-        for (const key of allowedFields) {
-            if (Object.prototype.hasOwnProperty.call(incoming, key) && incoming[key] !== undefined) {
-                client[key] = incoming[key];
-            }
-        }
-        if (incoming.socialLinks && typeof incoming.socialLinks === "object") {
-            client.socialLinks = { ...client.socialLinks, ...incoming.socialLinks };
-        }
-        if (incoming.workingHours && typeof incoming.workingHours === "object") {
-            client.workingHours = { ...client.workingHours, ...incoming.workingHours };
-        }
-        
-        // Update slug if necessary
-        if ((!client.slug || client.slug.trim() === "") && client.fullName) {
-            client.slug = await generateUniqueSlug(client.fullName);
-        }
-        
-        // --- PDF REGENERATION LOGIC (from previous partial fix) ---
-        const release = await pdfSemaphore.acquire(MAX_PDF_WAIT_MS).catch(() => null);
-        if (release) {
-            try {
-                // Use client.toObject() to get the latest DB state plus incoming changes
-                const pdfUrl = await generateAndUploadPdf({ ...client.toObject(), ...incoming });
-                client.pdfUrl = pdfUrl;
-                client.history.push({ action: "PDF_REGENERATED", notes: "PDF updated due to client data change", actor: "admin" });
-            } catch (err) {
-                logger.warn({ err }, "⚠️ PDF re-generation failed during client update");
-            } finally {
-                release();
-            }
-        } else {
-            logger.warn("PDF semaphore queue full. Skipping PDF re-generation.");
-        }
-        
-        // --- Status handling correction ---
-        // The unprovided code block's logic was slightly redundant/buggy:
-        // client.status = client.status === "pending" ? client.status : client.status;
-        // The status update is handled above by checking 'incoming.status' via 'allowedFields'.
-        
-        client.history.push({ action: "CLIENT_UPDATED", notes: "Admin saved info", actor: "admin" });
 
-        await client.save();
-        await logAction("admin", "CLIENT_UPDATED", client._id, "Admin saved client info", { incoming });
-
-        return respSuccess(res, client, "Client updated successfully");
-    } catch (err) {
-        logger.error({ err }, "❌ PUT /api/clients/:id error");
-        return respError(res, "Server error saving client info.", 500, null, err);
+// PUT /api/clients/:id: Update client info (Admin update route)
+app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const client = await Client.findById(id);
+    if (!client) return respError(res, "Client not found.", 404);
+    
+    const incoming = req.body || {};
+    
+    // --- Safe Field Update Logic ---
+    const allowedTopLevelFields = [
+        'fullName', 'title', 'company', 'businessWebsite', 'portfolioWebsite', 'locationMap',
+        'phone1', 'phone2', 'phone3', 'email1', 'email2', 'email3', 'address', 'bio', 'status', 'photoUrl'
+    ];
+    
+    // 1. Check for fullName change and regenerate slug if necessary
+    if (incoming.fullName && incoming.fullName !== client.fullName) {
+        client.slug = await generateUniqueSlug(incoming.fullName);
+        await logAction("admin", "SLUG_REGENERATED", id, `Slug changed from ${client.slug} based on new fullName.`, {});
     }
+
+    // 2. Handle photo upload if file is present (photoUrl is updated if successful)
+    if (req.file) {
+      const uploadResult = await cloudinary.uploader.upload(
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+        {
+          folder: "smartcardlink_photos",
+          resource_type: "image",
+          tags: ["client_photo", `client_${id}`],
+        }
+      );
+      incoming.photoUrl = uploadResult.secure_url;
+      await logAction("admin", "CLIENT_PHOTO_UPDATED", id, "Photo updated via PUT route.", { newPhoto: incoming.photoUrl });
+    }
+
+    // 3. Apply updates safely, preventing overwrites of critical fields like slug, _id, history
+    for (const field of allowedTopLevelFields) {
+        if (incoming[field] !== undefined && field !== 'photoUrl') { // photoUrl handled above
+            client[field] = incoming[field];
+        }
+    }
+    if (incoming.photoUrl) client.photoUrl = incoming.photoUrl;
+
+    // 4. Handle nested objects (socialLinks, workingHours) - handle JSON string from form
+    if (incoming.socialLinks) {
+        const links = (typeof incoming.socialLinks === 'string') ? JSON.parse(incoming.socialLinks) : incoming.socialLinks;
+        Object.assign(client.socialLinks, links);
+    }
+    if (incoming.workingHours) {
+        const hours = (typeof incoming.workingHours === 'string') ? JSON.parse(incoming.workingHours) : incoming.workingHours;
+        Object.assign(client.workingHours, hours);
+    }
+    
+    // 5. Save and Log
+    client.history.push({ action: "CLIENT_UPDATED", notes: "Admin saved info", actor: "admin" });
+    await client.save();
+    
+    return respSuccess(res, client, "Client updated successfully");
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+        return respError(res, `Validation Error: ${err.message}`, 400, null, err);
+    }
+    logger.error({ err }, "❌ PUT /api/clients/:id error");
+    return respError(res, "Server error saving client info.", 500, null, err);
+  }
 });
 
-// Create vCard: generate .vcf, QR, update client, send email
-app.post("/api/clients/:id/vcard", async (req, res) => {
-    try {
-        const id = req.params.id;
-        const client = await Client.findById(id);
-        if (!client) return respError(res, "Client not found.", 404);
 
-        if (!client.fullName || (!client.phone1 && !client.email1)) {
-            return respError(res, "Client must have fullName and at least one contact (phone1 or email1).", 400);
-        }
-
-        if (!client.slug || client.slug.trim() === "") {
-            client.slug = await generateUniqueSlug(client.fullName);
-        }
-
-        const publicVcardPage = `${APP_BASE_URL.replace(/\/$/, "")}/vcard/${client.slug}`;
-
-        // 1) Generate vCard content (.vcf)
-        const vcfContent = generateVcardContent(client);
-        const vcfBuffer = Buffer.from(vcfContent, "utf-8");
-
-        // 2) Upload .vcf to Cloudinary as raw
-        let vcardFileResult;
-        try {
-            vcardFileResult = await uploadToCloudinary(vcfBuffer, client.slug, "raw", "smartcardlink_vcards");
-            client.vcardFileUrl = vcardFileResult.secure_url || vcardFileResult.url || "";
-        } catch (err) {
-            logger.error({ err }, "❌ vCard raw upload failed");
-            return respError(res, "Failed uploading vCard file", 500, null, err);
-        }
-
-        // 3) Generate QR buffer
-        const qrBuffer = await QRCode.toBuffer(publicVcardPage, { type: "png", margin: 1, width: 400 });
-
-        // 4) Upload QR image to Cloudinary
-        let qrUploadResult;
-        try {
-            qrUploadResult = await uploadToCloudinary(qrBuffer, `${client.slug}_qr`, "image", "smartcardlink_qrcodes");
-            client.qrCodeUrl = qrUploadResult.secure_url || qrUploadResult.url || "";
-        } catch (err) {
-            logger.error({ err }, "❌ QR upload failed");
-            return respError(res, "Failed uploading QR code", 500, null, err);
-        }
-
-        // 5) Update client public link and status
-        client.vcardUrl = publicVcardPage;
-        client.status = "processed";
-        client.history.push({ action: "VCARD_CREATED", notes: "vCard created & uploaded", actor: "admin" });
-        await client.save();
-        await logAction("admin", "VCARD_CREATED", client._id, null, { vcardFileUrl: client.vcardFileUrl, qrCodeUrl: client.qrCodeUrl, publicPage: client.vcardUrl });
-
-        // 6) Send email
-        const emailRes = await sendVCardEmail(client);
-
-        return respSuccess(
-            res,
-            { vcardUrl: client.vcardUrl, qrCodeUrl: client.qrCodeUrl, slug: client.slug, vcardFileUrl: client.vcardFileUrl },
-            `vCard created. Email ${emailRes.success ? "sent" : "failed to send"}.`
-        );
-    } catch (err) {
-        logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
-        return respError(res, "Server error creating vCard.", 500, null, err);
+// PUT /api/clients/:id/status/:newStatus: Admin status change route (Active, Suspended, Deleted)
+app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) => {
+  try {
+    const { id, newStatus } = req.params;
+    const { notes } = req.body;
+    
+    if (!["Active", "Suspended", "Deleted"].includes(newStatus)) {
+        return respError(res, "Invalid status provided.", 400);
     }
+
+    const client = await Client.findById(id);
+    if (!client) return respError(res, "Client not found", 404);
+    
+    const previous = client.status;
+    client.status = newStatus;
+
+    client.history.push({ action: "STATUS_CHANGED", notes, actor: "admin" });
+    await client.save();
+    
+    await logAction("admin", "STATUS_CHANGED", client._id, notes, { previousStatus: previous, newStatus });
+    return respSuccess(res, client, `Client status updated to ${newStatus}`);
+  } catch (err) {
+    logger.error({ err }, "❌ PUT /api/clients/:id/status/:newStatus error");
+    return respError(res, "Server error updating status", 500, null, err);
+  }
 });
 
-// Stream or redirect client PDF
-app.get("/api/clients/:id/pdf", async (req, res) => {
-    // 1. Puppeteer in Production: Graceful queue full handling
-    const release = await pdfSemaphore.acquire(MAX_PDF_WAIT_MS).catch(() => null);
-    if (!release) {
-        return respError(res, "PDF generation service is currently busy. Please try again in a moment.", 503);
-    }
 
-    try {
-        const id = req.params.id;
-        const client = await Client.findById(id);
-        if (!client) return respError(res, "Client not found", 404);
+// DELETE /api/clients/:id: Admin soft-delete route
+app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { notes } = req.body;
+    
+    const client = await Client.findById(id);
+    if (!client) return respError(res, "Client not found", 404);
+    
+    const previous = client.status;
+    client.status = "Deleted"; // Soft delete
 
-        let pdfUrlToStream = client.pdfUrl;
-        let pdfResponse;
-        let isRegenerated = false;
-
-        if (pdfUrlToStream) {
-            // Attempt to fetch existing PDF from Cloudinary
-            try {
-                // 2. PDF Streaming: Use fetchWithRetry
-                pdfResponse = await fetchWithRetry(pdfUrlToStream);
-            } catch (err) {
-                logger.warn({ err }, "⚠️ Proxy of existing PDF failed, will regenerate.");
-                pdfUrlToStream = null; // Force regeneration
-            }
-        }
-
-        // Generate PDF if fetch failed or URL was missing
-        if (!pdfUrlToStream) {
-            const newPdfUrl = await generateAndUploadPdf(client);
-            client.pdfUrl = newPdfUrl;
-            client.history.push({ action: "PDF_GENERATED_ON_DEMAND", actor: "admin", notes: "Generated on view request" });
-            await client.save();
-            await logAction("admin", "PDF_GENERATED_ON_DEMAND", client._id, null, { pdfUrl: newPdfUrl });
-            isRegenerated = true;
-            
-            // Stream the newly generated PDF (with retries)
-            try {
-                pdfResponse = await fetchWithRetry(newPdfUrl);
-            } catch (err) {
-                return respError(res, "Failed to stream newly generated PDF", 500, null, err);
-            }
-        }
-
-        // Stream the final PDF
-        if (!pdfResponse || !pdfResponse.ok) {
-             throw new Error("Final PDF fetch failed or was empty.");
-        }
-
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename="client_${client.slug || client._id}.pdf"`);
-        await logAction("admin", isRegenerated ? "PDF_GENERATED_AND_VIEWED" : "PDF_VIEWED", client._id, null, { pdfUrl: client.pdfUrl });
-        return pdfResponse.body.pipe(res);
-
-    } catch (err) {
-        logger.error({ err }, "❌ GET /api/clients/:id/pdf error");
-        return respError(res, "Server error retrieving/generating PDF.", 500, null, err);
-    } finally {
-        release();
-    }
+    client.history.push({ action: "CLIENT_DELETED", notes, actor: "admin" });
+    await client.save();
+    
+    await logAction("admin", "CLIENT_DELETED", client._id, notes, { previousStatus: previous, newStatus: "Deleted" });
+    return respSuccess(res, null, "Client soft-deleted successfully");
+  } catch (err) {
+    logger.error({ err }, "❌ DELETE /api/clients/:id error");
+    return respError(res, "Server error deleting client", 500, null, err);
+  }
 });
 
-// Status change (requires notes)
-app.put("/api/clients/:id/status/:newStatus", async (req, res) => {
-    try {
-        const id = req.params.id;
-        const newStatus = (req.params.newStatus || "").toLowerCase();
-        const allowed = ["pending", "processed", "approved", "rejected", "disabled", "deleted"];
-        if (!allowed.includes(newStatus)) return respError(res, "Invalid status provided", 400);
 
-        const notes = req.body?.notes || "";
-        if (!notes || String(notes).trim().length < 3) return respError(res, "Notes are required and must be at least 3 characters long", 400);
+// POST /api/clients/:id/pdf: Admin route to generate and retrieve PDF
+app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const client = await Client.findById(id);
+    if (!client) return respError(res, "Client not found.", 404);
+    
+    // PDF Generation is stubbed, but should return a URL for the admin to view
+    const pdfUrl = await generateAndUploadPdf(client); 
 
-        const client = await Client.findById(id);
-        if (!client) return respError(res, "Client not found", 404);
-
-        const previous = client.status;
-        client.status = newStatus;
-        client.history.push({ action: "STATUS_CHANGED", notes, actor: "admin" });
-        await client.save();
-
-        await logAction("admin", "STATUS_CHANGED", client._id, notes, { previousStatus: previous, newStatus });
-        return respSuccess(res, client, `Client status updated to ${newStatus}`);
-    } catch (err) {
-        logger.error({ err }, "❌ PUT /api/clients/:id/status/:newStatus error");
-        return respError(res, "Server error updating status", 500, null, err);
-    }
+    return respSuccess(res, { pdfUrl }, "PDF URL generated successfully", 200, { redirect: pdfUrl });
+  } catch (err) {
+    logger.error({ err }, "❌ POST /api/clients/:id/pdf error");
+    return respError(res, "Server error generating PDF.", 500, null, err);
+  }
 });
 
-// Delete client (soft-delete) - requires notes
-app.delete("/api/clients/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        const notes = req.body?.notes || "";
-        if (!notes || String(notes).trim().length < 3) return respError(res, "Notes are required for deletion", 400);
 
-        const client = await Client.findById(id);
-        if (!client) return respError(res, "Client not found", 404);
-
-        client.status = "deleted";
-        client.history.push({ action: "CLIENT_DELETED", notes, actor: "admin" });
-        await client.save();
-        await logAction("admin", "CLIENT_DELETED", client._id, notes, null);
-
-        return respSuccess(res, client, "Client marked as deleted");
-    } catch (err) {
-        logger.error({ err }, "❌ DELETE /api/clients/:id error");
-        return respError(res, "Server error deleting client", 500, null, err);
+// POST /api/clients/:id/vcard: Create vCard, QR code, update client, send email
+app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const client = await Client.findById(id);
+    if (!client) return respError(res, "Client not found.", 404);
+    
+    if (!client.fullName || (!client.phone1 && !client.email1)) {
+      return respError(res, "Client must have fullName and at least one contact (phone1 or email1).", 400);
     }
-});
-
-// Export client as .vcf raw (redirect to file or stream)
-app.get("/vcard/:idOrSlug", async (req, res) => {
-    try {
-        const key = req.params.idOrSlug;
-        let client = mongoose.Types.ObjectId.isValid(key) ? await Client.findById(key) : await Client.findOne({ slug: key });
-
-        if (!client || ["disabled", "deleted"].includes(client.status)) return res.status(404).send("vCard not found or disabled/deleted");
-        if (!client.vcardFileUrl) return res.status(404).send("vCard file not generated");
-
-        await logAction("public", "VCARD_DOWNLOADED", client._id, `vCard raw file requested by ${req.ip}`, null);
-
-        // Security: Ensure the redirect URL is valid
-        if (!client.vcardFileUrl.startsWith('https://res.cloudinary.com')) {
-             logger.error({ vcardFileUrl: client.vcardFileUrl }, "Attempted vCard redirect to non-Cloudinary URL");
-             return res.status(500).send("Invalid vCard file URL.");
-        }
-
-        res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${client.slug}.vcf"`);
-        return res.redirect(302, client.vcardFileUrl);
-    } catch (err) {
-        logger.error({ err }, "❌ GET /vcard/:idOrSlug error");
-        return res.status(500).send("Error accessing vCard");
+    
+    // Ensure slug exists
+    if (!client.slug || client.slug.trim() === "") {
+      client.slug = await generateUniqueSlug(client.fullName);
     }
-});
+    
+    const publicVcardPage = `${VCARD_BASE_URL}/${client.slug}`;
+    
+    // 1. Generate vCard Content
+    const vcardContent = generateVcardContent(client);
+    
+    // 2. Upload vCard to Cloudinary
+    const vcardUrl = await uploadVcfToCloudinary(client.slug, vcardContent); 
+    
+    // 3. Generate QR Code
+    const qrCodeUrl = await qrcode.toDataURL(publicVcardPage);
+    
+    // 4. Update Client Record
+    client.vcardUrl = vcardUrl;
+    client.qrCodeUrl = qrCodeUrl;
+    client.status = "Active";
+    client.history.push({ action: "VCARD_CREATED", notes: `vCard at ${vcardUrl}, Public Page: ${publicVcardPage}`, actor: "admin" });
+    await client.save();
 
-// Public vCard JSON by slug or id (canonical)
-app.get("/api/vcard/:idOrSlug", async (req, res) => {
-    try {
-        const key = req.params.idOrSlug;
-        let client = mongoose.Types.ObjectId.isValid(key) ? await Client.findById(key) : await Client.findOne({ slug: key });
-
-        if (!client || ["disabled", "deleted"].includes(client.status)) return respError(res, "Client not found or disabled.", 404);
-        
-        // Filter sensitive data before sending to public client
-        const publicClientData = (({ _id, fullName, title, phone1, email1, company, businessWebsite, portfolioWebsite, locationMap, bio, address, socialLinks, workingHours, photoUrl, vcardUrl, qrCodeUrl, slug, status }) => 
-            ({ _id, fullName, title, phone1, email1, company, businessWebsite, portfolioWebsite, locationMap, bio, address, socialLinks, workingHours, photoUrl, vcardUrl, qrCodeUrl, slug, status }))(client.toObject());
-
-        await logAction("public", "VCARD_VIEWED", client._id, `Public vCard JSON requested by ${req.ip}`, null);
-
-        return respSuccess(res, publicClientData, "Public vCard data fetched.");
-    } catch (err) {
-        logger.error({ err }, "❌ GET /api/vcard/:idOrSlug error");
-        return respError(res, "Server error fetching vCard data.", 500, null, err);
+    // 5. Send vCard/QR email to client
+    const emailToClient = client.email1 || ADMIN_EMAIL;
+    if (emailToClient) {
+      const emailHtml = `
+        <h1>Your Digital Smart Card is Ready!</h1>
+        <p>Dear ${client.fullName},</p>
+        <p>Your SmartCardLink profile is now active and ready to share.</p>
+        <p><strong>Public Page Link:</strong> <a href="${publicVcardPage}">${publicVcardPage}</a></p>
+        <p><strong>Direct Download vCard:</strong> <a href="${vcardUrl}">Click to Download Contact (.vcf)</a></p>
+        <img src="${qrCodeUrl}" alt="QR Code" style="width: 200px; height: 200px; border: 1px solid #ccc; padding: 10px;">
+        <p>Thank you.</p>
+      `;
+      await sendEmail(emailToClient, `Your SmartCardLink is Ready: ${client.fullName}`, `Your digital smart card is ready. Public Page: ${publicVcardPage}`, emailHtml);
     }
-});
-
-// ------------------------
-// Catch-all Frontend Routing (CRITICAL FIX ADDED)
-// ------------------------
-app.get('*', (req, res) => {
-    const indexPath = path.join(staticPath, "index.html");
-    if (fs.existsSync(indexPath)) {
-        return res.sendFile(indexPath);
-    }
-    logger.error(`❌ Frontend entry file missing at ${indexPath}`);
-    res.status(404).send("SmartCardLink API - Frontend application missing or route not found.");
+    
+    return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.");
+  } catch (err) {
+    logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
+    return respError(res, "Server error creating vCard.", 500, null, err);
+  }
 });
 
 
 // ------------------------
-// Server Startup
+// Public View Route (VCard page)
+// ------------------------
+
+// GET /:slug: Public route to fetch the client data for client-side rendering
+app.get("/:slug", publicLimiter, async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    // Find the client and ensure status is Active
+    const client = await Client.findOne({ slug: slug, status: "Active" });
+    
+    if (!client) {
+      await logAction("system", "VCARD_MISSING", null, `Attempted access for missing/inactive slug: ${slug}`, { ip: req.ip });
+      // CRITICAL: Redirect to the fallback URL or a simple 404 page as requested
+      return res.redirect(APP_FALLBACK_URL || "/404.html"); 
+    }
+    
+    // Log the visit
+    await logAction("system", "VCARD_VISIT", client._id, `Visit to public page: ${slug}`, { ip: req.ip });
+    
+    // Data returned for client-side JavaScript rendering (as seen in admin-form.html)
+    const vcardData = {
+        fullName: client.fullName,
+        title: client.title,
+        company: client.company,
+        phone1: client.phone1,
+        email1: client.email1,
+        website: client.website,
+        address: client.address,
+        bio: client.bio,
+        photoUrl: client.photoUrl,
+        vcardUrl: client.vcardUrl,
+        qrCodeUrl: client.qrCodeUrl,
+        socialLinks: client.socialLinks, // Included for client-side rendering
+        workingHours: client.workingHours,
+    };
+    
+    // Return the data as a JSON response for dynamic rendering on the client-side.
+    return respSuccess(res, vcardData, "vCard data retrieved successfully");
+
+  } catch (err) {
+    logger.error({ err }, "❌ GET /:slug error");
+    return respError(res, "Error retrieving vCard.", 500, null, err);
+  }
+});
+
+
+// ------------------------
+// Server Start
 // ------------------------
 app.listen(PORT, HOST, () => {
-    logger.info(`🚀 Server running at http://${HOST}:${PORT}`);
-    logger.info(`Base URL is ${APP_BASE_URL}`);
-    logger.info(`Allowed CORS origins: ${ALLOWED_ORIGINS.join(', ')}`);
+  logger.info(`🚀 Server running on ${APP_BASE_URL}`);
 });

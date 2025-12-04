@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
     <style>
-        /* --- your full existing CSS preserved exactly --- */
+        /* --- DESIGN & STYLES (PRESERVED) --- */
         body {
             font-family: 'Inter', sans-serif;
             display: flex;
@@ -115,7 +115,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 900px;
+            min-width: 1200px;
         }
         th, td {
             padding: 1rem;
@@ -135,6 +135,10 @@
         }
         tbody tr:hover {
             background-color: #2d2d2d;
+        }
+        tbody tr.row-success {
+            background-color: #38a1694d !important;
+            transition: background-color 0.5s ease-out;
         }
         tbody tr.selected {
             background-color: #3b3b3b;
@@ -160,6 +164,11 @@
             object-fit: cover;
             border: 2px solid #555;
         }
+        .qr-code {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+        }
         .actions-cell {
             display: flex;
             gap: 0.5rem;
@@ -183,7 +192,32 @@
             border-radius: 0.375rem;
             font-weight: 600;
         }
-        /* modal + toast CSS remains unchanged */
+        /* MODAL CSS */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .modal-content { 
+            background-color: #1a1a1a; 
+            margin: 15% auto; 
+            padding: 20px; 
+            border: 1px solid #555; 
+            width: 80%; 
+            max-width: 400px; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
+            display: flex; 
+            flex-direction: column;
+            gap: 15px;
+        }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; align-self: flex-end; }
+        .modal-content h2 { color: #FFD700; margin-top: 0; }
+        .modal-content textarea { min-height: 100px; }
+        .modal-content button { width: 100%; margin-top: 5px; }
+        
+        /* TOAST CSS */
+        .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 1000; display: flex; flex-direction: column-reverse; gap: 0.5rem; }
+        .toast { background-color: #333; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 0; transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; transform: translateY(20px); display: flex; justify-content: space-between; align-items: center;}
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background-color: #ef4444; }
+        .toast.success { background-color: #22c55e; }
     </style>
 </head>
 <body>
@@ -191,12 +225,12 @@
         <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
     </video>
 
-    <div id="dashboardContainer" class="dashboard-card">
+    <div id="dashboardContainer" class="dashboard-card" style="display: block;"> 
         <h1 class="title">SmartCardLink Admin Dashboard</h1>
         
         <div class="controls-container">
             <div class="search-container">
-                <input type="text" id="filterInput" placeholder="Search clients by name, email, or phone" />
+                <input type="text" id="filterInput" placeholder="Search clients by name, email, phone or company" />
                 <button id="searchBtn">Search</button>
             </div>
             <select id="statusFilter">
@@ -207,194 +241,57 @@
                 <option value="Disabled">Disabled</option>
                 <option value="Deleted">Deleted</option>
             </select>
-            <button id="refreshBtn">Re-fetch All Clients</button>
+            <button id="refreshBtn" onclick="fetchAllClients()">
+                <i class="fas fa-sync-alt"></i> Re-fetch
+            </button>
+            <button id="exportBtn" onclick="exportToCsv()">
+                <i class="fas fa-file-export"></i> Export CSV
+            </button>
         </div>
-
+        
+        <div id="totals" class="section-header" style="display: none;"></div>
+        
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
                         <th>Photo</th>
                         <th>Name</th>
-                        <th>Phone</th>
+                        <th>Company</th> 
                         <th>Email</th>
+                        <th>Phone</th>
                         <th>Status</th>
+                        <th>vCard</th>
+                        <th>QR Code</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="clientTableBody">
-                    <tr><td colspan="6" style="text-align:center;">Loading client data...</td></tr>
+                    <tr><td colspan="9" style="text-align:center;">Loading client data...</td></tr>
                 </tbody>
             </table>
         </div>
+        
+        <div id="noResults" style="text-align:center; color: #aaa; padding: 20px; display: none;">No results found matching your criteria.</div>
     </div>
     
     <div id="notesModal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
             <h2 id="modalTitle">Reason for Action</h2>
-            <textarea id="modalTextarea" placeholder="Please provide a reason for this action (e.g., 'Duplicate entry', 'Client requested deactivation')."></textarea>
+            <textarea id="modalTextarea" placeholder="Please provide a reason for this action."></textarea>
             <button id="modalConfirmBtn">Confirm</button>
         </div>
     </div>
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- ✅ Safe production API base injection -->
     <script>
-      window.SCL_CONFIG = { API_BASE: "https://smartcardlink-flyio.fly.dev" };
+      window.SCL_CONFIG = { 
+        API_ROOT: "https://smartcardlink-flyio.fly.dev/api", 
+        ADMIN_FORM_URL: "admin-form.html"
+      };
     </script>
-
-    <script>
-        const API_BASE_URL = window.SCL_CONFIG?.API_BASE;
-
-        // --- your entire JS below preserved exactly ---
-        const clientTableBody = document.getElementById('clientTableBody');
-        const filterInput = document.getElementById('filterInput');
-        const statusFilter = document.getElementById('statusFilter');
-        const searchBtn = document.getElementById('searchBtn');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const toastContainer = document.getElementById('toast-container');
-        const notesModal = document.getElementById('notesModal');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalTextarea = document.getElementById('modalTextarea');
-        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
-        const modalCloseBtn = document.querySelector('.close-btn');
-
-        let allClients = [];
-
-        const showToast = (message, type = 'success') => {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerText = message;
-            toastContainer.appendChild(toast);
-            setTimeout(() => { toast.classList.add('show'); }, 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                toast.addEventListener('transitionend', () => toast.remove());
-            }, 5000);
-        };
-
-        const renderTable = (clients) => {
-            clientTableBody.innerHTML = '';
-            if (clients.length === 0) {
-                clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No clients found.</td></tr>';
-                return;
-            }
-            clients.forEach(client => {
-                const row = document.createElement('tr');
-                row.dataset.clientId = client._id;
-                const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
-                const clientStatus = client.status || 'Pending';
-                let actionsHtml = '';
-                if (clientStatus === 'Pending') {
-                    actionsHtml += `<button class="btn-action-process" onclick="processClient('${client._id}')">Process</button>`;
-                }
-                if (clientStatus === 'Active' || clientStatus === 'Processed') {
-                    actionsHtml += `<button class="btn-action-disable" onclick="showStatusModal('${client._id}', 'Disabled')">Disable</button>`;
-                }
-                if (clientStatus === 'Disabled') {
-                    actionsHtml += `<button class="btn-action-reactivate" onclick="showStatusModal('${client._id}', 'Active')">Reactivate</button>`;
-                }
-                if (clientStatus !== 'Deleted') {
-                    actionsHtml += `<button class="btn-action-delete" onclick="showDeleteModal('${client._id}')">Delete</button>`;
-                }
-                row.innerHTML = `
-                    <td><img src="${photoUrl}" alt="${client.fullName}" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
-                    <td>${client.fullName || 'N/A'}</td>
-                    <td>${client.phone1 || 'N/A'}</td>
-                    <td>${client.email1 || 'N/A'}</td>
-                    <td><span class="status-badge status-${clientStatus.replace(/\s/g, '')}">${clientStatus}</span></td>
-                    <td class="actions-cell">${actionsHtml}</td>`;
-                clientTableBody.appendChild(row);
-            });
-        };
-
-        const fetchFilteredClients = async () => {
-            const searchTerm = filterInput.value.trim();
-            const selectedStatus = statusFilter.value;
-            clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading client data...</td></tr>';
-            const url = new URL(`${API_BASE_URL}/api/admin/clients`);
-            if (searchTerm) url.searchParams.append('q', searchTerm);
-            if (selectedStatus) url.searchParams.append('status', selectedStatus);
-            try {
-                const response = await fetch(url.toString());
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to fetch clients.');
-                allClients = data;
-                renderTable(allClients);
-                showToast('Client data loaded successfully!');
-            } catch (error) {
-                console.error("Fetch error:", error);
-                showToast(`Failed to load clients: ${error.message}`, 'error');
-                clientTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Failed to load data.</td></tr>';
-            }
-        };
-
-        const updateClientStatus = async (clientId, newStatus, notes) => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/status/${newStatus}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes })
-                });
-                if (!response.ok) throw new Error('Failed to update status.');
-                showToast(`Client status updated to '${newStatus}'.`);
-                hideModal();
-                fetchFilteredClients();
-            } catch (error) {
-                console.error("Error updating status:", error);
-                showToast(`Failed to update status: ${error.message}`, 'error');
-            }
-        };
-
-        const deleteClient = async (clientId, notes) => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes })
-                });
-                if (!response.ok) throw new Error('Failed to delete client.');
-                showToast('Client deleted successfully.');
-                hideModal();
-                fetchFilteredClients();
-            } catch (error) {
-                console.error("Error deleting client:", error);
-                showToast(`Failed to delete client: ${error.message}`, 'error');
-            }
-        };
-
-        const showStatusModal = (clientId, newStatus) => {
-            modalTitle.innerText = `Reason for ${newStatus} Action`;
-            modalConfirmBtn.onclick = () => {
-                const notes = modalTextarea.value.trim();
-                if (notes === '') { showToast('A reason is required.', 'error'); return; }
-                updateClientStatus(clientId, newStatus, notes);
-            };
-            modalTextarea.value = '';
-            notesModal.style.display = 'block';
-        };
-
-        const showDeleteModal = (clientId) => {
-            modalTitle.innerText = `Reason for Deleting Client`;
-            modalConfirmBtn.onclick = () => {
-                const notes = modalTextarea.value.trim();
-                if (notes === '') { showToast('A reason is required.', 'error'); return; }
-                deleteClient(clientId, notes);
-            };
-            modalTextarea.value = '';
-            notesModal.style.display = 'block';
-        };
-
-        const hideModal = () => { notesModal.style.display = 'none'; };
-        const processClient = (clientId) => { window.open(`/admin_form.html?id=${clientId}`, '_blank'); };
-
-        searchBtn.addEventListener('click', fetchFilteredClients);
-        refreshBtn.addEventListener('click', fetchFilteredClients);
-        statusFilter.addEventListener('change', fetchFilteredClients);
-        modalCloseBtn.addEventListener('click', hideModal);
-        window.addEventListener('click', (event) => { if (event.target === notesModal) hideModal(); });
-        document.addEventListener('DOMContentLoaded', fetchFilteredClients);
-    </script>
+    
+    <script src="./js/adminDashboard.js"></script>
 </body>
 </html>
