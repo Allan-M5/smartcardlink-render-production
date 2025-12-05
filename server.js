@@ -124,9 +124,9 @@ const Client = mongoose.model("Client", ClientSchema);
 const app = express();
 const staticPath = path.join(__dirname, "public");
 
-// MongoDB Connection: Added best practice options
+// MongoDB Connection: Removed deprecated options (useNewUrlParser, useUnifiedTopology)
 mongoose
-  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(MONGO_URI)
   .then(() => logger.info("✅ MongoDB connected successfully"))
   .catch((err) => {
     logger.error({ err }, "❌ MongoDB connection error. Check MONGODB_URI.");
@@ -323,12 +323,14 @@ app.use(
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "res.cloudinary.com"],
+      // CRITICAL FIX: Ensure all necessary image sources are included.
+      imgSrc: ["'self'", "data:", "res.cloudinary.com", "https://res.cloudinary.com"], 
       // CRITICAL: Updated connectSrc to include all necessary domains from .env
       connectSrc: [
         "'self'", 
         BACKEND_API_URL, 
         new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
+        new URL(VCARD_BASE_URL).origin,    // Added for public vCard access
         "res.cloudinary.com", 
         "https://api.cloudinary.com", 
         "*.google-analytics.com", 
@@ -341,37 +343,35 @@ app.use(
 );
 
 // CORS
-// CRITICAL FIX: Ensure all required frontend modules are covered.
+// PRODUCTION FIX: Conditionally allow origins. No localhost in production.
 app.use(
   cors({
     origin: (origin, callback) => {
-        // Define all production and local origins
-        const allowedOrigins = [
-            BACKEND_API_URL, 
-            new URL(FRONTEND_BASE_URL).origin, // Client Form, Admin Dashboard, Admin Form, Client Dashboard
-            new URL(VCARD_BASE_URL).origin,    // Public vCard pages
+        const isProduction = process.env.NODE_ENV === "production";
+        
+        // Define production origins from .env, extracting the origin part (protocol + host)
+        const productionOrigins = [
+          BACKEND_API_URL, 
+          new URL(FRONTEND_BASE_URL).origin,
+          new URL(VCARD_BASE_URL).origin,
         ];
 
-        // Add localhost for development/local testing
-        if (process.env.NODE_ENV !== "production") {
-            allowedOrigins.push("http://localhost");
-            allowedOrigins.push("http://127.0.0.1");
-            allowedOrigins.push(/http:\/\/localhost:\d+$/); // dynamic ports
-        }
+        // Define development origins
+        const devOrigins = [
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
+          /http:\/\/localhost:\d+$/, // dynamic local ports
+        ];
+
+        // Determine the final allowed list
+        const allowedOrigins = isProduction ? productionOrigins : [...productionOrigins, ...devOrigins];
       
         if (!origin) return callback(null, true); // Allow server-to-server or requests without an Origin header
 
-        let checkOrigin = origin;
-        try {
-            // Normalize origin to its protocol + hostname (e.g., https://example.com)
-            checkOrigin = new URL(origin).origin; 
-        } catch (e) {
-            logger.warn(`CORS: Invalid origin URL received: ${origin}`);
-            // Check if the raw origin (e.g., "http://localhost:3000") is in the list
-        }
-      
-        // Check both the raw origin and the normalized origin
-        if (allowedOrigins.includes(origin) || allowedOrigins.includes(checkOrigin) || allowedOrigins.some(regex => regex instanceof RegExp && regex.test(origin))) {
+        // Check against normalized or raw origin
+        const normalizedOrigin = origin.includes('://') ? new URL(origin).origin : origin; 
+        
+        if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin) || allowedOrigins.some(regex => regex instanceof RegExp && regex.test(origin))) {
             return callback(null, true);
         }
 
@@ -796,6 +796,7 @@ app.get('/health', (req, res) => {
 // Server Start
 // ------------------------
 app.listen(PORT, HOST, () => {
-  logger.info(`🚀 Server running on ${APP_BASE_URL}`);
-  logger.info(`🌐 Frontend expects CORS from: ${FRONTEND_BASE_URL} and ${VCARD_BASE_URL}`);
+  // FIX: Display the public URL (APP_BASE_URL) in the startup log instead of localhost
+  logger.info(`🚀 Server live and listening on ${APP_BASE_URL}`); 
+  logger.info(`🌐 Frontend expects CORS from: ${new URL(FRONTEND_BASE_URL).origin} and ${new URL(VCARD_BASE_URL).origin}`);
 });
