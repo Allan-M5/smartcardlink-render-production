@@ -793,10 +793,19 @@ app.get('/health', (req, res) => {
 
 
 // ------------------------
-// Server Start
+// Server Start (UPDATED BLOCK)
 // ------------------------
+
+// Use RENDER_EXTERNAL_URL (provided by Render) if available, otherwise fall back to APP_BASE_URL
+const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || APP_BASE_URL;
+const ALLOWED_ORIGINS_LOG = [
+    new URL(FRONTEND_BASE_URL).origin,
+    new URL(VCARD_BASE_URL).origin
+].join(' and ');
+
+
 app.listen(PORT, HOST, () => {
-  // FIX: Display the public URL (APP_BASE_URL) in the startup log instead of localhost
-  logger.info(`🚀 Server live and listening on ${APP_BASE_URL}`); 
-  logger.info(`🌐 Frontend expects CORS from: ${new URL(FRONTEND_BASE_URL).origin} and ${new URL(VCARD_BASE_URL).origin}`);
+  // FINAL FIX: Log the system-provided RENDER_EXTERNAL_URL or the robustly set APP_BASE_URL
+  logger.info(`🚀 Server live and listening on ${PUBLIC_URL}`); 
+  logger.info(`🌐 Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
 });
