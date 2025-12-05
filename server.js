@@ -1,5 +1,3 @@
-// C:\Users\ADMIN\Desktop\smartcardlink-app\server.js
-
 // ------------------------
 // Imports
 // ------------------------
@@ -16,7 +14,8 @@ const vCardJS = require("vcards-js");
 const nodemailer = require("nodemailer");
 const pino = require("pino");
 const pinoHttp = require("pino-http");
-const fs = require("fs"); // Added for the favicon check from source
+const fs = require("fs"); 
+require('dotenv').config(); // CRITICAL: Load .env variables
 
 // Configure custom logger
 const logger = pino({ level: process.env.NODE_ENV === "production" ? "info" : "debug" });
@@ -28,20 +27,21 @@ const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI;
 
-// Base URLs
-const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
-const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; // Public URL for the vCard page
+// Base URLs - Using the newly defined .env variables
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; // Backend API URL
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000"; // Admin/Client Forms & Dashboards
+const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; // Public URL for the vCard page host
 const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL; // Used for /:slug redirect fallback
 
 // Derive the base URL for the backend API for internal use (CORS)
-const BACKEND_API_URL = APP_BASE_URL.startsWith("http") ? new URL(APP_BASE_URL).origin : APP_BASE_URL;
+const BACKEND_API_URL = new URL(APP_BASE_URL).origin;
 
 // SMTP
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null; // Use SMTP_USER as default Admin Email
 
 // Cloudinary
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
@@ -86,17 +86,17 @@ const ClientSchema = new mongoose.Schema({
   
   phone1: { type: String, trim: true, default: "" },
   phone2: { type: String, trim: true, default: "" },
-  phone3: { type: String, trim: true, default: "" }, // From admin-form.html
+  phone3: { type: String, trim: true, default: "" }, 
   email1: { type: String, trim: true, lowercase: true, default: "" },
   email2: { type: String, trim: true, lowercase: true, default: "" },
-  email3: { type: String, trim: true, lowercase: true, default: "" }, // From admin-form.html
+  email3: { type: String, trim: true, lowercase: true, default: "" }, 
 
   // Business Details
   company: { type: String, trim: true, default: "" },
-  website: { type: String, trim: true, default: "" }, // Renamed from businessWebsite for simplicity
+  website: { type: String, trim: true, default: "" }, 
   businessWebsite: { type: String, trim: true, default: "" },
   portfolioWebsite: { type: String, trim: true, default: "" },
-  locationMap: { type: String, trim: true, default: "" }, // locationMapUrl from form
+  locationMap: { type: String, trim: true, default: "" }, 
   address: { type: String, default: "" },
   bio: { type: String, default: "" },
 
@@ -129,18 +129,22 @@ mongoose
   .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => logger.info("✅ MongoDB connected successfully"))
   .catch((err) => {
-    logger.error({ err }, "❌ MongoDB connection error");
+    logger.error({ err }, "❌ MongoDB connection error. Check MONGODB_URI.");
     process.exit(1);
   });
 
 
 // Cloudinary Configuration
-cloudinary.config({
-  cloud_name: CLOUDINARY_CLOUD_NAME,
-  api_key: CLOUDINARY_API_KEY,
-  api_secret: CLOUDINARY_API_SECRET,
-  secure: true,
-});
+if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
+  cloudinary.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
+    secure: true,
+  });
+} else {
+    logger.warn("Cloudinary credentials missing. Uploads will fail.");
+}
 
 // Configure multer for file uploads (using memory storage for Cloudinary)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -184,7 +188,7 @@ const respError = (res, message = "Server error", statusCode = 500, data = null,
 // Logging
 const logAction = async (actor, action, clientId, notes, data) => {
   logger.info({ actor, action, clientId, notes, data }, `ACTION: ${action} by ${actor}`);
-  // In a real application, you would also save this to the client's history array here.
+  // History save implementation is in the route handlers for specific actions (e.g., PUT)
 };
 
 // Slug Generation
@@ -202,10 +206,9 @@ const generateUniqueSlug = async (name) => {
     slug = `${baseSlug}-${counter}`;
     counter++;
     if (counter > 100) {
-       logger.warn({ baseSlug, finalSlug: slug }, "High collision detected, using random slug suffix.");
-       // Use random suffix as a last resort
-       slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`; 
-       break;
+        logger.warn({ baseSlug, finalSlug: slug }, "High collision detected, using random slug suffix.");
+        slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`; 
+        break;
     }
   }
   return slug;
@@ -247,7 +250,6 @@ const generateVcardContent = (client) => {
   
   if (client.photoUrl) {
       try {
-          // CRITICAL: vCard.photo.attachFromUrl wrapped in try/catch as recommended.
           vCard.photo.attachFromUrl(client.photoUrl, 'JPEG'); 
       } catch(e) {
           logger.warn({ error: e, photoUrl: client.photoUrl }, "Failed to attach photo to vCard from URL. Proceeding without image.");
@@ -259,6 +261,7 @@ const generateVcardContent = (client) => {
 
 // Cloudinary VCF Upload
 const uploadVcfToCloudinary = async (slug, vcfContent) => {
+  if (!CLOUDINARY_CLOUD_NAME) throw new Error("Cloudinary not configured.");
   const base64Vcf = Buffer.from(vcfContent).toString('base64');
   
   const result = await cloudinary.uploader.upload(
@@ -297,11 +300,11 @@ const sendEmail = async (to, subject, text, html) => {
   }
 };
 
-// PDF Stub (Implemented but with warning as per observation)
+// PDF Stub 
 const generateAndUploadPdf = async (client) => {
   logger.warn(`PDF generation is a complex feature and is currently stubbed (generateAndUploadPdf).`);
   // Stubbed URL based on client slug
-  return `https://res.cloudinary.com/dicvwaud3/raw/upload/smartcardlink_pdfs/${client.slug}.pdf`;
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/raw/upload/smartcardlink_pdfs/${client.slug}.pdf`;
 };
 
 
@@ -312,7 +315,7 @@ app.use(pinoHttp({ logger }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Security Middleware (Helmet and CORS)
+// Security Middleware (Helmet)
 app.use(
   helmet.contentSecurityPolicy({
     directives: {
@@ -321,8 +324,16 @@ app.use(
       styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "data:", "res.cloudinary.com"],
-      // CRITICAL: Removed APP_FALLBACK_URL from connectSrc and added necessary external domains
-      connectSrc: ["'self'", BACKEND_API_URL, "res.cloudinary.com", "https://api.cloudinary.com", "*.google-analytics.com", "*.analytics.google.com"], 
+      // CRITICAL: Updated connectSrc to include all necessary domains from .env
+      connectSrc: [
+        "'self'", 
+        BACKEND_API_URL, 
+        new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
+        "res.cloudinary.com", 
+        "https://api.cloudinary.com", 
+        "*.google-analytics.com", 
+        "*.analytics.google.com"
+      ], 
       fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
       frameAncestors: ["'self'"],
     },
@@ -330,30 +341,42 @@ app.use(
 );
 
 // CORS
+// CRITICAL FIX: Ensure all required frontend modules are covered.
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        "http://localhost",
-        BACKEND_API_URL,
-        VCARD_BASE_URL,
-        APP_FALLBACK_URL,
-      ];
+        // Define all production and local origins
+        const allowedOrigins = [
+            BACKEND_API_URL, 
+            new URL(FRONTEND_BASE_URL).origin, // Client Form, Admin Dashboard, Admin Form, Client Dashboard
+            new URL(VCARD_BASE_URL).origin,    // Public vCard pages
+        ];
+
+        // Add localhost for development/local testing
+        if (process.env.NODE_ENV !== "production") {
+            allowedOrigins.push("http://localhost");
+            allowedOrigins.push("http://127.0.0.1");
+            allowedOrigins.push(/http:\/\/localhost:\d+$/); // dynamic ports
+        }
       
-      if (!origin) return callback(null, true);
+        if (!origin) return callback(null, true); // Allow server-to-server or requests without an Origin header
+
+        let checkOrigin = origin;
+        try {
+            // Normalize origin to its protocol + hostname (e.g., https://example.com)
+            checkOrigin = new URL(origin).origin; 
+        } catch (e) {
+            logger.warn(`CORS: Invalid origin URL received: ${origin}`);
+            // Check if the raw origin (e.g., "http://localhost:3000") is in the list
+        }
       
-      let checkOrigin = origin;
-      try {
-          checkOrigin = new URL(origin).origin; 
-      } catch (e) {
-          logger.warn(`CORS: Invalid origin URL received: ${origin}`);
-      }
-      
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes(checkOrigin)) {
-        return callback(null, true);
-      }
-      logger.warn(`CORS block for origin: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
+        // Check both the raw origin and the normalized origin
+        if (allowedOrigins.includes(origin) || allowedOrigins.includes(checkOrigin) || allowedOrigins.some(regex => regex instanceof RegExp && regex.test(origin))) {
+            return callback(null, true);
+        }
+
+        logger.warn(`CORS block for origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
@@ -472,7 +495,7 @@ app.get("/api/admin/clients", publicLimiter, async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize)
-      .select("-history -__v"); // Exclude heavy/internal fields
+      .select("-history -__v"); 
 
     const totalCount = await Client.countDocuments(filter);
     
@@ -540,7 +563,7 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, r
 
     // 3. Apply updates safely, preventing overwrites of critical fields like slug, _id, history
     for (const field of allowedTopLevelFields) {
-        if (incoming[field] !== undefined && field !== 'photoUrl') { // photoUrl handled above
+        if (incoming[field] !== undefined && field !== 'photoUrl') { 
             client[field] = incoming[field];
         }
     }
@@ -548,12 +571,20 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, r
 
     // 4. Handle nested objects (socialLinks, workingHours) - handle JSON string from form
     if (incoming.socialLinks) {
-        const links = (typeof incoming.socialLinks === 'string') ? JSON.parse(incoming.socialLinks) : incoming.socialLinks;
-        Object.assign(client.socialLinks, links);
+        try {
+          const links = (typeof incoming.socialLinks === 'string') ? JSON.parse(incoming.socialLinks) : incoming.socialLinks;
+          Object.assign(client.socialLinks, links);
+        } catch (e) {
+            logger.error({ error: e, input: incoming.socialLinks }, "Failed to parse socialLinks JSON.");
+        }
     }
     if (incoming.workingHours) {
-        const hours = (typeof incoming.workingHours === 'string') ? JSON.parse(incoming.workingHours) : incoming.workingHours;
-        Object.assign(client.workingHours, hours);
+        try {
+          const hours = (typeof incoming.workingHours === 'string') ? JSON.parse(incoming.workingHours) : incoming.workingHours;
+          Object.assign(client.workingHours, hours);
+        } catch (e) {
+          logger.error({ error: e, input: incoming.workingHours }, "Failed to parse workingHours JSON.");
+        }
     }
     
     // 5. Save and Log
@@ -577,7 +608,7 @@ app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) =>
     const { id, newStatus } = req.params;
     const { notes } = req.body;
     
-    if (!["Active", "Suspended", "Deleted"].includes(newStatus)) {
+    if (!["Pending", "Active", "Suspended", "Deleted"].includes(newStatus)) { // Added Pending as a valid status
         return respError(res, "Invalid status provided.", 400);
     }
 
@@ -657,6 +688,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
       client.slug = await generateUniqueSlug(client.fullName);
     }
     
+    // The public page URL uses the dedicated VCARD_BASE_URL
     const publicVcardPage = `${VCARD_BASE_URL}/${client.slug}`;
     
     // 1. Generate vCard Content
@@ -665,7 +697,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
     // 2. Upload vCard to Cloudinary
     const vcardUrl = await uploadVcfToCloudinary(client.slug, vcardContent); 
     
-    // 3. Generate QR Code
+    // 3. Generate QR Code (The QR code should encode the public page link, not the direct vCard link)
     const qrCodeUrl = await qrcode.toDataURL(publicVcardPage);
     
     // 4. Update Client Record
@@ -711,27 +743,27 @@ app.get("/:slug", publicLimiter, async (req, res) => {
     
     if (!client) {
       await logAction("system", "VCARD_MISSING", null, `Attempted access for missing/inactive slug: ${slug}`, { ip: req.ip });
-      // CRITICAL: Redirect to the fallback URL or a simple 404 page as requested
+      // Redirect to the fallback URL from .env
       return res.redirect(APP_FALLBACK_URL || "/404.html"); 
     }
     
     // Log the visit
     await logAction("system", "VCARD_VISIT", client._id, `Visit to public page: ${slug}`, { ip: req.ip });
     
-    // Data returned for client-side JavaScript rendering (as seen in admin-form.html)
+    // Data returned for client-side JavaScript rendering 
     const vcardData = {
         fullName: client.fullName,
         title: client.title,
         company: client.company,
         phone1: client.phone1,
         email1: client.email1,
-        website: client.website,
+        website: client.website || client.businessWebsite, // Consolidated
         address: client.address,
         bio: client.bio,
         photoUrl: client.photoUrl,
         vcardUrl: client.vcardUrl,
         qrCodeUrl: client.qrCodeUrl,
-        socialLinks: client.socialLinks, // Included for client-side rendering
+        socialLinks: client.socialLinks, 
         workingHours: client.workingHours,
     };
     
@@ -744,10 +776,26 @@ app.get("/:slug", publicLimiter, async (req, res) => {
   }
 });
 
+// ------------------------
+// Health Check Route (For Render Deployment)
+// ------------------------
+app.get('/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'UP' : 'DOWN';
+  const overallStatus = dbStatus === 'UP' ? 200 : 503;
+  
+  return res.status(overallStatus).json({
+    status: overallStatus === 200 ? 'ok' : 'error',
+    service: 'SmartCardLink API',
+    database: dbStatus,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 
 // ------------------------
 // Server Start
 // ------------------------
 app.listen(PORT, HOST, () => {
   logger.info(`🚀 Server running on ${APP_BASE_URL}`);
+  logger.info(`🌐 Frontend expects CORS from: ${FRONTEND_BASE_URL} and ${VCARD_BASE_URL}`);
 });
