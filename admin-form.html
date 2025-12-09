@@ -150,7 +150,9 @@
       background-color: #3b82f6;
       color: white;
     }
-    #photoFile { display: none; }
+    #photoFile { 
+      display: none; 
+    }
     .btn-save-info {
       background-color: black;
       color: white;
@@ -185,7 +187,10 @@
       vertical-align: middle;
       margin-left: 10px;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
     @media (min-width: 768px) {
       .photo-upload-container {
         flex-direction: row;
@@ -206,6 +211,8 @@
       <button id="create-vcard-btn" class="btn-create-vcard">Create vCard</button>
     </div>
     <form id="adminForm" autocomplete="off">
+      <input type="hidden" id="clientId" name="clientId">
+      
       <div class="section-header">Personal Details</div>
       <div class="grid-2col">
         <div><label for="fullName">Full Name</label><input type="text" id="fullName" name="fullName" required /></div>
@@ -278,22 +285,21 @@
   </div>
 
 <script>
-  // C:\Users\ADMIN\Desktop\smartcardlink-app\admin-form.html (REPLACEMENT SCRIPT)
-  
   (function () {
     'use strict';
 
-    // FIX 3: Set global API override and base URL
-    const API_BASE = "https://smartcardlink-api.onrender.com"; // Hardcoded for deployment stability
+    // Set global API base URL for stable API calls
+    const API_BASE = "https://smartcardlink-api.onrender.com"; 
     const API_URL = `${API_BASE}/api`; 
 
     const params = new URLSearchParams(window.location.search);
-    const clientId = params.get('id');
+    const urlClientId = params.get('id'); // ID from URL parameter
 
     // ------------------------
     // DOM Elements
     // ------------------------
     const form = document.getElementById('adminForm');
+    const clientIdInput = document.getElementById('clientId'); // Hidden field
     const viewPdfBtn = document.getElementById('view-pdf-btn');
     const createVcardBtn = document.getElementById('create-vcard-btn');
     const photoUploadInput = document.getElementById('photoFile');
@@ -307,7 +313,7 @@
     let isSaving = false;
 
     // ------------------------
-    // Helper Constants and Functions (RESTORED FROM adminForm.js)
+    // Helper Constants and Functions
     // ------------------------
 
     const SOCIAL_PREFIXES = {
@@ -316,12 +322,12 @@
       twitter: 'https://twitter.com/',
       linkedin: 'https://linkedin.com/in/',
       tiktok: 'https://tiktok.com/@',
-      youtube: 'https://youtube.com/',
+      youtube: 'https://youtube.com/', 
     };
 
     /**
-     * FIX 1: Normalizes a social media link to the required full URL format.
-     */
+      * Normalizes a social media link to the required full URL format.
+      */
     const normalizeSocialLink = (platform, input) => {
       if (!input || typeof input !== 'string' || input.trim() === '') return null;
 
@@ -329,58 +335,61 @@
       const prefix = SOCIAL_PREFIXES[platform];
       if (!prefix) return null;
 
-      // Check if it's already a correct full URL (only enforce https)
-      if (value.startsWith(prefix.replace('https', 'http'))) {
-          return value.replace('http:', 'https:');
+      // 1. Check if already a correct URL (enforce https)
+      if (value.startsWith('http')) {
+          value = value.replace('http:', 'https:');
+          return value; 
       }
-      
-      // 1. Remove common prefixes and handles
-      value = value.replace(/^(https?:\/\/)?(www\.)?/, '');
+
+      // 2. Clean common prefixes and handles
+      value = value.replace(/^(www\.)?/, '');
       
       if (platform === 'linkedin') {
-          value = value.replace(/^linkedin\.com\/(in\/)?/i, '');
+          value = value.replace(/^linkedin\.com\/(in\/|pub\/)?/i, '');
       } else if (platform === 'tiktok') {
           value = value.replace(/^tiktok\.com\/@/i, '');
           value = value.replace(/^@/, '');
-      } else if (platform === 'instagram' || platform === 'twitter') {
-          value = value.replace(/^(instagram|twitter)\.com\//i, '');
-          value = value.replace(/^@/, '');
-      } else if (platform === 'facebook') {
-          value = value.replace(/^facebook\.com\//i, '');
+      } else if (platform === 'instagram' || platform === 'twitter' || platform === 'facebook') {
+          value = value.replace(/^(instagram|twitter|facebook)\.com\//i, '');
+          // Fix: Use toLowerCase() correctly
+          value = value.toLowerCase().replace(/^@/, ''); 
       } else if (platform === 'youtube') {
-          value = value.replace(/^youtube\.com\/(user\/|c\/|channel\/)?/i, '');
+          value = value.replace(/^youtube\.com\//i, '');
       }
 
-      // 2. Remove trailing slashes
+      // 3. Remove trailing slashes
       value = value.replace(/\/$/, '');
       
       if (value === '') return null;
 
-      // 3. Reconstruct the final, correct URL
+      // 4. Reconstruct the final, correct URL
+      if (platform === 'linkedin') return prefix + value;
+      if (platform === 'tiktok' && !value.startsWith('@')) return prefix + value;
+
       return prefix + value;
     };
 
     /**
-     * FIX 2: Validates if a string is a valid email format.
-     */
+      * Validates if a string is a valid email format.
+      */
     const isValidEmail = (email) => {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email.trim());
     };
 
     /**
-     * FIX 2: Validates if a string is a valid phone number (no letters, >= 10 digits).
-     */
+      * Validates if a string is a valid phone number (no letters, >= 10 digits).
+      */
     const isValidPhone = (phone) => {
-      if (!phone) return true; 
+      if (!phone || phone.trim() === '') return true; 
       if (/[a-zA-Z]/.test(phone)) return false; 
       const cleaned = phone.replace(/\D/g, ''); 
       return cleaned.length >= 10;
     };
     
     /**
-     * Displays a toast message to the user.
-     */
+      * Displays a toast message to the user.
+      */
     const showToast = (message, isError = false) => {
       toastMessage.textContent = message;
       toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
@@ -392,9 +401,12 @@
     };
 
     /**
-     * Populates form fields from a client data object fetched from the backend.
-     */
+      * Populates form fields from a client data object fetched from the backend.
+      */
     const populateForm = (data) => {
+      // Set hidden ID
+      clientIdInput.value = data._id || '';
+
       const setValue = (id, value) => {
         const el = document.getElementById(id);
         if (el && value) el.value = value;
@@ -411,10 +423,10 @@
       setValue('email3', data.email3);
 
       // Business Details
-      setValue('companyName', data.company); 
+      setValue('companyName', data.company); // Mapped from 'company'
       setValue('businessWebsite', data.businessWebsite);
       setValue('portfolioWebsite', data.portfolioWebsite);
-      setValue('locationMapUrl', data.locationMap); 
+      setValue('locationMapUrl', data.locationMap); // Mapped from 'locationMap'
 
       // Photo URL
       if (data.photoUrl) {
@@ -423,6 +435,10 @@
         photoPreviewContainer.style.display = 'block';
         photoUploadLabel.textContent = 'Photo Uploaded';
         photoUploadLabel.style.backgroundColor = '#22c55e';
+      } else {
+        photoUploadLabel.textContent = 'Photo Upload';
+        photoUploadLabel.style.backgroundColor = '#ef4444';
+        photoPreviewContainer.style.display = 'none';
       }
 
       // Working Hours
@@ -432,7 +448,7 @@
         });
       }
 
-      // Social Links
+      // Social Links (Need to show the normalized URL in the input fields)
       if (data.socialLinks) {
         ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(platform => {
           setValue(platform, data.socialLinks[platform]);
@@ -456,6 +472,7 @@
           throw new Error(errorData.message || `Failed to fetch client data for ID: ${id}`);
         }
         const json = await response.json();
+        // Ensure consistent data retrieval from response
         const data = json.data || json; 
         populateForm(data);
         console.log(`Form populated with client data for ID: ${id}`);
@@ -480,27 +497,30 @@
           body: formData,
         });
 
-        const data = await response.json();
+        const json = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.message || 'Photo upload failed on the server.');
+        if (!response.ok || json.status !== 'success') {
+          throw new Error(json.message || 'Photo upload failed on the server.');
         }
 
-        const photoUrl = data.photoUrl;
-        photoUrlInput.value = photoUrl;
+        // Correctly retrieve photoUrl from response structure
+        const photoUrl = json.data?.photoUrl || json.photoUrl;
         
-        // FIX: The `photoPreview.src` is already set by `FileReader` for instant preview. 
-        // We ensure the success state is updated here.
+        if (!photoUrl) {
+          throw new Error("Server returned success but no public photo URL.");
+        }
+        
+        photoUrlInput.value = photoUrl;
         photoUploadLabel.textContent = 'Photo Uploaded';
         photoUploadLabel.style.backgroundColor = '#22c55e';
-        photoPreview.src = photoUrl;
+        photoPreview.src = photoUrl; // Update preview to confirm the FINAL public URL
         photoPreviewContainer.style.display = 'block';
         showToast('Photo uploaded successfully!');
         return photoUrl;
       } catch (error) {
         console.error('Photo upload error:', error);
         showToast(`Photo upload failed: ${error.message}`, true);
-        photoUploadLabel.textContent = 'Photo Upload Failed';
+        photoUploadLabel.textContent = 'Upload Failed';
         photoUploadLabel.style.backgroundColor = '#ef4444';
         return null;
       }
@@ -508,6 +528,9 @@
 
     const handleFormSubmission = async (e) => {
       e.preventDefault();
+      // Get the client ID from the hidden input field
+      const currentId = clientIdInput.value; 
+
       if (isSaving) return;
       isSaving = true;
       saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
@@ -521,14 +544,14 @@
       const socialLinksKeys = ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'];
       
       for (const [key, value] of formData.entries()) {
-        // Exclude the file input from the JSON payload
-        if (value && key !== 'photoFile') { 
+        // Exclude file input and the hidden clientId field, and empty strings
+        if (key !== 'photoFile' && key !== 'clientId' && value !== '') { 
           payload[key] = value.trim();
         }
       }
       
       try {
-        // --- FIX 2: Validation of Phone and Email ---
+        // --- Validation of Phone and Email ---
         const phoneFields = ['phone1', 'phone2', 'phone3'];
         const emailFields = ['email1', 'email2', 'email3'];
 
@@ -558,20 +581,16 @@
           delete payload.locationMapUrl;
         }
         
-        // Map photoUrl field
-        if (payload.photoUrl) {
-            payload.photoUrl = payload.photoUrl;
-        }
-
         // Populate nested workingHours
         for (const key of workingHoursKeys) {
-          if (payload[key] && payload[key] !== '--:--') {
+          // Treat empty string or default time as null/undefined
+          if (payload[key] && payload[key] !== '00:00') {
             workingHours[key] = payload[key];
-            delete payload[key];
           }
+          delete payload[key]; 
         }
         
-        // FIX 1 & 4: Populate nested socialLinks with normalization
+        // Populate nested socialLinks with normalization
         for (const key of socialLinksKeys) {
           const normalizedUrl = normalizeSocialLink(key, payload[key]);
           if (normalizedUrl) {
@@ -585,8 +604,8 @@
         if (Object.keys(socialLinks).length > 0) payload.socialLinks = socialLinks;
 
         // 2. API Call (PUT/POST)
-        const url = clientId ? `${API_URL}/clients/${clientId}` : `${API_URL}/clients`;
-        const method = clientId ? 'PUT' : 'POST';
+        const url = currentId ? `${API_URL}/clients/${currentId}` : `${API_URL}/clients`;
+        const method = currentId ? 'PUT' : 'POST';
 
         const response = await fetch(url, {
           method: method,
@@ -594,17 +613,23 @@
           body: JSON.stringify(payload),
         });
         
-        const data = await response.json();
+        const json = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to save client info.');
+        // Check for both response.ok and status: 'success'
+        if (!response.ok || json.status !== 'success') {
+          throw new Error(json.message || 'Failed to save client info.');
         }
         
         showToast('Client info saved successfully!');
         
-        // If creating a new client (POST), redirect to the edit view (PUT)
-        if (!clientId && (data._id || data.recordId)) {
-          window.location.href = `admin-form.html?id=${data._id || data.recordId}`;
+        // If creating a new client (POST), get the new ID and update the URL/UI
+        const newId = json.data?._id || json._id;
+        if (!currentId && newId) {
+          clientIdInput.value = newId;
+          window.history.pushState(null, '', `admin-form.html?id=${newId}`);
+          // Enable buttons
+          viewPdfBtn.disabled = false;
+          createVcardBtn.disabled = false;
         }
         
       } catch (error) {
@@ -618,24 +643,24 @@
     };
 
     const handleViewPdfClick = async () => {
-      if (!clientId) return showToast('Please save client info first.', true);
+      const currentId = clientIdInput.value; 
+      if (!currentId) return showToast('Please save client info first.', true);
       
       viewPdfBtn.classList.add('pressed');
       viewPdfBtn.innerHTML = 'Generating... <span class="spinner"></span>';
       viewPdfBtn.disabled = true;
 
       try {
-        // NOTE: The backend route is POST /clients/:id/pdf, but the frontend was using a GET-like fetch. 
-        // We'll stick to the POST method defined in the adminForm.js
-        const response = await fetch(`${API_URL}/clients/${clientId}/pdf`, { method: 'POST' });
+        const response = await fetch(`${API_URL}/clients/${currentId}/pdf`, { method: 'POST' });
         
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to retrieve PDF.');
         }
         
-        const data = response.url ? { pdfUrl: response.url } : await response.json();
-        const pdfUrl = data.pdfUrl || data.url || response.url;
+        const json = await response.json();
+        // Check both nested and top-level response structures
+        const pdfUrl = json.data?.pdfUrl || json.pdfUrl; 
 
         if (pdfUrl) {
           window.open(pdfUrl, '_blank');
@@ -655,14 +680,15 @@
     };
 
     const handleCreateVcardClick = async () => {
-      if (!clientId) return showToast('Please save client info first.', true);
+      const currentId = clientIdInput.value;
+      if (!currentId) return showToast('Please save client info first.', true);
 
       createVcardBtn.classList.add('pressed');
       createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
       createVcardBtn.disabled = true;
 
       try {
-        const response = await fetch(`${API_URL}/clients/${clientId}/vcard`, {
+        const response = await fetch(`${API_URL}/clients/${currentId}/vcard`, {
           method: 'POST',
         });
 
@@ -671,8 +697,11 @@
           throw new Error(errorData.message || 'Failed to create vCard.');
         }
 
-        const data = await response.json();
+        const json = await response.json();
         showToast('vCard and QR code created successfully! Email sent.', false);
+        
+        // Check both nested and top-level response structures
+        const data = json.data || json;
 
         if (data.vcardUrl) window.open(data.vcardUrl, '_blank');
         
@@ -703,15 +732,21 @@
     // ------------------------
 
     document.addEventListener('DOMContentLoaded', () => {
-      if (clientId) {
-        fetchClientData(clientId);
+      if (urlClientId) {
+        // Set initial ID from URL parameter and fetch data
+        clientIdInput.value = urlClientId;
+        fetchClientData(urlClientId);
+      } else {
+        // Disable buttons for new clients until saved
+        viewPdfBtn.disabled = true;
+        createVcardBtn.disabled = true;
       }
     });
 
     photoUploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        // Instant preview
+        // Instant local preview (uses FileReader)
         const reader = new FileReader();
         reader.onload = (event) => {
           photoPreview.src = event.target.result;
@@ -719,7 +754,7 @@
         };
         reader.readAsDataURL(file);
 
-        // Start upload
+        // Start network upload
         uploadPhoto(file);
       }
     });
