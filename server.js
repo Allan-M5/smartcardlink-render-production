@@ -14,34 +14,40 @@ const vCardJS = require("vcards-js");
 const nodemailer = require("nodemailer");
 const pino = require("pino");
 const pinoHttp = require("pino-http");
-const fs = require("fs"); 
+const fs = require("fs");
+const { body, validationResult } = require('express-validator'); // ADDED: Input validation
 require('dotenv').config(); // CRITICAL: Load .env variables
+
 
 // Configure custom logger
 const logger = pino({ level: process.env.NODE_ENV === "production" ? "info" : "debug" });
 
+
 // ------------------------
-// Environment Variables
+// Environment Variables (Loaded from your live environment details)
 // ------------------------
 const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
-const MONGO_URI = process.env.MONGODB_URI;
+const MONGO_URI = process.env.MONGODB_URI; // mongodb+srv://allanmujera91:Smartcard2025Backend...
 
 // Base URLs - Using the newly defined .env variables
-const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; // Backend API URL
-const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000"; // Admin/Client Forms & Dashboards
-const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; // Public URL for the vCard page host
-const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL; // Used for /:slug redirect fallback
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; // https://smartcardlink-api.onrender.com
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000"; // https://smartcardlink-dashboard-frontend.onrender.com
+const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; // https://smartcardlink-public.onrender.com
+const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL; // https://smartcardlink-public.onrender.com/404.html
+
 
 // Derive the base URL for the backend API for internal use (CORS)
 const BACKEND_API_URL = new URL(APP_BASE_URL).origin;
 
+
 // SMTP
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-const SMTP_USER = process.env.SMTP_USER;
+const SMTP_HOST = process.env.SMTP_HOST; // smtp.gmail.com
+const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587; // 587
+const SMTP_USER = process.env.SMTP_USER; // allanmujera91@gmail.com
 const SMTP_PASS = process.env.SMTP_PASS;
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null; // Use SMTP_USER as default Admin Email
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null; // allanmujera91@gmail.com
+
 
 // Cloudinary
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
@@ -50,7 +56,7 @@ const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
 
 // ------------------------
-// Database Schema and Model (Comprehensive)
+// Database Schema and Model
 // ------------------------
 const historySchema = new mongoose.Schema({
   action: { type: String, required: true },
@@ -58,6 +64,7 @@ const historySchema = new mongoose.Schema({
   actor: { type: String, default: "system" },
   timestamp: { type: Date, default: Date.now },
 });
+
 
 // Nested Schemas for form data
 const socialLinksSchema = new mongoose.Schema({
@@ -69,6 +76,7 @@ const socialLinksSchema = new mongoose.Schema({
   youtube: { type: String, trim: true, default: "" },
 }, { _id: false });
 
+
 const workingHoursSchema = new mongoose.Schema({
   monFriStart: { type: String, default: "" },
   monFriEnd: { type: String, default: "" },
@@ -79,43 +87,50 @@ const workingHoursSchema = new mongoose.Schema({
 }, { _id: false });
 
 
+
 const ClientSchema = new mongoose.Schema({
   // Personal Details
   fullName: { type: String, required: true, trim: true },
   title: { type: String, trim: true, default: "" },
-  
+  
   phone1: { type: String, trim: true, default: "" },
   phone2: { type: String, trim: true, default: "" },
-  phone3: { type: String, trim: true, default: "" }, 
+  phone3: { type: String, trim: true, default: "" }, 
   email1: { type: String, trim: true, lowercase: true, default: "" },
   email2: { type: String, trim: true, lowercase: true, default: "" },
-  email3: { type: String, trim: true, lowercase: true, default: "" }, 
+  email3: { type: String, trim: true, lowercase: true, default: "" }, 
+
 
   // Business Details
   company: { type: String, trim: true, default: "" },
-  website: { type: String, trim: true, default: "" }, 
+  website: { type: String, trim: true, default: "" }, 
   businessWebsite: { type: String, trim: true, default: "" },
   portfolioWebsite: { type: String, trim: true, default: "" },
-  locationMap: { type: String, trim: true, default: "" }, 
+  locationMap: { type: String, trim: true, default: "" }, 
   address: { type: String, default: "" },
   bio: { type: String, default: "" },
+
 
   // Nested Data
   workingHours: workingHoursSchema,
   socialLinks: socialLinksSchema,
-  
+  
   // Status and Media
   photoUrl: { type: String, default: "" }, // Cloudinary URL
   slug: { type: String, required: true, unique: true, index: true },
   status: { type: String, enum: ["Pending", "Active", "Suspended", "Deleted"], default: "Pending" },
 
+
   vcardUrl: { type: String, default: "" }, // Cloudinary URL to .vcf file
   qrCodeUrl: { type: String, default: "" }, // Data URL for QR code (or Cloudinary if uploaded)
+
 
   history: [historySchema],
 }, { timestamps: true });
 
+
 const Client = mongoose.model("Client", ClientSchema);
+
 
 
 // ------------------------
@@ -124,7 +139,8 @@ const Client = mongoose.model("Client", ClientSchema);
 const app = express();
 const staticPath = path.join(__dirname, "public");
 
-// MongoDB Connection: Removed deprecated options (useNewUrlParser, useUnifiedTopology)
+
+// MongoDB Connection: Uses MONGODB_URI
 mongoose
   .connect(MONGO_URI)
   .then(() => logger.info("✅ MongoDB connected successfully"))
@@ -134,7 +150,8 @@ mongoose
   });
 
 
-// Cloudinary Configuration
+
+// Cloudinary Configuration: Uses CLOUDINARY_... variables
 if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
   cloudinary.config({
     cloud_name: CLOUDINARY_CLOUD_NAME,
@@ -146,15 +163,16 @@ if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
     logger.warn("Cloudinary credentials missing. Uploads will fail.");
 }
 
+
 // Configure multer for file uploads (using memory storage for Cloudinary)
 const upload = multer({ storage: multer.memoryStorage() });
 
 
-// Email Transporter
+// Email Transporter: Uses SMTP_... variables
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: SMTP_PORT === 465, 
+  secure: SMTP_PORT === 465, 
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
@@ -162,9 +180,11 @@ const transporter = nodemailer.createTransport({
 });
 
 
+
 // ------------------------
-// Helper Functions (Fully Implemented)
+// Helper Functions
 // ------------------------
+
 
 // Standardized API Response
 const respSuccess = (res, data = null, message = "OK", statusCode = 200, meta = null) => {
@@ -176,6 +196,7 @@ const respSuccess = (res, data = null, message = "OK", statusCode = 200, meta = 
   });
 };
 
+
 const respError = (res, message = "Server error", statusCode = 500, data = null, errorObj = null) => {
   if (errorObj) logger.error({ error: errorObj }, `API Error: ${message}`);
   return res.status(statusCode).json({
@@ -185,20 +206,22 @@ const respError = (res, message = "Server error", statusCode = 500, data = null,
   });
 };
 
-// Logging
+
+// Logging (Pino only)
 const logAction = async (actor, action, clientId, notes, data) => {
   logger.info({ actor, action, clientId, notes, data }, `ACTION: ${action} by ${actor}`);
-  // History save implementation is in the route handlers for specific actions (e.g., PUT)
 };
+
 
 // Slug Generation
 const generateUniqueSlug = async (name) => {
   const baseSlug = name
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, "") 
-    .replace(/[\s-]+/g, "-") 
+    .replace(/[^a-z0-9\s-]/g, "") 
+    .replace(/[\s-]+/g, "-") 
     .substring(0, 50);
+
 
   let slug = baseSlug;
   let counter = 1;
@@ -207,12 +230,13 @@ const generateUniqueSlug = async (name) => {
     counter++;
     if (counter > 100) {
         logger.warn({ baseSlug, finalSlug: slug }, "High collision detected, using random slug suffix.");
-        slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`; 
+        slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`; 
         break;
     }
   }
   return slug;
 };
+
 
 // VCard Content Generation
 const generateVcardContent = (client) => {
@@ -223,21 +247,22 @@ const generateVcardContent = (client) => {
   vCard.name = client.fullName;
   vCard.organization = client.company || "";
   vCard.title = client.title || "";
-  
+  
   // Primary Contacts
   if (client.phone1) vCard.cellPhone = client.phone1;
   if (client.email1) vCard.email = client.email1;
-  
+  
   // Secondary Contacts
   if (client.phone2) vCard.workPhone = client.phone2;
   if (client.email2) vCard.workEmail = client.email2;
   if (client.phone3) vCard.otherPhone = client.phone3;
   if (client.email3) vCard.otherEmail = client.email3;
-  
+  
   // Addresses and URLs
   if (client.address) vCard.homeAddress.label = client.address;
   if (client.website || client.businessWebsite) vCard.url = client.website || client.businessWebsite;
   if (client.portfolioWebsite) vCard.note = `Portfolio: ${client.portfolioWebsite}`;
+
 
   // Social Links (using an X-SOCIAL property for broader compatibility)
   if (client.socialLinks) {
@@ -247,29 +272,30 @@ const generateVcardContent = (client) => {
         .join('\n');
     if (socialText) vCard.socialmedia = socialText;
   }
-  
+  
   if (client.photoUrl) {
       try {
-          vCard.photo.attachFromUrl(client.photoUrl, 'JPEG'); 
+          vCard.photo.attachFromUrl(client.photoUrl, 'JPEG'); 
       } catch(e) {
           logger.warn({ error: e, photoUrl: client.photoUrl }, "Failed to attach photo to vCard from URL. Proceeding without image.");
       }
   }
-  
+  
   return vCard.getFormattedString();
 };
+
 
 // Cloudinary VCF Upload
 const uploadVcfToCloudinary = async (slug, vcfContent) => {
   if (!CLOUDINARY_CLOUD_NAME) throw new Error("Cloudinary not configured.");
   const base64Vcf = Buffer.from(vcfContent).toString('base64');
-  
+  
   const result = await cloudinary.uploader.upload(
     `data:text/vcard;base64,${base64Vcf}`,
     {
       folder: "smartcardlink_vcards",
-      resource_type: "raw", 
-      public_id: slug, 
+      resource_type: "raw", 
+      public_id: slug, 
       format: "vcf",
       tags: ["client_vcard"],
     }
@@ -277,13 +303,14 @@ const uploadVcfToCloudinary = async (slug, vcfContent) => {
   return result.secure_url;
 };
 
+
 // Email Function
 const sendEmail = async (to, subject, text, html) => {
   if (!SMTP_USER || !SMTP_PASS) {
     logger.warn("SMTP credentials missing. Skipping email send.");
     return;
   }
-  
+  
   const mailOptions = {
     from: `"SmartCardLink Admin" <${SMTP_USER}>`,
     to: to,
@@ -291,7 +318,7 @@ const sendEmail = async (to, subject, text, html) => {
     text: text,
     html: html || `<p>${text}</p>`,
   };
-  
+  
   try {
     const info = await transporter.sendMail(mailOptions);
     logger.info(`Email sent to ${to}: ${info.messageId}`);
@@ -300,7 +327,8 @@ const sendEmail = async (to, subject, text, html) => {
   }
 };
 
-// PDF Stub 
+
+// PDF Stub 
 const generateAndUploadPdf = async (client) => {
   logger.warn(`PDF generation is a complex feature and is currently stubbed (generateAndUploadPdf).`);
   // Stubbed URL based on client slug
@@ -315,8 +343,10 @@ app.use(pinoHttp({ logger }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // CRITICAL FIX: Trust the proxy (Render) for rate-limiting
 app.set('trust proxy', 1);
+
 
 // Security Middleware (Helmet)
 app.use(
@@ -327,23 +357,24 @@ app.use(
       styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       // CRITICAL FIX: Ensure all necessary image sources are included.
-      imgSrc: ["'self'", "data:", "res.cloudinary.com", "https://res.cloudinary.com"], 
+      imgSrc: ["'self'", "data:", "res.cloudinary.com", "https://res.cloudinary.com"], 
       // CRITICAL: Updated connectSrc to include all necessary domains from .env
       connectSrc: [
-        "'self'", 
-        BACKEND_API_URL, 
+        "'self'", 
+        BACKEND_API_URL, 
         new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
-        new URL(VCARD_BASE_URL).origin,    // Added for public vCard access
-        "res.cloudinary.com", 
-        "https://api.cloudinary.com", 
-        "*.google-analytics.com", 
+        new URL(VCARD_BASE_URL).origin,    // Added for public vCard access
+        "res.cloudinary.com", 
+        "https://api.cloudinary.com", 
+        "*.google-analytics.com", 
         "*.analytics.google.com"
-      ], 
+      ], 
       fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
       frameAncestors: ["'self'"],
     },
   })
 );
+
 
 // CORS
 // PRODUCTION FIX: Conditionally allow origins. No localhost in production.
@@ -351,13 +382,14 @@ app.use(
   cors({
     origin: (origin, callback) => {
         const isProduction = process.env.NODE_ENV === "production";
-        
+        
         // Define production origins from .env, extracting the origin part (protocol + host)
         const productionOrigins = [
-          BACKEND_API_URL, 
+          BACKEND_API_URL, 
           new URL(FRONTEND_BASE_URL).origin,
           new URL(VCARD_BASE_URL).origin,
         ];
+
 
         // Define development origins
         const devOrigins = [
@@ -366,17 +398,20 @@ app.use(
           /http:\/\/localhost:\d+$/, // dynamic local ports
         ];
 
+
         // Determine the final allowed list
         const allowedOrigins = isProduction ? productionOrigins : [...productionOrigins, ...devOrigins];
-      
+      
         if (!origin) return callback(null, true); // Allow server-to-server or requests without an Origin header
 
+
         // Check against normalized or raw origin
-        const normalizedOrigin = origin.includes('://') ? new URL(origin).origin : origin; 
-        
+        const normalizedOrigin = origin.includes('://') ? new URL(origin).origin : origin; 
+        
         if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin) || allowedOrigins.some(regex => regex instanceof RegExp && regex.test(origin))) {
             return callback(null, true);
         }
+
 
         logger.warn(`CORS block for origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
@@ -385,6 +420,7 @@ app.use(
     credentials: true,
   })
 );
+
 
 
 // Rate limiter for public/admin endpoints
@@ -397,10 +433,12 @@ const publicLimiter = RateLimit({
 });
 
 
+
 // ------------------------
 // Static File Serving
 // ------------------------
 app.use(express.static(staticPath));
+
 
 // Favicon check to avoid 404 noise
 app.get("/favicon.ico", (req, res) => {
@@ -409,14 +447,17 @@ app.get("/favicon.ico", (req, res) => {
     return res.status(204).end();
 });
 
+
 // ------------------------
 // API Routes
 // ------------------------
+
 
 // POST /api/upload-photo: Handle photo upload to Cloudinary (for both form submit and admin update)
 app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req, res) => {
   try {
     if (!req.file) return respError(res, "No file uploaded.", 400);
+
 
     const result = await cloudinary.uploader.upload(
       `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
@@ -427,9 +468,10 @@ app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req,
       }
     );
 
+
     await logAction("system", "TEMP_PHOTO_UPLOAD", null, "Temporary photo uploaded for client form", { photoUrl: result.secure_url });
-    
-    // CRITICAL FIX: Return a simplified JSON response for frontend consumption
+    
+    // CRITICAL FIX: Return a simplified JSON response for frontend consumption
     return respSuccess(res, { photoUrl: result.secure_url }, "Photo uploaded successfully");
   } catch (err) {
     logger.error({ err }, "❌ POST /api/upload-photo error");
@@ -438,33 +480,45 @@ app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req,
 });
 
 
+
 // POST /api/clients: Create a new client record (initial form submission)
-app.post("/api/clients", publicLimiter, async (req, res) => {
+app.post("/api/clients", publicLimiter, [
+    // ADDED: Input Validation
+    body('fullName').trim().isLength({ min: 1, max: 100 }).withMessage('Full Name is required and must be under 100 characters.'),
+    body('email1').isEmail().optional({ checkFalsy: true }).withMessage('Must be a valid email address.')
+], async (req, res) => {
   try {
+    // Check validation results
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return respError(res, "Validation Failed.", 400, errors.array());
+    }
+
     const incoming = req.body || {};
-    
+    
     // Normalize companyName to company if present (from admin-form.html logic)
     if (incoming.companyName) {
         incoming.company = incoming.companyName;
         delete incoming.companyName;
     }
-    
+    
     const clientDoc = new Client(incoming);
-    
+    
     // Auto-generate slug and status upon initial creation
     clientDoc.status = "Pending";
     clientDoc.slug = await generateUniqueSlug(clientDoc.fullName);
 
+
     clientDoc.history.push({ action: "CLIENT_CREATED", notes: "Initial form submission", actor: "client_submission" });
     await clientDoc.save();
-    
-    // Notify admin by email
+    
+    // Notify admin by email (Uses ADMIN_EMAIL and SMTP details)
     if (ADMIN_EMAIL) {
       const subject = `New SmartCardLink submission: ${clientDoc.fullName}`;
       const text = `New client submitted. ID: ${clientDoc._id} — ${clientDoc.fullName}. Check admin panel to process.`;
       await sendEmail(ADMIN_EMAIL, subject, text);
     }
-    
+    
     return respSuccess(res, { recordId: clientDoc._id }, "Saved. Pending admin processing.", 201);
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -476,13 +530,16 @@ app.post("/api/clients", publicLimiter, async (req, res) => {
 });
 
 
+
 // GET /api/admin/clients: Admin listing with filtering and pagination
+// NOTE: Security Warning - This route is unauthenticated as requested.
 app.get("/api/admin/clients", publicLimiter, async (req, res) => {
   try {
     const { q, status, page = 1, limit = 50 } = req.query;
     const filter = {};
     const pageSize = parseInt(limit);
     const skip = (parseInt(page) - 1) * pageSize;
+
 
     if (status) filter.status = status;
     if (q) {
@@ -495,21 +552,23 @@ app.get("/api/admin/clients", publicLimiter, async (req, res) => {
         { slug: regex }
       ];
     }
-    
+    
     const clients = await Client.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize)
-      .select("-history -__v"); 
+      .select("-history -__v"); 
+
 
     const totalCount = await Client.countDocuments(filter);
-    
+    
     const meta = {
         total: totalCount,
         page: parseInt(page),
         limit: pageSize,
         pages: Math.ceil(totalCount / pageSize),
     };
+
 
     return respSuccess(res, clients, "Admin clients list retrieved successfully", 200, meta);
   } catch (err) {
@@ -519,7 +578,9 @@ app.get("/api/admin/clients", publicLimiter, async (req, res) => {
 });
 
 
+
 // GET /api/clients/:id: Helper for Admin Panel to fetch one client
+// NOTE: Security Warning - This route is unauthenticated as requested.
 app.get("/api/clients/:id", publicLimiter, async (req, res) => {
     try {
         const client = await Client.findById(req.params.id);
@@ -531,26 +592,29 @@ app.get("/api/clients/:id", publicLimiter, async (req, res) => {
 });
 
 
+
 // PUT /api/clients/:id: Update client info (Admin update route)
+// NOTE: Security Warning - This route is unauthenticated as requested.
 app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, res) => {
   try {
     const id = req.params.id;
     const client = await Client.findById(id);
     if (!client) return respError(res, "Client not found.", 404);
-    
+    
     const incoming = req.body || {};
-    
+    
     // --- Safe Field Update Logic ---
     const allowedTopLevelFields = [
         'fullName', 'title', 'company', 'businessWebsite', 'portfolioWebsite', 'locationMap',
-        'phone1', 'phone2', 'phone3', 'email1', 'email2', 'email3', 'address', 'bio', 'status', 'photoUrl'
+        'phone1', 'phone2', 'phone3', 'email1', 'email2', 'email3', 'address', 'bio', 'status'
     ];
-    
+    
     // 1. Check for fullName change and regenerate slug if necessary
     if (incoming.fullName && incoming.fullName !== client.fullName) {
         client.slug = await generateUniqueSlug(incoming.fullName);
         await logAction("admin", "SLUG_REGENERATED", id, `Slug changed from ${client.slug} based on new fullName.`, {});
     }
+
 
     // 2. Handle photo upload if file is present (photoUrl is updated if successful)
     if (req.file) {
@@ -566,37 +630,32 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, r
       await logAction("admin", "CLIENT_PHOTO_UPDATED", id, "Photo updated via PUT route.", { newPhoto: incoming.photoUrl });
     }
 
+
     // 3. Apply updates safely, preventing overwrites of critical fields like slug, _id, history
     for (const field of allowedTopLevelFields) {
-        if (incoming[field] !== undefined && field !== 'photoUrl') { 
+        if (incoming[field] !== undefined) { 
             client[field] = incoming[field];
         }
     }
-    if (incoming.photoUrl) client.photoUrl = incoming.photoUrl;
 
-    // 4. Handle nested objects (socialLinks, workingHours) - handle JSON string from form
-    if (incoming.socialLinks) {
-        try {
-          const links = (typeof incoming.socialLinks === 'string') ? JSON.parse(incoming.socialLinks) : incoming.socialLinks;
-          Object.assign(client.socialLinks, links);
-        } catch (e) {
-            logger.error({ error: e, input: incoming.socialLinks }, "Failed to parse socialLinks JSON.");
-        }
+    // CRITICAL FIX: Merge nested fields (socialLinks, workingHours)
+    if (incoming.socialLinks && typeof incoming.socialLinks === 'object') {
+        Object.assign(client.socialLinks, incoming.socialLinks);
     }
-    if (incoming.workingHours) {
-        try {
-          const hours = (typeof incoming.workingHours === 'string') ? JSON.parse(incoming.workingHours) : incoming.workingHours;
-          Object.assign(client.workingHours, hours);
-        } catch (e) {
-          logger.error({ error: e, input: incoming.workingHours }, "Failed to parse workingHours JSON.");
-        }
+    if (incoming.workingHours && typeof incoming.workingHours === 'object') {
+        Object.assign(client.workingHours, incoming.workingHours);
     }
-    
-    // 5. Save and Log
-    client.history.push({ action: "CLIENT_UPDATED", notes: "Admin saved info", actor: "admin" });
+    
+    // 4. Update photoUrl if present (either from file upload or direct URL input)
+    if (incoming.photoUrl) {
+        client.photoUrl = incoming.photoUrl;
+    }
+    
+    client.history.push({ action: "CLIENT_UPDATED", notes: "Admin updated client data.", actor: "admin" });
+
     await client.save();
-    
-    return respSuccess(res, client, "Client updated successfully");
+    
+    return respSuccess(res, { recordId: client._id }, "Client data saved successfully.");
   } catch (err) {
     if (err.name === 'ValidationError') {
         return respError(res, `Validation Error: ${err.message}`, 400, null, err);
@@ -607,49 +666,61 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, r
 });
 
 
-// PUT /api/clients/:id/status/:newStatus: Admin status change route (Active, Suspended, Deleted)
+
+// PUT /api/clients/:id/status/:newStatus: Handle status changes (Activate, Disable, Processed, Deleted)
+// NOTE: Security Warning - This route is unauthenticated as requested.
 app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) => {
-  try {
-    const { id, newStatus } = req.params;
-    const { notes } = req.body;
-    
-    if (!["Pending", "Active", "Suspended", "Deleted"].includes(newStatus)) { // Added Pending as a valid status
-        return respError(res, "Invalid status provided.", 400);
+    try {
+        const id = req.params.id;
+        const newStatus = req.params.newStatus; // e.g., Active, Suspended, Processed, Deleted
+        const { notes } = req.body; // Notes from the modal
+        
+        // Note: 'Disabled' is mapped to DB schema 'Suspended'
+        const dbStatus = newStatus === 'Disabled' ? 'Suspended' : newStatus; 
+
+        if (!['Active', 'Suspended', 'Pending', 'Deleted'].includes(dbStatus)) {
+            return respError(res, "Invalid status requested.", 400);
+        }
+        
+        const client = await Client.findById(id);
+        if (!client) return respError(res, "Client not found.", 404);
+
+        if (client.status === dbStatus) {
+             return respSuccess(res, { recordId: client._id, newStatus: dbStatus }, `Client already in status ${dbStatus}.`, 200);
+        }
+        
+        client.status = dbStatus;
+        client.history.push({ action: `STATUS_CHANGED_TO_${dbStatus.toUpperCase()}`, notes: notes || `Status changed to ${dbStatus}.`, actor: "admin" });
+
+        await client.save();
+        
+        return respSuccess(res, { recordId: client._id, newStatus: client.status }, `Client status updated to ${newStatus}.`);
+
+    } catch (err) {
+        logger.error({ err }, "❌ PUT /api/clients/:id/status/:newStatus error");
+        return respError(res, err?.message || "Server error updating status", 500, null, err);
     }
-
-    const client = await Client.findById(id);
-    if (!client) return respError(res, "Client not found", 404);
-    
-    const previous = client.status;
-    client.status = newStatus;
-
-    client.history.push({ action: "STATUS_CHANGED", notes, actor: "admin" });
-    await client.save();
-    
-    await logAction("admin", "STATUS_CHANGED", client._id, notes, { previousStatus: previous, newStatus });
-    return respSuccess(res, client, `Client status updated to ${newStatus}`);
-  } catch (err) {
-    logger.error({ err }, "❌ PUT /api/clients/:id/status/:newStatus error");
-    return respError(res, "Server error updating status", 500, null, err);
-  }
 });
 
 
+
 // DELETE /api/clients/:id: Admin soft-delete route
+// NOTE: Security Warning - This route is unauthenticated as requested.
 app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
   try {
     const id = req.params.id;
     const { notes } = req.body;
-    
+    
     const client = await Client.findById(id);
     if (!client) return respError(res, "Client not found", 404);
-    
+    
     const previous = client.status;
     client.status = "Deleted"; // Soft delete
 
+
     client.history.push({ action: "CLIENT_DELETED", notes, actor: "admin" });
     await client.save();
-    
+    
     await logAction("admin", "CLIENT_DELETED", client._id, notes, { previousStatus: previous, newStatus: "Deleted" });
     return respSuccess(res, null, "Client soft-deleted successfully");
   } catch (err) {
@@ -659,15 +730,21 @@ app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
 });
 
 
+
 // POST /api/clients/:id/pdf: Admin route to generate and retrieve PDF
+// NOTE: Security Warning - This route is unauthenticated as requested.
 app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
   try {
     const id = req.params.id;
     const client = await Client.findById(id);
     if (!client) return respError(res, "Client not found.", 404);
-    
+    
     // PDF Generation is stubbed, but should return a URL for the admin to view
-    const pdfUrl = await generateAndUploadPdf(client); 
+    const pdfUrl = await generateAndUploadPdf(client); 
+    
+    // Log the PDF generation
+    client.history.push({ action: "PDF_GENERATED", notes: `PDF link created: ${pdfUrl}`, actor: "admin" });
+    await client.save();
 
     return respSuccess(res, { pdfUrl }, "PDF URL generated successfully", 200, { redirect: pdfUrl });
   } catch (err) {
@@ -677,67 +754,65 @@ app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
 });
 
 
-// POST /api/clients/:id/vcard: Create vCard, QR code, update client, send email
-app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const client = await Client.findById(id);
-    if (!client) return respError(res, "Client not found.", 404);
-    
-    if (!client.fullName || (!client.phone1 && !client.email1)) {
-      return respError(res, "Client must have fullName and at least one contact (phone1 or email1).", 400);
-    }
-    
-    // Ensure slug exists
-    if (!client.slug || client.slug.trim() === "") {
-      client.slug = await generateUniqueSlug(client.fullName);
-    }
-    
-    // The public page URL uses the dedicated VCARD_BASE_URL
-    const publicVcardPage = `${VCARD_BASE_URL}/${client.slug}`;
-    
-    // 1. Generate vCard Content
-    const vcardContent = generateVcardContent(client);
-    
-    // 2. Upload vCard to Cloudinary
-    const vcardUrl = await uploadVcfToCloudinary(client.slug, vcardContent); 
-    
-    // 3. Generate QR Code (The QR code should encode the public page link, not the direct vCard link)
-    const qrCodeUrl = await qrcode.toDataURL(publicVcardPage);
-    
-    // 4. Update Client Record
-    client.vcardUrl = vcardUrl;
-    client.qrCodeUrl = qrCodeUrl;
-    client.status = "Active";
-    client.history.push({ action: "VCARD_CREATED", notes: `vCard at ${vcardUrl}, Public Page: ${publicVcardPage}`, actor: "admin" });
-    await client.save();
 
-    // 5. Send vCard/QR email to client
-    const emailToClient = client.email1 || ADMIN_EMAIL;
-    if (emailToClient) {
-      const emailHtml = `
-        <h1>Your Digital Smart Card is Ready!</h1>
-        <p>Dear ${client.fullName},</p>
-        <p>Your SmartCardLink profile is now active and ready to share.</p>
-        <p><strong>Public Page Link:</strong> <a href="${publicVcardPage}">${publicVcardPage}</a></p>
-        <p><strong>Direct Download vCard:</strong> <a href="${vcardUrl}">Click to Download Contact (.vcf)</a></p>
-        <img src="${qrCodeUrl}" alt="QR Code" style="width: 200px; height: 200px; border: 1px solid #ccc; padding: 10px;">
-        <p>Thank you.</p>
-      `;
-      await sendEmail(emailToClient, `Your SmartCardLink is Ready: ${client.fullName}`, `Your digital smart card is ready. Public Page: ${publicVcardPage}`, emailHtml);
+// POST /api/clients/:id/vcard: Create vCard, QR code, update client, send email
+// NOTE: Security Warning - This route is unauthenticated as requested.
+app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const client = await Client.findById(id);
+
+        if (!client) return respError(res, "Client not found.", 404);
+        if (!client.email1) return respError(res, "Cannot generate vCard: Client has no primary email address (email1).", 400);
+
+        // 1. Generate vCard Content
+        const vcfContent = generateVcardContent(client);
+        
+        // 2. Upload VCF to Cloudinary
+        const vcardUrl = await uploadVcfToCloudinary(client.slug, vcfContent);
+        
+        // 3. Prepare public page link and Generate QR Code (Data URL encoding the public page)
+        const publicVcardPage = `${VCARD_BASE_URL}/vcard.html?slug=${client.slug}`; // Uses VCARD_BASE_URL
+        const qrCodeDataUrl = await qrcode.toDataURL(publicVcardPage, { errorCorrectionLevel: "H", type: "image/png" }); 
+
+        // 4. Update DB
+        client.vcardUrl = vcardUrl; 
+        client.qrCodeUrl = qrCodeDataUrl; 
+        client.status = "Active"; 
+        client.history.push({ 
+            action: "VCARD_GENERATED", 
+            notes: `vCard generated, status set to Active. VCF: ${vcardUrl}`,
+            actor: "admin"
+        });
+
+        await client.save(); 
+
+        // 5. Send Client Email (Uses SMTP details)
+        const emailSubject = `Your SmartCardLink is Ready!`;
+        const emailHtml = `
+            <p>Dear ${client.fullName},</p>
+            <p>Your digital smart card is now **Active** and ready to share.</p>
+            <p><strong>Public Page Link:</strong> <a href="${publicVcardPage}">${publicVcardPage}</a></p>
+            <p><strong>Direct Download vCard:</strong> <a href="${vcardUrl}">Click to Download Contact (.vcf)</a></p>
+            <p>Please save the downloaded .vcf file to your contacts.</p>
+            <p>Thank you.</p>
+        `;
+        await sendEmail(client.email1, emailSubject, `Your digital smart card link is: ${publicVcardPage}`, emailHtml);
+
+        return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.", 200);
+
+    } catch (err) {
+        logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
+        return respError(res, err?.message || "vCard generation failed.", 500, null, err);
     }
-    
-    return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.");
-  } catch (err) {
-    logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
-    return respError(res, "Server error creating vCard.", 500, null, err);
-  }
 });
+
 
 
 // ------------------------
 // Public View Route (VCard page)
 // ------------------------
+
 
 // GET /:slug: Public route to fetch the client data for client-side rendering
 app.get("/:slug", publicLimiter, async (req, res) => {
@@ -745,17 +820,17 @@ app.get("/:slug", publicLimiter, async (req, res) => {
     const slug = req.params.slug;
     // Find the client and ensure status is Active
     const client = await Client.findOne({ slug: slug, status: "Active" });
-    
+    
     if (!client) {
       await logAction("system", "VCARD_MISSING", null, `Attempted access for missing/inactive slug: ${slug}`, { ip: req.ip });
       // Redirect to the fallback URL from .env
-      return res.redirect(APP_FALLBACK_URL || "/404.html"); 
+      return res.redirect(APP_FALLBACK_URL || "/404.html");  // Uses APP_FALLBACK_URL
     }
-    
+    
     // Log the visit
     await logAction("system", "VCARD_VISIT", client._id, `Visit to public page: ${slug}`, { ip: req.ip });
-    
-    // Data returned for client-side JavaScript rendering 
+    
+    // Data returned for client-side JavaScript rendering 
     const vcardData = {
         fullName: client.fullName,
         title: client.title,
@@ -768,12 +843,13 @@ app.get("/:slug", publicLimiter, async (req, res) => {
         photoUrl: client.photoUrl,
         vcardUrl: client.vcardUrl,
         qrCodeUrl: client.qrCodeUrl,
-        socialLinks: client.socialLinks, 
+        socialLinks: client.socialLinks, 
         workingHours: client.workingHours,
     };
-    
+    
     // Return the data as a JSON response for dynamic rendering on the client-side.
     return respSuccess(res, vcardData, "vCard data retrieved successfully");
+
 
   } catch (err) {
     logger.error({ err }, "❌ GET /:slug error");
@@ -781,13 +857,14 @@ app.get("/:slug", publicLimiter, async (req, res) => {
   }
 });
 
+
 // ------------------------
 // Health Check Route (For Render Deployment)
 // ------------------------
 app.get('/health', (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'UP' : 'DOWN';
   const overallStatus = dbStatus === 'UP' ? 200 : 503;
-  
+  
   return res.status(overallStatus).json({
     status: overallStatus === 200 ? 'ok' : 'error',
     service: 'SmartCardLink API',
@@ -797,9 +874,11 @@ app.get('/health', (req, res) => {
 });
 
 
+
 // ------------------------
-// Server Start (UPDATED BLOCK)
+// Server Start
 // ------------------------
+
 
 // Use RENDER_EXTERNAL_URL (provided by Render) if available, otherwise fall back to APP_BASE_URL
 const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || APP_BASE_URL;
@@ -808,9 +887,8 @@ const ALLOWED_ORIGINS_LOG = [
     new URL(VCARD_BASE_URL).origin
 ].join(' and ');
 
-
 app.listen(PORT, HOST, () => {
-  // FINAL FIX: Log the system-provided RENDER_EXTERNAL_URL or the robustly set APP_BASE_URL
-  logger.info(`🚀 Server live and listening on ${PUBLIC_URL}`); 
+  // Logs the live URL from your environment settings
+  logger.info(`🚀 Server live and listening on ${PUBLIC_URL}`); 
   logger.info(`🌐 Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
 });

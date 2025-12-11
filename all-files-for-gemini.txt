@@ -1,0 +1,4606 @@
+﻿// ------------------------
+// Imports
+// ------------------------
+const express = require("express");
+const path = require("path");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const helmet = require("helmet");
+const RateLimit = require("express-rate-limit");
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const qrcode = require("qrcode");
+const vCardJS = require("vcards-js");
+const nodemailer = require("nodemailer");
+const pino = require("pino");
+const pinoHttp = require("pino-http");
+const fs = require("fs"); 
+require('dotenv').config(); // CRITICAL: Load .env variables
+
+// Configure custom logger
+const logger = pino({ level: process.env.NODE_ENV === "production" ? "info" : "debug" });
+
+// ------------------------
+// Environment Variables
+// ------------------------
+const PORT = process.env.PORT || 8080;
+const HOST = "0.0.0.0";
+const MONGO_URI = process.env.MONGODB_URI;
+
+// Base URLs - Using the newly defined .env variables
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; // Backend API URL
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000"; // Admin/Client Forms & Dashboards
+const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; // Public URL for the vCard page host
+const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL; // Used for /:slug redirect fallback
+
+// Derive the base URL for the backend API for internal use (CORS)
+const BACKEND_API_URL = new URL(APP_BASE_URL).origin;
+
+// SMTP
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null; // Use SMTP_USER as default Admin Email
+
+// Cloudinary
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
+
+
+// ------------------------
+// Database Schema and Model (Comprehensive)
+// ------------------------
+const historySchema = new mongoose.Schema({
+Â  action: { type: String, required: true },
+Â  notes: { type: String },
+Â  actor: { type: String, default: "system" },
+Â  timestamp: { type: Date, default: Date.now },
+});
+
+// Nested Schemas for form data
+const socialLinksSchema = new mongoose.Schema({
+Â  facebook: { type: String, trim: true, default: "" },
+Â  instagram: { type: String, trim: true, default: "" },
+Â  twitter: { type: String, trim: true, default: "" },
+Â  linkedin: { type: String, trim: true, default: "" },
+Â  tiktok: { type: String, trim: true, default: "" },
+Â  youtube: { type: String, trim: true, default: "" },
+}, { _id: false });
+
+const workingHoursSchema = new mongoose.Schema({
+Â  monFriStart: { type: String, default: "" },
+Â  monFriEnd: { type: String, default: "" },
+Â  satStart: { type: String, default: "" },
+Â  satEnd: { type: String, default: "" },
+Â  sunStart: { type: String, default: "" },
+Â  sunEnd: { type: String, default: "" },
+}, { _id: false });
+
+
+const ClientSchema = new mongoose.Schema({
+Â  // Personal Details
+Â  fullName: { type: String, required: true, trim: true },
+Â  title: { type: String, trim: true, default: "" },
+Â  
+Â  phone1: { type: String, trim: true, default: "" },
+Â  phone2: { type: String, trim: true, default: "" },
+Â  phone3: { type: String, trim: true, default: "" }, 
+Â  email1: { type: String, trim: true, lowercase: true, default: "" },
+Â  email2: { type: String, trim: true, lowercase: true, default: "" },
+Â  email3: { type: String, trim: true, lowercase: true, default: "" }, 
+
+Â  // Business Details
+Â  company: { type: String, trim: true, default: "" },
+Â  website: { type: String, trim: true, default: "" }, 
+Â  businessWebsite: { type: String, trim: true, default: "" },
+Â  portfolioWebsite: { type: String, trim: true, default: "" },
+Â  locationMap: { type: String, trim: true, default: "" }, 
+Â  address: { type: String, default: "" },
+Â  bio: { type: String, default: "" },
+
+Â  // Nested Data
+Â  workingHours: workingHoursSchema,
+Â  socialLinks: socialLinksSchema,
+Â  
+Â  // Status and Media
+Â  photoUrl: { type: String, default: "" }, // Cloudinary URL
+Â  slug: { type: String, required: true, unique: true, index: true },
+Â  status: { type: String, enum: ["Pending", "Active", "Suspended", "Deleted"], default: "Pending" },
+
+Â  vcardUrl: { type: String, default: "" }, // Cloudinary URL to .vcf file
+Â  qrCodeUrl: { type: String, default: "" }, // Data URL for QR code (or Cloudinary if uploaded)
+
+Â  history: [historySchema],
+}, { timestamps: true });
+
+const Client = mongoose.model("Client", ClientSchema);
+
+
+// ------------------------
+// App Initialization & DB Connection
+// ------------------------
+const app = express();
+const staticPath = path.join(__dirname, "public");
+
+// MongoDB Connection: Removed deprecated options (useNewUrlParser, useUnifiedTopology)
+mongoose
+Â  .connect(MONGO_URI)
+Â  .then(() => logger.info("âœ… MongoDB connected successfully"))
+Â  .catch((err) => {
+Â  Â  logger.error({ err }, "âŒ MongoDB connection error. Check MONGODB_URI.");
+Â  Â  process.exit(1);
+Â  });
+
+
+// Cloudinary Configuration
+if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
+Â  cloudinary.config({
+Â  Â  cloud_name: CLOUDINARY_CLOUD_NAME,
+Â  Â  api_key: CLOUDINARY_API_KEY,
+Â  Â  api_secret: CLOUDINARY_API_SECRET,
+Â  Â  secure: true,
+Â  });
+} else {
+Â  Â  logger.warn("Cloudinary credentials missing. Uploads will fail.");
+}
+
+// Configure multer for file uploads (using memory storage for Cloudinary)
+const upload = multer({ storage: multer.memoryStorage() });
+
+
+// Email Transporter
+const transporter = nodemailer.createTransport({
+Â  host: SMTP_HOST,
+Â  port: SMTP_PORT,
+Â  secure: SMTP_PORT === 465, 
+Â  auth: {
+Â  Â  user: SMTP_USER,
+Â  Â  pass: SMTP_PASS,
+Â  },
+});
+
+
+// ------------------------
+// Helper Functions (Fully Implemented)
+// ------------------------
+
+// Standardized API Response
+const respSuccess = (res, data = null, message = "OK", statusCode = 200, meta = null) => {
+Â  return res.status(statusCode).json({
+Â  Â  status: "success",
+Â  Â  message,
+Â  Â  data,
+Â  Â  meta,
+Â  });
+};
+
+const respError = (res, message = "Server error", statusCode = 500, data = null, errorObj = null) => {
+Â  if (errorObj) logger.error({ error: errorObj }, `API Error: ${message}`);
+Â  return res.status(statusCode).json({
+Â  Â  status: "error",
+Â  Â  message,
+Â  Â  data,
+Â  });
+};
+
+// Logging
+const logAction = async (actor, action, clientId, notes, data) => {
+Â  logger.info({ actor, action, clientId, notes, data }, `ACTION: ${action} by ${actor}`);
+Â  // History save implementation is in the route handlers for specific actions (e.g., PUT)
+};
+
+// Slug Generation
+const generateUniqueSlug = async (name) => {
+Â  const baseSlug = name
+Â  Â  .toLowerCase()
+Â  Â  .trim()
+Â  Â  .replace(/[^a-z0-9\s-]/g, "") 
+Â  Â  .replace(/[\s-]+/g, "-") 
+Â  Â  .substring(0, 50);
+
+Â  let slug = baseSlug;
+Â  let counter = 1;
+Â  while (await Client.findOne({ slug: slug })) {
+Â  Â  slug = `${baseSlug}-${counter}`;
+Â  Â  counter++;
+Â  Â  if (counter > 100) {
+Â  Â  Â  Â  logger.warn({ baseSlug, finalSlug: slug }, "High collision detected, using random slug suffix.");
+Â  Â  Â  Â  slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`; 
+Â  Â  Â  Â  break;
+Â  Â  }
+Â  }
+Â  return slug;
+};
+
+// VCard Content Generation
+const generateVcardContent = (client) => {
+Â  const vCard = vCardJS();
+Â  const names = (client.fullName || "").split(" ");
+Â  vCard.firstName = names.shift() || "";
+Â  vCard.lastName = names.join(" ") || "";
+Â  vCard.name = client.fullName;
+Â  vCard.organization = client.company || "";
+Â  vCard.title = client.title || "";
+Â  
+Â  // Primary Contacts
+Â  if (client.phone1) vCard.cellPhone = client.phone1;
+Â  if (client.email1) vCard.email = client.email1;
+Â  
+Â  // Secondary Contacts
+Â  if (client.phone2) vCard.workPhone = client.phone2;
+Â  if (client.email2) vCard.workEmail = client.email2;
+Â  if (client.phone3) vCard.otherPhone = client.phone3;
+Â  if (client.email3) vCard.otherEmail = client.email3;
+Â  
+Â  // Addresses and URLs
+Â  if (client.address) vCard.homeAddress.label = client.address;
+Â  if (client.website || client.businessWebsite) vCard.url = client.website || client.businessWebsite;
+Â  if (client.portfolioWebsite) vCard.note = `Portfolio: ${client.portfolioWebsite}`;
+
+Â  // Social Links (using an X-SOCIAL property for broader compatibility)
+Â  if (client.socialLinks) {
+Â  Â  const socialText = Object.entries(client.socialLinks)
+Â  Â  Â  Â  .filter(([_, url]) => url)
+Â  Â  Â  Â  .map(([platform, url]) => `${platform}: ${url}`)
+Â  Â  Â  Â  .join('\n');
+Â  Â  if (socialText) vCard.socialmedia = socialText;
+Â  }
+Â  
+Â  if (client.photoUrl) {
+Â  Â  Â  try {
+Â  Â  Â  Â  Â  vCard.photo.attachFromUrl(client.photoUrl, 'JPEG'); 
+Â  Â  Â  } catch(e) {
+Â  Â  Â  Â  Â  logger.warn({ error: e, photoUrl: client.photoUrl }, "Failed to attach photo to vCard from URL. Proceeding without image.");
+Â  Â  Â  }
+Â  }
+Â  
+Â  return vCard.getFormattedString();
+};
+
+// Cloudinary VCF Upload
+const uploadVcfToCloudinary = async (slug, vcfContent) => {
+Â  if (!CLOUDINARY_CLOUD_NAME) throw new Error("Cloudinary not configured.");
+Â  const base64Vcf = Buffer.from(vcfContent).toString('base64');
+Â  
+Â  const result = await cloudinary.uploader.upload(
+Â  Â  `data:text/vcard;base64,${base64Vcf}`,
+Â  Â  {
+Â  Â  Â  folder: "smartcardlink_vcards",
+Â  Â  Â  resource_type: "raw", 
+Â  Â  Â  public_id: slug, 
+Â  Â  Â  format: "vcf",
+Â  Â  Â  tags: ["client_vcard"],
+Â  Â  }
+Â  );
+Â  return result.secure_url;
+};
+
+// Email Function
+const sendEmail = async (to, subject, text, html) => {
+Â  if (!SMTP_USER || !SMTP_PASS) {
+Â  Â  logger.warn("SMTP credentials missing. Skipping email send.");
+Â  Â  return;
+Â  }
+Â  
+Â  const mailOptions = {
+Â  Â  from: `"SmartCardLink Admin" <${SMTP_USER}>`,
+Â  Â  to: to,
+Â  Â  subject: subject,
+Â  Â  text: text,
+Â  Â  html: html || `<p>${text}</p>`,
+Â  };
+Â  
+Â  try {
+Â  Â  const info = await transporter.sendMail(mailOptions);
+Â  Â  logger.info(`Email sent to ${to}: ${info.messageId}`);
+Â  } catch (err) {
+Â  Â  logger.error({ err }, `âŒ Failed to send email to ${to}`);
+Â  }
+};
+
+// PDF Stub 
+const generateAndUploadPdf = async (client) => {
+Â  logger.warn(`PDF generation is a complex feature and is currently stubbed (generateAndUploadPdf).`);
+Â  // Stubbed URL based on client slug
+Â  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/raw/upload/smartcardlink_pdfs/${client.slug}.pdf`;
+};
+
+
+// ------------------------
+// Middleware
+// ------------------------
+app.use(pinoHttp({ logger }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// CRITICAL FIX: Trust the proxy (Render) for rate-limiting
+app.set('trust proxy', 1);
+
+// Security Middleware (Helmet)
+app.use(
+Â  helmet.contentSecurityPolicy({
+Â  Â  directives: {
+Â  Â  Â  defaultSrc: ["'self'"],
+Â  Â  Â  scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+Â  Â  Â  styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+Â  Â  Â  styleSrcElem: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+Â  Â  Â  // CRITICAL FIX: Ensure all necessary image sources are included.
+Â  Â  Â  imgSrc: ["'self'", "data:", "res.cloudinary.com", "https://res.cloudinary.com"], 
+Â  Â  Â  // CRITICAL: Updated connectSrc to include all necessary domains from .env
+Â  Â  Â  connectSrc: [
+Â  Â  Â  Â  "'self'", 
+Â  Â  Â  Â  BACKEND_API_URL, 
+Â  Â  Â  Â  new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
+Â  Â  Â  Â  new URL(VCARD_BASE_URL).origin, Â  Â // Added for public vCard access
+Â  Â  Â  Â  "res.cloudinary.com", 
+Â  Â  Â  Â  "https://api.cloudinary.com", 
+Â  Â  Â  Â  "*.google-analytics.com", 
+Â  Â  Â  Â  "*.analytics.google.com"
+Â  Â  Â  ], 
+Â  Â  Â  fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
+Â  Â  Â  frameAncestors: ["'self'"],
+Â  Â  },
+Â  })
+);
+
+// CORS
+// PRODUCTION FIX: Conditionally allow origins. No localhost in production.
+app.use(
+Â  cors({
+Â  Â  origin: (origin, callback) => {
+Â  Â  Â  Â  const isProduction = process.env.NODE_ENV === "production";
+Â  Â  Â  Â  
+Â  Â  Â  Â  // Define production origins from .env, extracting the origin part (protocol + host)
+Â  Â  Â  Â  const productionOrigins = [
+Â  Â  Â  Â  Â  BACKEND_API_URL, 
+Â  Â  Â  Â  Â  new URL(FRONTEND_BASE_URL).origin,
+Â  Â  Â  Â  Â  new URL(VCARD_BASE_URL).origin,
+Â  Â  Â  Â  ];
+
+Â  Â  Â  Â  // Define development origins
+Â  Â  Â  Â  const devOrigins = [
+Â  Â  Â  Â  Â  "http://localhost:3000",
+Â  Â  Â  Â  Â  "http://127.0.0.1:3000",
+Â  Â  Â  Â  Â  /http:\/\/localhost:\d+$/, // dynamic local ports
+Â  Â  Â  Â  ];
+
+Â  Â  Â  Â  // Determine the final allowed list
+Â  Â  Â  Â  const allowedOrigins = isProduction ? productionOrigins : [...productionOrigins, ...devOrigins];
+Â  Â  Â  
+Â  Â  Â  Â  if (!origin) return callback(null, true); // Allow server-to-server or requests without an Origin header
+
+Â  Â  Â  Â  // Check against normalized or raw origin
+Â  Â  Â  Â  const normalizedOrigin = origin.includes('://') ? new URL(origin).origin : origin; 
+Â  Â  Â  Â  
+Â  Â  Â  Â  if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin) || allowedOrigins.some(regex => regex instanceof RegExp && regex.test(origin))) {
+Â  Â  Â  Â  Â  Â  return callback(null, true);
+Â  Â  Â  Â  }
+
+Â  Â  Â  Â  logger.warn(`CORS block for origin: ${origin}`);
+Â  Â  Â  Â  callback(new Error("Not allowed by CORS"));
+Â  Â  },
+Â  Â  methods: ["GET", "POST", "PUT", "DELETE"],
+Â  Â  credentials: true,
+Â  })
+);
+
+
+// Rate limiter for public/admin endpoints
+const publicLimiter = RateLimit({
+Â  windowMs: 15 * 60 * 1000,
+Â  max: 200,
+Â  message: "Too many requests, please try again later.",
+Â  legacyHeaders: false,
+Â  standardHeaders: true,
+});
+
+
+// ------------------------
+// Static File Serving
+// ------------------------
+app.use(express.static(staticPath));
+
+// Favicon check to avoid 404 noise
+app.get("/favicon.ico", (req, res) => {
+Â  Â  const icoPath = path.join(staticPath, "favicon.ico");
+Â  Â  if (fs.existsSync(icoPath)) return res.sendFile(icoPath);
+Â  Â  return res.status(204).end();
+});
+
+// ------------------------
+// API Routes
+// ------------------------
+
+// POST /api/upload-photo: Handle photo upload to Cloudinary (for both form submit and admin update)
+app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req, res) => {
+Â  try {
+Â  Â  if (!req.file) return respError(res, "No file uploaded.", 400);
+
+Â  Â  const result = await cloudinary.uploader.upload(
+Â  Â  Â  `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+Â  Â  Â  {
+Â  Â  Â  Â  folder: "smartcardlink_photos",
+Â  Â  Â  Â  resource_type: "image",
+Â  Â  Â  Â  tags: ["client_photo", "temp_upload"],
+Â  Â  Â  }
+Â  Â  );
+
+Â  Â  await logAction("system", "TEMP_PHOTO_UPLOAD", null, "Temporary photo uploaded for client form", { photoUrl: result.secure_url });
+Â  Â  
+    // CRITICAL FIX: Return a simplified JSON response for frontend consumption
+Â  Â  return respSuccess(res, { photoUrl: result.secure_url }, "Photo uploaded successfully");
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ POST /api/upload-photo error");
+Â  Â  return respError(res, "Upload error", 500, null, err);
+Â  }
+});
+
+
+// POST /api/clients: Create a new client record (initial form submission)
+app.post("/api/clients", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const incoming = req.body || {};
+Â  Â  
+Â  Â  // Normalize companyName to company if present (from admin-form.html logic)
+Â  Â  if (incoming.companyName) {
+Â  Â  Â  Â  incoming.company = incoming.companyName;
+Â  Â  Â  Â  delete incoming.companyName;
+Â  Â  }
+Â  Â  
+Â  Â  const clientDoc = new Client(incoming);
+Â  Â  
+Â  Â  // Auto-generate slug and status upon initial creation
+Â  Â  clientDoc.status = "Pending";
+Â  Â  clientDoc.slug = await generateUniqueSlug(clientDoc.fullName);
+
+Â  Â  clientDoc.history.push({ action: "CLIENT_CREATED", notes: "Initial form submission", actor: "client_submission" });
+Â  Â  await clientDoc.save();
+Â  Â  
+Â  Â  // Notify admin by email
+Â  Â  if (ADMIN_EMAIL) {
+Â  Â  Â  const subject = `New SmartCardLink submission: ${clientDoc.fullName}`;
+Â  Â  Â  const text = `New client submitted. ID: ${clientDoc._id} â€” ${clientDoc.fullName}. Check admin panel to process.`;
+Â  Â  Â  await sendEmail(ADMIN_EMAIL, subject, text);
+Â  Â  }
+Â  Â  
+Â  Â  return respSuccess(res, { recordId: clientDoc._id }, "Saved. Pending admin processing.", 201);
+Â  } catch (err) {
+Â  Â  if (err.name === 'ValidationError') {
+Â  Â  Â  Â  return respError(res, `Validation Error: ${err.message}`, 400, null, err);
+Â  Â  }
+Â  Â  logger.error({ err }, "âŒ POST /api/clients error");
+Â  Â  return respError(res, err?.message || "Server error", 500, null, err);
+Â  }
+});
+
+
+// GET /api/admin/clients: Admin listing with filtering and pagination
+app.get("/api/admin/clients", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const { q, status, page = 1, limit = 50 } = req.query;
+Â  Â  const filter = {};
+Â  Â  const pageSize = parseInt(limit);
+Â  Â  const skip = (parseInt(page) - 1) * pageSize;
+
+Â  Â  if (status) filter.status = status;
+Â  Â  if (q) {
+Â  Â  Â  const regex = new RegExp(q, "i");
+Â  Â  Â  filter.$or = [
+Â  Â  Â  Â  { fullName: regex },
+Â  Â  Â  Â  { company: regex },
+Â  Â  Â  Â  { email1: regex },
+Â  Â  Â  Â  { phone1: regex },
+Â  Â  Â  Â  { slug: regex }
+Â  Â  Â  ];
+Â  Â  }
+Â  Â  
+Â  Â  const clients = await Client.find(filter)
+Â  Â  Â  .sort({ createdAt: -1 })
+Â  Â  Â  .skip(skip)
+Â  Â  Â  .limit(pageSize)
+Â  Â  Â  .select("-history -__v"); 
+
+Â  Â  const totalCount = await Client.countDocuments(filter);
+Â  Â  
+Â  Â  const meta = {
+Â  Â  Â  Â  total: totalCount,
+Â  Â  Â  Â  page: parseInt(page),
+Â  Â  Â  Â  limit: pageSize,
+Â  Â  Â  Â  pages: Math.ceil(totalCount / pageSize),
+Â  Â  };
+
+Â  Â  return respSuccess(res, clients, "Admin clients list retrieved successfully", 200, meta);
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ GET /api/admin/clients error");
+Â  Â  return respError(res, "Server error fetching clients", 500, null, err);
+Â  }
+});
+
+
+// GET /api/clients/:id: Helper for Admin Panel to fetch one client
+app.get("/api/clients/:id", publicLimiter, async (req, res) => {
+Â  Â  try {
+Â  Â  Â  Â  const client = await Client.findById(req.params.id);
+Â  Â  Â  Â  if (!client) return respError(res, "Client not found.", 404);
+Â  Â  Â  Â  return respSuccess(res, client);
+Â  Â  } catch (err) {
+Â  Â  Â  Â  return respError(res, "Error fetching client.", 500, null, err);
+Â  Â  }
+});
+
+
+// PUT /api/clients/:id: Update client info (Admin update route)
+app.put("/api/clients/:id", publicLimiter, upload.single("photo"), async (req, res) => {
+Â  try {
+Â  Â  const id = req.params.id;
+Â  Â  const client = await Client.findById(id);
+Â  Â  if (!client) return respError(res, "Client not found.", 404);
+Â  Â  
+Â  Â  const incoming = req.body || {};
+Â  Â  
+Â  Â  // --- Safe Field Update Logic ---
+Â  Â  const allowedTopLevelFields = [
+Â  Â  Â  Â  'fullName', 'title', 'company', 'businessWebsite', 'portfolioWebsite', 'locationMap',
+Â  Â  Â  Â  'phone1', 'phone2', 'phone3', 'email1', 'email2', 'email3', 'address', 'bio', 'status', 'photoUrl'
+Â  Â  ];
+Â  Â  
+Â  Â  // 1. Check for fullName change and regenerate slug if necessary
+Â  Â  if (incoming.fullName && incoming.fullName !== client.fullName) {
+Â  Â  Â  Â  client.slug = await generateUniqueSlug(incoming.fullName);
+Â  Â  Â  Â  await logAction("admin", "SLUG_REGENERATED", id, `Slug changed from ${client.slug} based on new fullName.`, {});
+Â  Â  }
+
+Â  Â  // 2. Handle photo upload if file is present (photoUrl is updated if successful)
+Â  Â  if (req.file) {
+Â  Â  Â  const uploadResult = await cloudinary.uploader.upload(
+Â  Â  Â  Â  `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+Â  Â  Â  Â  {
+Â  Â  Â  Â  Â  folder: "smartcardlink_photos",
+Â  Â  Â  Â  Â  resource_type: "image",
+Â  Â  Â  Â  Â  tags: ["client_photo", `client_${id}`],
+Â  Â  Â  Â  }
+Â  Â  Â  );
+Â  Â  Â  incoming.photoUrl = uploadResult.secure_url;
+Â  Â  Â  await logAction("admin", "CLIENT_PHOTO_UPDATED", id, "Photo updated via PUT route.", { newPhoto: incoming.photoUrl });
+Â  Â  }
+
+Â  Â  // 3. Apply updates safely, preventing overwrites of critical fields like slug, _id, history
+Â  Â  for (const field of allowedTopLevelFields) {
+Â  Â  Â  Â  if (incoming[field] !== undefined && field !== 'photoUrl') { 
+Â  Â  Â  Â  Â  Â  client[field] = incoming[field];
+Â  Â  Â  Â  }
+Â  Â  }
+Â  Â  if (incoming.photoUrl) client.photoUrl = incoming.photoUrl;
+
+Â  Â  // 4. Handle nested objects (socialLinks, workingHours) - handle JSON string from form
+Â  Â  if (incoming.socialLinks) {
+Â  Â  Â  Â  try {
+Â  Â  Â  Â  Â  const links = (typeof incoming.socialLinks === 'string') ? JSON.parse(incoming.socialLinks) : incoming.socialLinks;
+Â  Â  Â  Â  Â  Object.assign(client.socialLinks, links);
+Â  Â  Â  Â  } catch (e) {
+Â  Â  Â  Â  Â  Â  logger.error({ error: e, input: incoming.socialLinks }, "Failed to parse socialLinks JSON.");
+Â  Â  Â  Â  }
+Â  Â  }
+Â  Â  if (incoming.workingHours) {
+Â  Â  Â  Â  try {
+Â  Â  Â  Â  Â  const hours = (typeof incoming.workingHours === 'string') ? JSON.parse(incoming.workingHours) : incoming.workingHours;
+Â  Â  Â  Â  Â  Object.assign(client.workingHours, hours);
+Â  Â  Â  Â  } catch (e) {
+Â  Â  Â  Â  Â  logger.error({ error: e, input: incoming.workingHours }, "Failed to parse workingHours JSON.");
+Â  Â  Â  Â  }
+Â  Â  }
+Â  Â  
+Â  Â  // 5. Save and Log
+Â  Â  client.history.push({ action: "CLIENT_UPDATED", notes: "Admin saved info", actor: "admin" });
+Â  Â  await client.save();
+Â  Â  
+Â  Â  return respSuccess(res, client, "Client updated successfully");
+Â  } catch (err) {
+Â  Â  if (err.name === 'ValidationError') {
+Â  Â  Â  Â  return respError(res, `Validation Error: ${err.message}`, 400, null, err);
+Â  Â  }
+Â  Â  logger.error({ err }, "âŒ PUT /api/clients/:id error");
+Â  Â  return respError(res, "Server error saving client info.", 500, null, err);
+Â  }
+});
+
+
+// PUT /api/clients/:id/status/:newStatus: Admin status change route (Active, Suspended, Deleted)
+app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const { id, newStatus } = req.params;
+Â  Â  const { notes } = req.body;
+Â  Â  
+Â  Â  if (!["Pending", "Active", "Suspended", "Deleted"].includes(newStatus)) { // Added Pending as a valid status
+Â  Â  Â  Â  return respError(res, "Invalid status provided.", 400);
+Â  Â  }
+
+Â  Â  const client = await Client.findById(id);
+Â  Â  if (!client) return respError(res, "Client not found", 404);
+Â  Â  
+Â  Â  const previous = client.status;
+Â  Â  client.status = newStatus;
+
+Â  Â  client.history.push({ action: "STATUS_CHANGED", notes, actor: "admin" });
+Â  Â  await client.save();
+Â  Â  
+Â  Â  await logAction("admin", "STATUS_CHANGED", client._id, notes, { previousStatus: previous, newStatus });
+Â  Â  return respSuccess(res, client, `Client status updated to ${newStatus}`);
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ PUT /api/clients/:id/status/:newStatus error");
+Â  Â  return respError(res, "Server error updating status", 500, null, err);
+Â  }
+});
+
+
+// DELETE /api/clients/:id: Admin soft-delete route
+app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const id = req.params.id;
+Â  Â  const { notes } = req.body;
+Â  Â  
+Â  Â  const client = await Client.findById(id);
+Â  Â  if (!client) return respError(res, "Client not found", 404);
+Â  Â  
+Â  Â  const previous = client.status;
+Â  Â  client.status = "Deleted"; // Soft delete
+
+Â  Â  client.history.push({ action: "CLIENT_DELETED", notes, actor: "admin" });
+Â  Â  await client.save();
+Â  Â  
+Â  Â  await logAction("admin", "CLIENT_DELETED", client._id, notes, { previousStatus: previous, newStatus: "Deleted" });
+Â  Â  return respSuccess(res, null, "Client soft-deleted successfully");
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ DELETE /api/clients/:id error");
+Â  Â  return respError(res, "Server error deleting client", 500, null, err);
+Â  }
+});
+
+
+// POST /api/clients/:id/pdf: Admin route to generate and retrieve PDF
+app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const id = req.params.id;
+Â  Â  const client = await Client.findById(id);
+Â  Â  if (!client) return respError(res, "Client not found.", 404);
+Â  Â  
+Â  Â  // PDF Generation is stubbed, but should return a URL for the admin to view
+Â  Â  const pdfUrl = await generateAndUploadPdf(client); 
+
+Â  Â  return respSuccess(res, { pdfUrl }, "PDF URL generated successfully", 200, { redirect: pdfUrl });
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ POST /api/clients/:id/pdf error");
+Â  Â  return respError(res, "Server error generating PDF.", 500, null, err);
+Â  }
+});
+
+
+// POST /api/clients/:id/vcard: Create vCard, QR code, update client, send email
+app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const id = req.params.id;
+Â  Â  const client = await Client.findById(id);
+Â  Â  if (!client) return respError(res, "Client not found.", 404);
+Â  Â  
+Â  Â  if (!client.fullName || (!client.phone1 && !client.email1)) {
+Â  Â  Â  return respError(res, "Client must have fullName and at least one contact (phone1 or email1).", 400);
+Â  Â  }
+Â  Â  
+Â  Â  // Ensure slug exists
+Â  Â  if (!client.slug || client.slug.trim() === "") {
+Â  Â  Â  client.slug = await generateUniqueSlug(client.fullName);
+Â  Â  }
+Â  Â  
+Â  Â  // The public page URL uses the dedicated VCARD_BASE_URL
+Â  Â  const publicVcardPage = `${VCARD_BASE_URL}/${client.slug}`;
+Â  Â  
+Â  Â  // 1. Generate vCard Content
+Â  Â  const vcardContent = generateVcardContent(client);
+Â  Â  
+Â  Â  // 2. Upload vCard to Cloudinary
+Â  Â  const vcardUrl = await uploadVcfToCloudinary(client.slug, vcardContent); 
+Â  Â  
+Â  Â  // 3. Generate QR Code (The QR code should encode the public page link, not the direct vCard link)
+Â  Â  const qrCodeUrl = await qrcode.toDataURL(publicVcardPage);
+Â  Â  
+Â  Â  // 4. Update Client Record
+Â  Â  client.vcardUrl = vcardUrl;
+Â  Â  client.qrCodeUrl = qrCodeUrl;
+Â  Â  client.status = "Active";
+Â  Â  client.history.push({ action: "VCARD_CREATED", notes: `vCard at ${vcardUrl}, Public Page: ${publicVcardPage}`, actor: "admin" });
+Â  Â  await client.save();
+
+Â  Â  // 5. Send vCard/QR email to client
+Â  Â  const emailToClient = client.email1 || ADMIN_EMAIL;
+Â  Â  if (emailToClient) {
+Â  Â  Â  const emailHtml = `
+Â  Â  Â  Â  <h1>Your Digital Smart Card is Ready!</h1>
+Â  Â  Â  Â  <p>Dear ${client.fullName},</p>
+Â  Â  Â  Â  <p>Your SmartCardLink profile is now active and ready to share.</p>
+Â  Â  Â  Â  <p><strong>Public Page Link:</strong> <a href="${publicVcardPage}">${publicVcardPage}</a></p>
+Â  Â  Â  Â  <p><strong>Direct Download vCard:</strong> <a href="${vcardUrl}">Click to Download Contact (.vcf)</a></p>
+Â  Â  Â  Â  <img src="${qrCodeUrl}" alt="QR Code" style="width: 200px; height: 200px; border: 1px solid #ccc; padding: 10px;">
+Â  Â  Â  Â  <p>Thank you.</p>
+Â  Â  Â  `;
+Â  Â  Â  await sendEmail(emailToClient, `Your SmartCardLink is Ready: ${client.fullName}`, `Your digital smart card is ready. Public Page: ${publicVcardPage}`, emailHtml);
+Â  Â  }
+Â  Â  
+Â  Â  return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.");
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ POST /api/clients/:id/vcard error");
+Â  Â  return respError(res, "Server error creating vCard.", 500, null, err);
+Â  }
+});
+
+
+// ------------------------
+// Public View Route (VCard page)
+// ------------------------
+
+// GET /:slug: Public route to fetch the client data for client-side rendering
+app.get("/:slug", publicLimiter, async (req, res) => {
+Â  try {
+Â  Â  const slug = req.params.slug;
+Â  Â  // Find the client and ensure status is Active
+Â  Â  const client = await Client.findOne({ slug: slug, status: "Active" });
+Â  Â  
+Â  Â  if (!client) {
+Â  Â  Â  await logAction("system", "VCARD_MISSING", null, `Attempted access for missing/inactive slug: ${slug}`, { ip: req.ip });
+Â  Â  Â  // Redirect to the fallback URL from .env
+Â  Â  Â  return res.redirect(APP_FALLBACK_URL || "/404.html"); 
+Â  Â  }
+Â  Â  
+Â  Â  // Log the visit
+Â  Â  await logAction("system", "VCARD_VISIT", client._id, `Visit to public page: ${slug}`, { ip: req.ip });
+Â  Â  
+Â  Â  // Data returned for client-side JavaScript rendering 
+Â  Â  const vcardData = {
+Â  Â  Â  Â  fullName: client.fullName,
+Â  Â  Â  Â  title: client.title,
+Â  Â  Â  Â  company: client.company,
+Â  Â  Â  Â  phone1: client.phone1,
+Â  Â  Â  Â  email1: client.email1,
+Â  Â  Â  Â  website: client.website || client.businessWebsite, // Consolidated
+Â  Â  Â  Â  address: client.address,
+Â  Â  Â  Â  bio: client.bio,
+Â  Â  Â  Â  photoUrl: client.photoUrl,
+Â  Â  Â  Â  vcardUrl: client.vcardUrl,
+Â  Â  Â  Â  qrCodeUrl: client.qrCodeUrl,
+Â  Â  Â  Â  socialLinks: client.socialLinks, 
+Â  Â  Â  Â  workingHours: client.workingHours,
+Â  Â  };
+Â  Â  
+Â  Â  // Return the data as a JSON response for dynamic rendering on the client-side.
+Â  Â  return respSuccess(res, vcardData, "vCard data retrieved successfully");
+
+Â  } catch (err) {
+Â  Â  logger.error({ err }, "âŒ GET /:slug error");
+Â  Â  return respError(res, "Error retrieving vCard.", 500, null, err);
+Â  }
+});
+
+// ------------------------
+// Health Check Route (For Render Deployment)
+// ------------------------
+app.get('/health', (req, res) => {
+Â  const dbStatus = mongoose.connection.readyState === 1 ? 'UP' : 'DOWN';
+Â  const overallStatus = dbStatus === 'UP' ? 200 : 503;
+Â  
+Â  return res.status(overallStatus).json({
+Â  Â  status: overallStatus === 200 ? 'ok' : 'error',
+Â  Â  service: 'SmartCardLink API',
+Â  Â  database: dbStatus,
+Â  Â  timestamp: new Date().toISOString(),
+Â  });
+});
+
+
+// ------------------------
+// Server Start (UPDATED BLOCK)
+// ------------------------
+
+// Use RENDER_EXTERNAL_URL (provided by Render) if available, otherwise fall back to APP_BASE_URL
+const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || APP_BASE_URL;
+const ALLOWED_ORIGINS_LOG = [
+Â  Â  new URL(FRONTEND_BASE_URL).origin,
+Â  Â  new URL(VCARD_BASE_URL).origin
+].join(' and ');
+
+
+app.listen(PORT, HOST, () => {
+Â  // FINAL FIX: Log the system-provided RENDER_EXTERNAL_URL or the robustly set APP_BASE_URL
+Â  logger.info(`ðŸš€ Server live and listening on ${PUBLIC_URL}`); 
+Â  logger.info(`ðŸŒ Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
+});
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink Admin Form</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 1rem;
+      background: none;
+      position: relative;
+      color: white;
+    }
+    #bg-video {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      z-index: -100;
+      filter: brightness(0.4) saturate(1.2);
+      object-fit: cover;
+    }
+    .form-card {
+      background-color: #111;
+      border-radius: 1rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 750px;
+      border: 1px solid #333;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      overflow-y: auto;
+    }
+    h1.title {
+      color: #FFD700;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    button, .file-input-label {
+      transition: background-color 0.3s, color 0.3s;
+      font-weight: 600;
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+      text-align: center;
+      border: 1px solid transparent;
+    }
+    .section-header {
+      background-color: #1f2937;
+      color: #FFD700;
+      padding: 0.5rem;
+      text-align: center;
+      border-radius: 0.375rem;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    label {
+      color: white;
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 0.375rem;
+      border: 1px solid #ccc;
+      resize: vertical;
+      box-sizing: border-box;
+      background-color: white;
+      color: black;
+    }
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .top-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .top-buttons button {
+      flex: 1 1 45%;
+      margin-top: 0;
+    }
+    .action-button {
+      background-color: black;
+      color: white;
+      border: 1px solid #FFD700;
+    }
+    .action-button:hover {
+      background-color: #FFD700;
+      color: black;
+    }
+    .btn-view-pdf {
+      background-color: #fff;
+      color: black;
+      border: 1px solid #FFD700;
+    }
+    .btn-view-pdf:hover, .btn-view-pdf.pressed {
+      background-color: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+    .btn-create-vcard {
+      background-color: black;
+      color: white;
+      border: 1px solid #FFD700;
+    }
+    .btn-create-vcard:hover, .btn-create-vcard.pressed {
+      background-color: #22c55e;
+      color: white;
+      border-color: #22c55e;
+    }
+    .photo-upload-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .photo-upload-container .url-input-container {
+      flex: 1;
+    }
+    .file-input-label {
+      background-color: #ef4444;
+      color: white;
+      border: none;
+      flex: 0 0 120px;
+      margin-top: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 600;
+    }
+    .file-input-label:hover {
+      background-color: #3b82f6;
+      color: white;
+    }
+    #photoFile { 
+      display: none; 
+    }
+    .btn-save-info {
+      background-color: black;
+      color: white;
+      border: 1px solid #FFD700;
+    }
+    .btn-save-info:hover {
+      background-color: #FFD700;
+      color: black;
+    }
+    .toast-message {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #FFD700;
+      color: black;
+      padding: 1rem 2rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: none;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: white;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    @media (min-width: 768px) {
+      .photo-upload-container {
+        flex-direction: row;
+        align-items: flex-end;
+      }
+    }
+  </style>
+</head>
+<body>
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+  <div class="form-card">
+    <h1 class="title">SmartCardLink Admin Form</h1>
+    <div class="top-buttons">
+      <button id="view-pdf-btn" class="btn-view-pdf">View Client Info PDF</button>
+      <button id="create-vcard-btn" class="btn-create-vcard">Create vCard</button>
+    </div>
+    <form id="adminForm" autocomplete="off">
+      <input type="hidden" id="clientId" name="clientId">
+      
+      <div class="section-header">Personal Details</div>
+      <div class="grid-2col">
+        <div><label for="fullName">Full Name</label><input type="text" id="fullName" name="fullName" required /></div>
+        <div><label for="title">Title/Position</label><input type="text" id="title" name="title" /></div>
+      </div>
+      <div class="grid-2col">
+        <div><label for="phone1">Phone Number 1 (Main/Default)</label><input type="tel" id="phone1" name="phone1" required /></div>
+        <div><label for="phone2">Phone Number 2</label><input type="tel" id="phone2" name="phone2" /></div>
+      </div>
+      <div><label for="phone3">Phone Number 3</label><input type="tel" id="phone3" name="phone3" /></div>
+      <div class="grid-2col">
+        <div><label for="email1">Email 1 (Main/Default)</label><input type="email" id="email1" name="email1" required /></div>
+        <div><label for="email2">Email 2</label><input type="email" id="email2" name="email2" /></div>
+      </div>
+      <div><label for="email3">Email 3</label><input type="email" id="email3" name="email3" /></div>
+
+      <div class="section-header">Business Details</div>
+      <div class="grid-2col">
+        <div><label for="companyName">Company Name</label><input type="text" id="companyName" name="companyName" /></div>
+        <div><label for="businessWebsite">Business Website</label><input type="url" id="businessWebsite" name="businessWebsite" /></div>
+      </div>
+      <div class="grid-2col">
+        <div><label for="portfolioWebsite">Portfolio Website</label><input type="url" id="portfolioWebsite" name="portfolioWebsite" /></div>
+        <div><label for="locationMapUrl">Location Map URL</label><input type="url" id="locationMapUrl" name="locationMapUrl" /></div>
+      </div>
+
+      <div class="section-header">Photo Upload</div>
+      <div class="photo-upload-container">
+        <div class="url-input-container">
+          <label for="photoUrl">Photo URL</label>
+          <small style="color:#FFD700; display:block; margin-bottom:0.25rem;">(Auto-populated after upload)</small>
+          <input type="url" id="photoUrl" name="photoUrl" readonly />
+        </div>
+        <label for="photoFile" id="photo-upload-label" class="file-input-label">Photo Upload</label>
+        <input type="file" id="photoFile" accept="image/*" />
+      </div>
+      <div id="photo-preview-container" style="margin-top: 1rem; text-align: center; display: none;">
+        <img id="photo-preview" src="#" alt="Photo Preview" style="max-width: 150px; height: 150px; object-fit: cover; border-radius: 50%; border: 2px solid #FFD700;"/>
+      </div>
+
+      <div class="section-header">Working Hours</div>
+      <div class="grid-2col">
+        <div><label for="monFriStart">Mon-Fri Start</label><input type="time" id="monFriStart" name="monFriStart" value="08:00" /></div>
+        <div><label for="monFriEnd">Mon-Fri End</label><input type="time" id="monFriEnd" name="monFriEnd" value="17:00" /></div>
+        <div><label for="satStart">Saturday Start</label><input type="time" id="satStart" name="satStart" value="09:00" /></div>
+        <div><label for="satEnd">Saturday End</label><input type="time" id="satEnd" name="satEnd" value="12:00" /></div>
+        <div><label for="sunStart">Sunday Start</label><input type="time" id="sunStart" name="sunStart" /></div>
+        <div><label for="sunEnd">Sunday End</label><input type="time" id="sunEnd" name="sunEnd" /></div>
+      </div>
+
+      <div class="section-header">Social Links</div>
+      <div class="grid-2col">
+        <div><label for="facebook">Facebook</label><input type="text" id="facebook" name="facebook" /></div>
+        <div><label for="instagram">Instagram</label><input type="text" id="instagram" name="instagram" /></div>
+        <div><label for="twitter">X (Twitter)</label><input type="text" id="twitter" name="twitter" /></div>
+        <div><label for="linkedin">LinkedIn</label><input type="text" id="linkedin" name="linkedin" /></div>
+        <div><label for="tiktok">TikTok</label><input type="text" id="tiktok" name="tiktok" /></div>
+        <div><label for="youtube">YouTube</label><input type="text" id="youtube" name="youtube" /></div>
+      </div>
+
+      <div class="section-header">Bio</div>
+      <textarea id="bio" name="bio" rows="4"></textarea>
+
+      <div class="section-header">Address</div>
+      <input type="text" id="address" name="address" />
+
+      <button type="submit" id="save-btn" class="btn-save-info">Save Info</button>
+    </form>
+    <div id="toast-message" class="toast-message"></div>
+  </div>
+
+<script>
+  (function () {
+    'use strict';
+
+    // Set global API base URL for stable API calls
+    const API_BASE = "https://smartcardlink-api.onrender.com"; 
+    const API_URL = `${API_BASE}/api`; 
+
+    const params = new URLSearchParams(window.location.search);
+    const urlClientId = params.get('id'); // ID from URL parameter
+
+    // ------------------------
+    // DOM Elements
+    // ------------------------
+    const form = document.getElementById('adminForm');
+    const clientIdInput = document.getElementById('clientId'); // Hidden field
+    const viewPdfBtn = document.getElementById('view-pdf-btn');
+    const createVcardBtn = document.getElementById('create-vcard-btn');
+    const photoUploadInput = document.getElementById('photoFile');
+    const photoUrlInput = document.getElementById('photoUrl');
+    const photoUploadLabel = document.getElementById('photo-upload-label');
+    const photoPreviewContainer = document.getElementById('photo-preview-container');
+    const photoPreview = document.getElementById('photo-preview');
+    const saveBtn = document.getElementById('save-btn');
+    const toastMessage = document.getElementById('toast-message');
+
+    let isSaving = false;
+
+    // ------------------------
+    // Helper Constants and Functions
+    // ------------------------
+
+    const SOCIAL_PREFIXES = {
+      facebook: 'https://facebook.com/',
+      instagram: 'https://instagram.com/',
+      twitter: 'https://twitter.com/',
+      linkedin: 'https://linkedin.com/in/',
+      tiktok: 'https://tiktok.com/@',
+      youtube: 'https://youtube.com/', 
+    };
+
+    /**
+      * Normalizes a social media link to the required full URL format.
+      */
+    const normalizeSocialLink = (platform, input) => {
+      if (!input || typeof input !== 'string' || input.trim() === '') return null;
+
+      let value = input.trim();
+      const prefix = SOCIAL_PREFIXES[platform];
+      if (!prefix) return null;
+
+      // 1. Check if already a correct URL (enforce https)
+      if (value.startsWith('http')) {
+          value = value.replace('http:', 'https:');
+          return value; 
+      }
+
+      // 2. Clean common prefixes and handles
+      value = value.replace(/^(www\.)?/, '');
+      
+      if (platform === 'linkedin') {
+          value = value.replace(/^linkedin\.com\/(in\/|pub\/)?/i, '');
+      } else if (platform === 'tiktok') {
+          value = value.replace(/^tiktok\.com\/@/i, '');
+          value = value.replace(/^@/, '');
+      } else if (platform === 'instagram' || platform === 'twitter' || platform === 'facebook') {
+          value = value.replace(/^(instagram|twitter|facebook)\.com\//i, '');
+          // Fix: Use toLowerCase() correctly
+          value = value.toLowerCase().replace(/^@/, ''); 
+      } else if (platform === 'youtube') {
+          value = value.replace(/^youtube\.com\//i, '');
+      }
+
+      // 3. Remove trailing slashes
+      value = value.replace(/\/$/, '');
+      
+      if (value === '') return null;
+
+      // 4. Reconstruct the final, correct URL
+      if (platform === 'linkedin') return prefix + value;
+      if (platform === 'tiktok' && !value.startsWith('@')) return prefix + value;
+
+      return prefix + value;
+    };
+
+    /**
+      * Validates if a string is a valid email format.
+      */
+    const isValidEmail = (email) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email.trim());
+    };
+
+    /**
+      * Validates if a string is a valid phone number (no letters, >= 10 digits).
+      */
+    const isValidPhone = (phone) => {
+      if (!phone || phone.trim() === '') return true; 
+      if (/[a-zA-Z]/.test(phone)) return false; 
+      const cleaned = phone.replace(/\D/g, ''); 
+      return cleaned.length >= 10;
+    };
+    
+    /**
+      * Displays a toast message to the user.
+      */
+    const showToast = (message, isError = false) => {
+      toastMessage.textContent = message;
+      toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
+      toastMessage.style.color = isError ? 'white' : 'black';
+      toastMessage.style.display = 'block';
+      setTimeout(() => {
+        toastMessage.style.display = 'none';
+      }, 3000);
+    };
+
+    /**
+      * Populates form fields from a client data object fetched from the backend.
+      */
+    const populateForm = (data) => {
+      // Set hidden ID
+      clientIdInput.value = data._id || '';
+
+      const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value) el.value = value;
+      };
+
+      // Personal Details
+      setValue('fullName', data.fullName);
+      setValue('title', data.title);
+      setValue('phone1', data.phone1);
+      setValue('phone2', data.phone2);
+      setValue('phone3', data.phone3);
+      setValue('email1', data.email1);
+      setValue('email2', data.email2);
+      setValue('email3', data.email3);
+
+      // Business Details
+      setValue('companyName', data.company); // Mapped from 'company'
+      setValue('businessWebsite', data.businessWebsite);
+      setValue('portfolioWebsite', data.portfolioWebsite);
+      setValue('locationMapUrl', data.locationMap); // Mapped from 'locationMap'
+
+      // Photo URL
+      if (data.photoUrl) {
+        photoUrlInput.value = data.photoUrl;
+        photoPreview.src = data.photoUrl;
+        photoPreviewContainer.style.display = 'block';
+        photoUploadLabel.textContent = 'Photo Uploaded';
+        photoUploadLabel.style.backgroundColor = '#22c55e';
+      } else {
+        photoUploadLabel.textContent = 'Photo Upload';
+        photoUploadLabel.style.backgroundColor = '#ef4444';
+        photoPreviewContainer.style.display = 'none';
+      }
+
+      // Working Hours
+      if (data.workingHours) {
+        ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(day => {
+          setValue(day, data.workingHours[day]);
+        });
+      }
+
+      // Social Links (Need to show the normalized URL in the input fields)
+      if (data.socialLinks) {
+        ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(platform => {
+          setValue(platform, data.socialLinks[platform]);
+        });
+      }
+
+      // Bio & Address
+      setValue('bio', data.bio);
+      setValue('address', data.address);
+    };
+
+    // ------------------------
+    // Core Application Logic
+    // ------------------------
+
+    const fetchClientData = async (id) => {
+      try {
+        const response = await fetch(`${API_URL}/clients/${id}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Failed to fetch client data for ID: ${id}`);
+        }
+        const json = await response.json();
+        // Ensure consistent data retrieval from response
+        const data = json.data || json; 
+        populateForm(data);
+        console.log(`Form populated with client data for ID: ${id}`);
+      } catch (error) {
+        console.error('Error fetching client data:', error);
+        showToast(`Error fetching data: ${error.message}`, true);
+      }
+    };
+
+    const uploadPhoto = async (file) => {
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('photo', file); 
+
+      try {
+        photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
+        photoUploadLabel.style.backgroundColor = '#3b82f6';
+
+        const response = await fetch(`${API_URL}/upload-photo`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        const json = await response.json();
+
+        if (!response.ok || json.status !== 'success') {
+          throw new Error(json.message || 'Photo upload failed on the server.');
+        }
+
+        // Correctly retrieve photoUrl from response structure
+        const photoUrl = json.data?.photoUrl || json.photoUrl;
+        
+        if (!photoUrl) {
+          throw new Error("Server returned success but no public photo URL.");
+        }
+        
+        photoUrlInput.value = photoUrl;
+        photoUploadLabel.textContent = 'Photo Uploaded';
+        photoUploadLabel.style.backgroundColor = '#22c55e';
+        photoPreview.src = photoUrl; // Update preview to confirm the FINAL public URL
+        photoPreviewContainer.style.display = 'block';
+        showToast('Photo uploaded successfully!');
+        return photoUrl;
+      } catch (error) {
+        console.error('Photo upload error:', error);
+        showToast(`Photo upload failed: ${error.message}`, true);
+        photoUploadLabel.textContent = 'Upload Failed';
+        photoUploadLabel.style.backgroundColor = '#ef4444';
+        return null;
+      }
+    };
+
+    const handleFormSubmission = async (e) => {
+      e.preventDefault();
+      // Get the client ID from the hidden input field
+      const currentId = clientIdInput.value; 
+
+      if (isSaving) return;
+      isSaving = true;
+      saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
+      saveBtn.disabled = true;
+
+      const formData = new FormData(form);
+      const payload = {};
+      const socialLinks = {}; // Will hold normalized links
+      const workingHours = {};
+      const workingHoursKeys = ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'];
+      const socialLinksKeys = ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'];
+      
+      for (const [key, value] of formData.entries()) {
+        // Exclude file input and the hidden clientId field, and empty strings
+        if (key !== 'photoFile' && key !== 'clientId' && value !== '') { 
+          payload[key] = value.trim();
+        }
+      }
+      
+      try {
+        // --- Validation of Phone and Email ---
+        const phoneFields = ['phone1', 'phone2', 'phone3'];
+        const emailFields = ['email1', 'email2', 'email3'];
+
+        for (const key of phoneFields) {
+            if (payload[key] && !isValidPhone(payload[key])) {
+              throw new Error(`Invalid phone number for ${key}: Must be 10 digits or more and contain no letters.`);
+            }
+        }
+
+        for (const key of emailFields) {
+            if (payload[key] && !isValidEmail(payload[key])) {
+              throw new Error(`Invalid email address for ${key}.`);
+            }
+        }
+
+        // 1. Data Normalization for Backend Schema
+        
+        // Map companyName field to the expected 'company' schema field
+        if (payload.companyName) {
+          payload.company = payload.companyName;
+          delete payload.companyName;
+        }
+        
+        // Map locationMapUrl field to the expected 'locationMap' schema field
+        if (payload.locationMapUrl) {
+          payload.locationMap = payload.locationMapUrl;
+          delete payload.locationMapUrl;
+        }
+        
+        // Populate nested workingHours
+        for (const key of workingHoursKeys) {
+          // Treat empty string or default time as null/undefined
+          if (payload[key] && payload[key] !== '00:00') {
+            workingHours[key] = payload[key];
+          }
+          delete payload[key]; 
+        }
+        
+        // Populate nested socialLinks with normalization
+        for (const key of socialLinksKeys) {
+          const normalizedUrl = normalizeSocialLink(key, payload[key]);
+          if (normalizedUrl) {
+            socialLinks[key] = normalizedUrl;
+          }
+          // Always delete the flat key from the main payload
+          delete payload[key]; 
+        }
+
+        if (Object.keys(workingHours).length > 0) payload.workingHours = workingHours;
+        if (Object.keys(socialLinks).length > 0) payload.socialLinks = socialLinks;
+
+        // 2. API Call (PUT/POST)
+        const url = currentId ? `${API_URL}/clients/${currentId}` : `${API_URL}/clients`;
+        const method = currentId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        
+        const json = await response.json();
+
+        // Check for both response.ok and status: 'success'
+        if (!response.ok || json.status !== 'success') {
+          throw new Error(json.message || 'Failed to save client info.');
+        }
+        
+        showToast('Client info saved successfully!');
+        
+        // If creating a new client (POST), get the new ID and update the URL/UI
+        const newId = json.data?._id || json._id;
+        if (!currentId && newId) {
+          clientIdInput.value = newId;
+          window.history.pushState(null, '', `admin-form.html?id=${newId}`);
+          // Enable buttons
+          viewPdfBtn.disabled = false;
+          createVcardBtn.disabled = false;
+        }
+        
+      } catch (error) {
+        console.error('Save error:', error);
+        showToast(`Save failed: ${error.message}`, true);
+      } finally {
+        isSaving = false;
+        saveBtn.innerHTML = 'Save Info';
+        saveBtn.disabled = false;
+      }
+    };
+
+    const handleViewPdfClick = async () => {
+      const currentId = clientIdInput.value; 
+      if (!currentId) return showToast('Please save client info first.', true);
+      
+      viewPdfBtn.classList.add('pressed');
+      viewPdfBtn.innerHTML = 'Generating... <span class="spinner"></span>';
+      viewPdfBtn.disabled = true;
+
+      try {
+        const response = await fetch(`${API_URL}/clients/${currentId}/pdf`, { method: 'POST' });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to retrieve PDF.');
+        }
+        
+        const json = await response.json();
+        // Check both nested and top-level response structures
+        const pdfUrl = json.data?.pdfUrl || json.pdfUrl; 
+
+        if (pdfUrl) {
+          window.open(pdfUrl, '_blank');
+          showToast('PDF opened successfully!');
+        } else {
+            throw new Error('PDF URL not returned by server.');
+        }
+        
+      } catch (error) {
+        console.error('PDF retrieval error:', error);
+        showToast(`PDF retrieval failed: ${error.message}`, true);
+      } finally {
+        viewPdfBtn.innerHTML = 'View Client Info PDF';
+        viewPdfBtn.classList.remove('pressed');
+        viewPdfBtn.disabled = false;
+      }
+    };
+
+    const handleCreateVcardClick = async () => {
+      const currentId = clientIdInput.value;
+      if (!currentId) return showToast('Please save client info first.', true);
+
+      createVcardBtn.classList.add('pressed');
+      createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
+      createVcardBtn.disabled = true;
+
+      try {
+        const response = await fetch(`${API_URL}/clients/${currentId}/vcard`, {
+          method: 'POST',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create vCard.');
+        }
+
+        const json = await response.json();
+        showToast('vCard and QR code created successfully! Email sent.', false);
+        
+        // Check both nested and top-level response structures
+        const data = json.data || json;
+
+        if (data.vcardUrl) window.open(data.vcardUrl, '_blank');
+        
+        if (data.qrCodeUrl) {
+          const qrCodeWindow = window.open('', '_blank');
+          qrCodeWindow.document.write(`
+            <html><head><title>QR Code</title>
+            <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f0f0;}</style>
+            </head><body>
+              <img src="${data.qrCodeUrl}" alt="QR Code" style="max-width:90%;max-height:90vh;">
+            </body></html>
+          `);
+          qrCodeWindow.document.close();
+        }
+
+      } catch (error) {
+        console.error('vCard creation error:', error);
+        showToast(`vCard creation failed: ${error.message}`, true);
+      } finally {
+        createVcardBtn.innerHTML = 'Create vCard';
+        createVcardBtn.classList.remove('pressed');
+        createVcardBtn.disabled = false;
+      }
+    };
+
+    // ------------------------
+    // Initialization & Event Listeners
+    // ------------------------
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (urlClientId) {
+        // Set initial ID from URL parameter and fetch data
+        clientIdInput.value = urlClientId;
+        fetchClientData(urlClientId);
+      } else {
+        // Disable buttons for new clients until saved
+        viewPdfBtn.disabled = true;
+        createVcardBtn.disabled = true;
+      }
+    });
+
+    photoUploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        // Instant local preview (uses FileReader)
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          photoPreview.src = event.target.result;
+          photoPreviewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+
+        // Start network upload
+        uploadPhoto(file);
+      }
+    });
+
+    form.addEventListener('submit', handleFormSubmission);
+    viewPdfBtn.addEventListener('click', handleViewPdfClick);
+    createVcardBtn.addEventListener('click', handleCreateVcardClick);
+
+  })();
+</script>
+</body>
+</html>
+// C:\Users\ADMIN\Desktop\smartcardlink-app\server\routes\profileRoutes.js
+
+const express = require("express");
+const router = express.Router();
+const fs = require("fs");
+const path = require("path");
+const QRCode = require("qrcode");
+const nodemailer = require("nodemailer");
+
+// Load Profile model (Mongoose)
+const Profile = require("../models/Profile");
+
+/* ===================== Helpers ===================== */
+
+// Ensure a directory exists (idempotent)
+function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+}
+
+// Safe filename
+function safeFileName(base) {
+  return base.replace(/[^a-z0-9_\-\.]/gi, "_");
+}
+
+// Slugify (for URLs)
+function slugify(input) {
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+// Build a minimal vCard 3.0 string
+function buildVCard({ name, phone, email, company, title, card_url }) {
+  let first = name || "";
+  let last = "";
+  if (name && name.trim().includes(" ")) {
+    const parts = name.trim().split(/\s+/);
+    first = parts.slice(0, -1).join(" ");
+    last = parts[parts.length - 1];
+  }
+
+  const lines = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `N:${last};${first};;;`,
+    `FN:${name}`,
+    company ? `ORG:${company}` : null,
+    title ? `TITLE:${title}` : null,
+    phone ? `TEL;TYPE=CELL:${phone}` : null,
+    email ? `EMAIL;TYPE=INTERNET:${email}` : null,
+    card_url ? `URL:${card_url}` : null,
+    "END:VCARD",
+  ].filter(Boolean);
+
+  return lines.join("\r\n");
+}
+
+// Build WhatsApp click-to-chat link (expects E.164 digits, no +)
+function buildWaLink(intlDigitsOnly, message) {
+  const text = encodeURIComponent(message || "");
+  return `https://wa.me/${intlDigitsOnly}${text ? `?text=${text}` : ""}`;
+}
+
+// Create nodemailer transporter if env set
+function getTransporter() {
+  const user = process.env.ADMIN_EMAIL;
+  const pass = process.env.ADMIN_EMAIL_PASSWORD;
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
+}
+
+/* ===================== Setup ===================== */
+
+const vcardsDir = path.join(__dirname, "../vcards");
+ensureDir(vcardsDir);
+
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 5000}`).replace(/\/+$/, "");
+
+/* ===================== Routes ===================== */
+
+// GET all profiles
+router.get("/profiles", async (req, res) => {
+  try {
+    const profiles = await Profile.find().sort({ createdAt: -1 });
+    res.json(profiles);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching profiles", error: String(err) });
+  }
+});
+
+// GET profile by ID
+router.get("/profiles/:id", async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id);
+    if (!profile) return res.status(404).json({ message: "Profile not found" });
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching profile", error: String(err) });
+  }
+});
+
+// GET profile by full card URL (URL-encoded)
+router.get("/profile/card/:encodedUrl", async (req, res) => {
+  try {
+    const cardUrl = decodeURIComponent(req.params.encodedUrl);
+    const profile = await Profile.findOne({ card_url: cardUrl });
+    if (!profile) return res.status(404).json({ message: "Profile not found" });
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching profile", error: String(err) });
+  }
+});
+
+// POST create profile -> vCard + QR + email admin/client
+router.post("/profiles", async (req, res) => {
+  const startedAt = Date.now();
+  let vcfPath = null;
+  let qrPath = null;
+
+  try {
+    // Accept common client form field names
+    const name = req.body.name || req.body.fullName || "";
+    const phone = req.body.phone || req.body.phone1 || req.body.phone2 || req.body.phone3 || "";
+    const email = req.body.email || req.body.email1 || req.body.email2 || req.body.email3 || "";
+    const company = req.body.company || "";
+    const title = req.body.title || "";
+
+    if (!name || !phone || !email || !company) {
+      return res.status(400).json({ message: "Missing required fields (name, phone, email, company)" });
+    }
+
+    // Generate slug + friendly card URL which points at the popup1 client page (so camera/QR opens popup)
+    const baseSlug = slugify(`${name}-${company}`) || "user";
+    let slug = baseSlug;
+    let card_url = "";
+
+    for (let i = 0; i < 6; i++) {
+      const candidate = `${PUBLIC_BASE_URL}/popup1/popup1.html?slug=${slug}`;
+      const exists = await Profile.exists({ card_url: candidate });
+      if (!exists) {
+        card_url = candidate;
+        break;
+      }
+      slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+    if (!card_url) return res.status(500).json({ message: "Failed to generate unique card URL" });
+
+    // 1) Save profile
+    const profile = new Profile({ name, phone, email, company, card_url });
+    await profile.save();
+
+    // 2) Create vCard file
+    const vcardStr = buildVCard({ name, phone, email, company, title, card_url });
+    const baseName = safeFileName(`${name}_${startedAt}`);
+    vcfPath = path.join(vcardsDir, `${baseName}.vcf`);
+    fs.writeFileSync(vcfPath, vcardStr, "utf8");
+
+    // 3) QR PNG for card_url (admin printing)
+    qrPath = path.join(vcardsDir, `${baseName}.png`);
+    await QRCode.toFile(qrPath, card_url, {
+      errorCorrectionLevel: "M",
+      width: 600,
+      margin: 2,
+    });
+
+    const publicVcfUrl = `${PUBLIC_BASE_URL}/vcards/${path.basename(vcfPath)}`;
+    const publicQrUrl = `${PUBLIC_BASE_URL}/vcards/${path.basename(qrPath)}`;
+
+    // 4) Email (if configured)
+    const transporter = getTransporter();
+    const adminEmail = process.env.ADMIN_EMAIL || null;
+
+    // Build WhatsApp link (for admin convenience)
+    const adminWhatsAppIntl = (process.env.ADMIN_WHATSAPP_NUMBER || "")
+      .replace(/[^\d]/g, "")
+      .replace(/^0+/, "");
+    const waMessage = `New SmartCardLink QR ready for printing.\nClient: ${name}\nURL: ${card_url}`;
+    const waLink = adminWhatsAppIntl ? buildWaLink(adminWhatsAppIntl, waMessage) : null;
+
+    if (transporter && adminEmail) {
+      // a) Email to client (cc admin)
+      await transporter.sendMail({
+        from: `"SmartCardLink" <${adminEmail}>`,
+        to: email,
+        cc: adminEmail,
+        subject: `Your SmartCardLink is ready: ${name}`,
+        text: `Hi ${name},
+
+Your SmartCardLink is ready.
+
+View your digital card:
+${card_url}
+
+(Attached: .vcf contact file you can save.)`,
+        attachments: [{ filename: `${baseName}.vcf`, path: vcfPath }],
+      });
+
+      // b) Email to admin (QR attached for printing)
+      await transporter.sendMail({
+        from: `"SmartCardLink" <${adminEmail}>`,
+        to: adminEmail,
+        subject: `QR for printing â€” ${name}`,
+        text: `New SmartCardLink created.
+
+Client: ${name}
+Company: ${company}
+Phone: ${phone}
+Email: ${email}
+
+Client URL:
+${card_url}
+
+Public QR: ${publicQrUrl}
+
+WhatsApp quick send: ${waLink || "(ADMIN_WHATSAPP_NUMBER not set)"}
+
+QR PNG is attached for printing.`,
+        attachments: [
+          { filename: `${baseName}.png`, path: qrPath },
+          { filename: `${baseName}.vcf`, path: vcfPath },
+        ],
+      });
+    } else {
+      console.warn("âš ï¸ ADMIN_EMAIL or ADMIN_EMAIL_PASSWORD not set â€” email notifications skipped.");
+    }
+
+    // 5) Respond with useful info for client and admin tools
+    res.json({
+      message: "Profile created, vCard & QR generated. Notifications processed (if email configured).",
+      profile,
+      card_url,
+      vcard_url: publicVcfUrl,
+      qr_url: publicQrUrl,
+      admin_whatsapp_link: waLink || null,
+    });
+  } catch (err) {
+    console.error("âŒ Error creating profile:", err);
+    try { if (vcfPath && fs.existsSync(vcfPath)) fs.unlinkSync(vcfPath); } catch {}
+    try { if (qrPath && fs.existsSync(qrPath)) fs.unlinkSync(qrPath); } catch {}
+    res.status(500).json({ message: "Error creating profile", error: String(err) });
+  }
+});
+
+module.exports = router;
+// C:\Users\ADMIN\Desktop\smartcardlink-app\adminForm.js
+
+(function () {
+  'use strict';
+
+  // FIX 3: Add global API override
+  const API_URL = window.API_BASE_URL || `${window.location.origin}/api`; 
+
+  const params = new URLSearchParams(window.location.search);
+  const clientId = params.get('id');
+
+  // ------------------------
+  // DOM Elements
+  // ------------------------
+  const form = document.getElementById('adminForm');
+  const viewPdfBtn = document.getElementById('view-pdf-btn');
+  const createVcardBtn = document.getElementById('create-vcard-btn');
+  const photoUploadInput = document.getElementById('photoFile');
+  const photoUrlInput = document.getElementById('photoUrl');
+  const photoUploadLabel = document.getElementById('photo-upload-label');
+  const photoPreviewContainer = document.getElementById('photo-preview-container');
+  const photoPreview = document.getElementById('photo-preview');
+  const saveBtn = document.getElementById('save-btn');
+  const toastMessage = document.getElementById('toast-message');
+
+  let isSaving = false;
+
+  // ------------------------
+  // Helper Constants and Functions
+  // ------------------------
+
+  const SOCIAL_PREFIXES = {
+    facebook: 'https://facebook.com/',
+    instagram: 'https://instagram.com/',
+    twitter: 'https://twitter.com/',
+    linkedin: 'https://linkedin.com/in/',
+    tiktok: 'https://tiktok.com/@',
+    youtube: 'https://youtube.com/',
+  };
+
+  /**
+   * FIX 1: Normalizes a social media link to the required full URL format.
+   * Handles full URLs, partial URLs, usernames, and handles (@user).
+   * @param {string} platform - The social platform key.
+   * @param {string} input - The raw user input.
+   * @returns {string} The normalized full URL, or null if invalid/empty.
+   */
+  const normalizeSocialLink = (platform, input) => {
+    if (!input || typeof input !== 'string' || input.trim() === '') return null;
+
+    let value = input.trim();
+    const prefix = SOCIAL_PREFIXES[platform];
+    if (!prefix) return null;
+
+    // Check if it's already a correct full URL (only enforce https)
+    if (value.startsWith(prefix.replace('https', 'http'))) {
+        return value.replace('http:', 'https:');
+    }
+    
+    // 1. Remove common prefixes and handles (www, http/s, handle symbols)
+    value = value.replace(/^(https?:\/\/)?(www\.)?/, '');
+    
+    if (platform === 'linkedin') {
+        value = value.replace(/^linkedin\.com\/(in\/)?/i, '');
+    } else if (platform === 'tiktok') {
+        value = value.replace(/^tiktok\.com\/@/i, '');
+        value = value.replace(/^@/, '');
+    } else if (platform === 'instagram' || platform === 'twitter') {
+        value = value.replace(/^(instagram|twitter)\.com\//i, '');
+        value = value.replace(/^@/, '');
+    } else if (platform === 'facebook') {
+        value = value.replace(/^facebook\.com\//i, '');
+    } else if (platform === 'youtube') {
+        // Handle common youtube URL paths: /user/, /c/, /channel/, /
+        value = value.replace(/^youtube\.com\/(user\/|c\/|channel\/)?/i, '');
+    }
+
+    // 2. Remove trailing slashes
+    value = value.replace(/\/$/, '');
+    
+    // If the value is empty after normalization, return null
+    if (value === '') return null;
+
+    // 3. Reconstruct the final, correct URL
+    return prefix + value;
+  };
+
+  /**
+   * FIX 2: Validates if a string is a valid email format.
+   * @param {string} email
+   * @returns {boolean}
+   */
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  };
+
+  /**
+   * FIX 2: Validates if a string is a valid phone number (no letters, >= 10 digits).
+   * @param {string} phone
+   * @returns {boolean}
+   */
+  const isValidPhone = (phone) => {
+    if (!phone) return true; // Allow empty/optional phone fields to pass
+    
+    // Reject any letters
+    if (/[a-zA-Z]/.test(phone)) return false; 
+    
+    const cleaned = phone.replace(/\D/g, ''); // Remove all non-digits (spaces, dashes, parens)
+    return cleaned.length >= 10; // Check length
+  };
+  
+  /**
+   * Displays a toast message to the user.
+   * @param {string} message The message to display.
+   * @param {boolean} isError Whether the message is an error.
+   */
+  const showToast = (message, isError = false) => {
+    toastMessage.textContent = message;
+    toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
+    toastMessage.style.color = isError ? 'white' : 'black';
+    toastMessage.style.display = 'block';
+    setTimeout(() => {
+      toastMessage.style.display = 'none';
+    }, 3000);
+  };
+
+  /**
+   * Populates form fields from a client data object fetched from the backend.
+   * @param {object} data The client data object.
+   */
+  const populateForm = (data) => {
+    const setValue = (id, value) => {
+      const el = document.getElementById(id);
+      if (el && value) el.value = value;
+    };
+
+    // Personal Details
+    setValue('fullName', data.fullName);
+    setValue('title', data.title);
+    setValue('phone1', data.phone1);
+    setValue('phone2', data.phone2);
+    setValue('phone3', data.phone3);
+    setValue('email1', data.email1);
+    setValue('email2', data.email2);
+    setValue('email3', data.email3);
+
+    // Business Details
+    setValue('companyName', data.company); 
+    setValue('businessWebsite', data.businessWebsite);
+    setValue('portfolioWebsite', data.portfolioWebsite);
+    setValue('locationMapUrl', data.locationMap); 
+
+    // Photo URL
+    if (data.photoUrl) {
+      photoUrlInput.value = data.photoUrl;
+      photoPreview.src = data.photoUrl;
+      photoPreviewContainer.style.display = 'block';
+      photoUploadLabel.textContent = 'Photo Uploaded';
+      photoUploadLabel.style.backgroundColor = '#22c55e';
+    }
+
+    // Working Hours
+    if (data.workingHours) {
+      ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(day => {
+        setValue(day, data.workingHours[day]);
+      });
+    }
+
+    // Social Links
+    if (data.socialLinks) {
+      ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(platform => {
+        setValue(platform, data.socialLinks[platform]);
+      });
+    }
+
+    // Bio & Address
+    setValue('bio', data.bio);
+    setValue('address', data.address);
+  };
+
+  // ------------------------
+  // Core Application Logic
+  // ------------------------
+
+  const fetchClientData = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/clients/${id}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch client data for ID: ${id}`);
+      }
+      const json = await response.json();
+      const data = json.data || json; 
+      populateForm(data);
+      console.log(`Form populated with client data for ID: ${id}`);
+    } catch (error) {
+      console.error('Error fetching client data:', error);
+      showToast(`Error fetching data: ${error.message}`, true);
+    }
+  };
+
+  const uploadPhoto = async (file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('photo', file); 
+
+    try {
+      photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
+      photoUploadLabel.style.backgroundColor = '#3b82f6';
+
+      const response = await fetch(`${API_URL}/upload-photo`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Photo upload failed on the server.');
+      }
+
+      const photoUrl = data.photoUrl;
+      photoUrlInput.value = photoUrl;
+      showToast('Photo uploaded successfully!');
+
+      photoUploadLabel.textContent = 'Photo Uploaded';
+      photoUploadLabel.style.backgroundColor = '#22c55e';
+    } catch (error) {
+      console.error('Photo upload error:', error);
+      showToast(`Photo upload failed: ${error.message}`, true);
+      photoUploadLabel.textContent = 'Photo Upload Failed';
+      photoUploadLabel.style.backgroundColor = '#ef4444';
+    }
+  };
+
+  const handleFormSubmission = async (e) => {
+    e.preventDefault();
+    if (isSaving) return;
+    isSaving = true;
+    saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
+    saveBtn.disabled = true;
+
+    const formData = new FormData(form);
+    const payload = {};
+    const socialLinks = {}; // Will hold normalized links
+    const workingHours = {};
+    const workingHoursKeys = ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'];
+    const socialLinksKeys = ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'];
+    
+    for (const [key, value] of formData.entries()) {
+      // Exclude the file input from the JSON payload
+      if (value && key !== 'photoFile') { 
+        payload[key] = value.trim();
+      }
+    }
+    
+    try {
+      // --- FIX 2: Validation of Phone and Email ---
+      const phoneFields = ['phone1', 'phone2', 'phone3'];
+      const emailFields = ['email1', 'email2', 'email3'];
+
+      for (const key of phoneFields) {
+          if (payload[key] && !isValidPhone(payload[key])) {
+              throw new Error(`Invalid phone number for ${key}: Must be 10 digits or more and contain no letters.`);
+          }
+      }
+
+      for (const key of emailFields) {
+          if (payload[key] && !isValidEmail(payload[key])) {
+              throw new Error(`Invalid email address for ${key}.`);
+          }
+      }
+
+      // 1. Data Normalization for Backend Schema (FIX 4: Maintain existing logic)
+      
+      // Map companyName field to the expected 'company' schema field
+      if (payload.companyName) {
+        payload.company = payload.companyName;
+        delete payload.companyName;
+      }
+      
+      // Map locationMapUrl field to the expected 'locationMap' schema field
+      if (payload.locationMapUrl) {
+        payload.locationMap = payload.locationMapUrl;
+        delete payload.locationMapUrl;
+      }
+      
+      // Map photoUrl field
+      if (payload.photoUrl) {
+          payload.photoUrl = payload.photoUrl;
+      }
+
+      // Populate nested workingHours
+      for (const key of workingHoursKeys) {
+        if (payload[key] && payload[key] !== '--:--') {
+          workingHours[key] = payload[key];
+          delete payload[key];
+        }
+      }
+      
+      // FIX 1 & 4: Populate nested socialLinks with normalization
+      for (const key of socialLinksKeys) {
+        const normalizedUrl = normalizeSocialLink(key, payload[key]);
+        if (normalizedUrl) {
+          socialLinks[key] = normalizedUrl;
+        }
+        // Always delete the flat key from the main payload
+        delete payload[key]; 
+      }
+
+      if (Object.keys(workingHours).length > 0) payload.workingHours = workingHours;
+      if (Object.keys(socialLinks).length > 0) payload.socialLinks = socialLinks;
+
+      // 2. API Call (PUT/POST)
+      const url = clientId ? `${API_URL}/clients/${clientId}` : `${API_URL}/clients`;
+      const method = clientId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to save client info.');
+      }
+      
+      showToast('Client info saved successfully!');
+      
+      // If creating a new client (POST), redirect to the edit view (PUT)
+      if (!clientId && data._id) {
+        window.location.href = `admin-form.html?id=${data._id}`;
+      }
+      
+    } catch (error) {
+      console.error('Save error:', error);
+      showToast(`Save failed: ${error.message}`, true);
+    } finally {
+      isSaving = false;
+      saveBtn.innerHTML = 'Save Info';
+      saveBtn.disabled = false;
+    }
+  };
+
+  const handleViewPdfClick = async () => {
+    if (!clientId) return showToast('Please save client info first.', true);
+    
+    viewPdfBtn.classList.add('pressed');
+    viewPdfBtn.innerHTML = 'Generating... <span class="spinner"></span>';
+    viewPdfBtn.disabled = true;
+
+    try {
+      const response = await fetch(`${API_URL}/clients/${clientId}/pdf`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to retrieve PDF.');
+      }
+      
+      const data = response.url ? { pdfUrl: response.url } : await response.json();
+      const pdfUrl = data.pdfUrl || data.url || response.url;
+
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        showToast('PDF opened successfully!');
+      } else {
+         throw new Error('PDF URL not returned by server.');
+      }
+      
+    } catch (error) {
+      console.error('PDF retrieval error:', error);
+      showToast(`PDF retrieval failed: ${error.message}`, true);
+    } finally {
+      // Corrected: Removed the partial `viewPdf...` that caused a syntax error.
+      viewPdfBtn.innerHTML = 'View Client Info PDF';
+      viewPdfBtn.classList.remove('pressed');
+      viewPdfBtn.disabled = false;
+    }
+  };
+
+  const handleCreateVcardClick = async () => {
+    if (!clientId) return showToast('Please save client info first.', true);
+
+    createVcardBtn.classList.add('pressed');
+    createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
+    createVcardBtn.disabled = true;
+
+    try {
+      const response = await fetch(`${API_URL}/clients/${clientId}/vcard`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create vCard.');
+      }
+
+      const data = await response.json();
+      showToast('vCard and QR code created successfully! Email sent.', false);
+
+      if (data.vcardUrl) window.open(data.vcardUrl, '_blank');
+      
+      if (data.qrCodeUrl) {
+        const qrCodeWindow = window.open('', '_blank');
+        qrCodeWindow.document.write(`
+          <html><head><title>QR Code</title>
+          <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f0f0;}</style>
+          </head><body>
+            <img src="${data.qrCodeUrl}" alt="QR Code" style="max-width:90%;max-height:90vh;">
+          </body></html>
+        `);
+        qrCodeWindow.document.close();
+      }
+
+    } catch (error) {
+      console.error('vCard creation error:', error);
+      showToast(`vCard creation failed: ${error.message}`, true);
+    } finally {
+      createVcardBtn.innerHTML = 'Create vCard';
+      createVcardBtn.classList.remove('pressed');
+      createVcardBtn.disabled = false;
+    }
+  };
+
+  // ------------------------
+  // Initialization & Event Listeners
+  // ------------------------
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (clientId) {
+      fetchClientData(clientId);
+    }
+  });
+
+  photoUploadInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Instant preview
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        photoPreview.src = event.target.result;
+        photoPreviewContainer.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+
+      // Start upload
+      uploadPhoto(file);
+    }
+  });
+
+  form.addEventListener('submit', handleFormSubmission);
+  viewPdfBtn.addEventListener('click', handleViewPdfClick);
+  createVcardBtn.addEventListener('click', handleCreateVcardClick);
+
+})();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SmartCardLink Client Form</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* All CSS syntax has been hardened with semicolons to eliminate previous parser errors */
+  body {
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 1rem;
+    background: none;
+    position: relative;
+    color: white;
+  }
+  #bg-video {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    min-width: 100%;
+    min-height: 100%;
+    z-index: -100;
+    filter: brightness(0.4) saturate(1.2);
+    object-fit: cover;
+  }
+  .form-card {
+    background-color: #111;
+    border-radius: 1rem;
+    padding: 2rem;
+    width: 100%;
+    max-width: 750px;
+    border: 1px solid #333;
+    box-shadow: 0 0 20px rgba(0,0,0,0.4);
+    overflow-y: auto;
+  }
+  h1.title {
+    color: #FFD700;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+  button {
+    transition: background-color 0.3s, color 0.3s;
+    font-weight: 600;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    background-color: black;
+    color: white;
+    border: 1px solid #FFD700;
+    width: 100%;
+    margin-top: 1rem;
+  }
+  button:hover {
+    background-color: #FFD700;
+    color: black;
+  }
+  .section-header {
+    background-color: #1f2937;
+    color: #FFD700;
+    padding: 0.5rem;
+    text-align: center;
+    border-radius: 0.375rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  label {
+    color: white;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    display: block;
+  }
+  input, textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid #ccc;
+    resize: vertical;
+    box-sizing: border-box;
+    background-color: white;
+    color: black;
+  }
+  .grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .payment-info, .disclaimer {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #FFD700;
+    border-radius: 0.5rem;
+    background-color: #1a1a1a;
+    text-align: center;
+  }
+  .payment-info p {
+    margin: 0.25rem 0;
+    color: #f0f0f0;
+    font-size: 0.9rem;
+  }
+  .disclaimer h3 {
+    margin: 0;
+    color: #FFD700;
+  }
+  .disclaimer ul {
+    list-style-type: disc;
+    padding-left: 20px;
+    text-align: left;
+    margin-top: 0.5rem;
+  }
+  .disclaimer li {
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+  }
+  @media (max-width: 768px) {
+    .grid-2col {
+      grid-template-columns: 1fr;
+    }
+  }
+  .result {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 0.5rem;
+    color: #e2e8f0;
+    display: none;
+  }
+  .result a { color: #FFD700; word-break: break-all; }
+  .form-message {
+    text-align: center;
+    padding: 1rem;
+    margin-top: 1rem;
+    border-radius: 0.5rem;
+    font-weight: bold;
+    display: none;
+  }
+  .form-message.success { background-color: #d1e7dd; color: #0f5132; display: block; }
+  .form-message.error { background-color: #f8d7da; color: #842029; display: block; }
+</style>
+</head>
+<body>
+<video autoplay muted loop playsinline id="bg-video">
+  <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+<div class="form-card">
+  <h1 class="title">SmartCardLink Client Form</h1>
+
+  <form id="clientForm" autocomplete="off">
+    <div class="section-header">Personal Details</div>
+    <div class="grid-2col">
+      <div>
+        <label for="fullName">Full Name</label>
+        <input type="text" name="fullName" id="fullName" autocomplete="name" required />
+      </div>
+      <div>
+        <label for="title">Title/Position</label>
+        <input type="text" name="title" id="title" autocomplete="organization-title" />
+      </div>
+    </div>
+    <div class="grid-2col">
+      <div>
+        <label for="phone1">Phone Number 1 (Main/Default)</label>
+        <input type="tel" name="phone1" id="phone1" autocomplete="tel" required />
+      </div>
+      <div>
+        <label for="phone2">Phone Number 2</label>
+        <input type="tel" name="phone2" id="phone2" autocomplete="tel-alternate" />
+      </div>
+    </div>
+    <div>
+      <label for="phone3">Phone Number 3</label>
+      <input type="tel" name="phone3" id="phone3" autocomplete="tel-extension" />
+    </div>
+    <div class="grid-2col">
+      <div>
+        <label for="email1">Email 1 (Main/Default)</label>
+        <input type="email" name="email1" id="email1" autocomplete="email" required />
+      </div>
+      <div>
+        <label for="email2">Email 2</label>
+        <input type="email" name="email2" id="email2" autocomplete="new-email2" />
+      </div>
+    </div>
+    <div>
+      <label for="email3">Email 3</label>
+      <input type="email" name="email3" id="email3" autocomplete="new-email3" />
+    </div>
+
+    <div class="section-header">Business Details</div>
+    <div class="grid-2col">
+      <div>
+        <label for="company">Company Name</label>
+        <input type="text" name="company" id="company" autocomplete="organization" required />
+      </div>
+      <div>
+        <label for="businessWebsite">Business Website</label>
+        <input type="url" name="businessWebsite" id="businessWebsite" autocomplete="url" />
+       </div>
+    </div>
+    <div class="grid-2col">
+      <div>
+        <label for="portfolioWebsite">Portfolio Website</label>
+        <input type="url" name="portfolioWebsite" id="portfolioWebsite" autocomplete="url" />
+      </div>
+      <div>
+        <label for="locationMap">Location Map URL</label>
+        <input type="url" name="locationMap" id="locationMap" autocomplete="url" />
+      </div>
+    </div>
+
+    <div class="section-header">Working Hours</div>
+    <div class="grid-2col">
+      <div><label for="monFriStart">Mon-Fri Start</label><input type="time" name="monFriStart" id="monFriStart" value="08:00" /></div>
+      <div><label for="monFriEnd">Mon-Fri End</label><input type="time" name="monFriEnd" id="monFriEnd" value="17:00" /></div>
+      <div><label for="satStart">Saturday Start</label><input type="time" name="satStart" id="satStart" value="09:00" /></div>
+      <div><label for="satEnd">Saturday End</label><input type="time" name="satEnd" id="satEnd" value="12:00" /></div>
+      <div><label for="sunStart">Sunday Start</label><input type="time" name="sunStart" id="sunStart" disabled /></div>
+      <div><label for="sunEnd">Sunday End</label><input type="time" name="sunEnd" id="sunEnd" disabled /></div>
+    </div>
+
+    <div class="section-header">Social Links</div>
+    <div class="grid-2col">
+      <div><label for="facebook">Facebook</label><input type="url" name="facebook" id="facebook" autocomplete="off" /></div>
+      <div><label for="instagram">Instagram</label><input type="url" name="instagram" id="instagram" autocomplete="off" /></div>
+      <div><label for="twitter">X (Twitter)</label><input type="url" name="twitter" id="twitter" autocomplete="off" /></div>
+      <div><label for="linkedin">LinkedIn</label><input type="url" name="linkedin" id="linkedin" autocomplete="off" /></div>
+      <div><label for="tiktok">TikTok</label><input type="url" name="tiktok" id="tiktok" autocomplete="off" /></div>
+      <div><label for="youtube">YouTube</label><input type="url" name="youtube" id="youtube" autocomplete="off" /></div>
+    </div>
+
+    <div class="section-header">Bio</div>
+    <textarea name="bio" id="bio" rows="4" autocomplete="off"></textarea>
+
+    <div>
+      <label for="address">Address</label>
+      <input type="text" name="address" id="address" autocomplete="street-address" />
+    </div>
+
+    <div class="payment-info">
+      <h3 style="color:#FFD700; margin-top:0;">Payment (MPESA)</h3>
+      <p style="font-size: 1.2rem; font-weight: bold;">Pochi La Biashara: 0702444552</p>
+    </div>
+
+    <div class="disclaimer">
+      <h3 style="color:#FFD700;">Disclaimer</h3>
+      <ul>
+        <li>I certify that the information provided is accurate and truthful.</li>
+        <li>I understand that payment is required for this service to be activated.</li>
+        <li>I acknowledge that SmartCardLink is not liable for inaccurate details I have submitted.</li>
+      </ul>
+    </div>
+
+    <button type="submit">Submit Form</button>
+  </form>
+
+  <div class="form-message" id="formMessage"></div>
+</div>
+
+<script>
+  // ========================================================================
+  // === CRITICAL: RENDER ENDPOINTS - ONLY MAIN API AND LOCAL HOST ARE USED ===
+  // The live Render API URL has been inserted directly as requested.
+  // ========================================================================
+  const RENDER_API_DOMAIN = "https://smartcardlink-api.onrender.com"; // <-- Live Render API URL
+  const LOCAL_API = "http://localhost:8080"; // Local dev endpoint
+
+  // Use the environment variable (if passed) or default to the Render domain.
+  const MAIN_API = window.SCL_CONFIG?.API_BASE || RENDER_API_DOMAIN;
+  
+  const form = document.getElementById("clientForm");
+  const formMessage = document.getElementById("formMessage");
+
+  function showMessage(message, type) {
+    formMessage.innerHTML = message;
+    formMessage.className = `form-message ${type}`;
+    formMessage.style.display = 'block';
+  }
+
+  // Generalized POST function with exponential backoff.
+  // Since we only have one main target (plus localhost fallback), we just retry the main API.
+  async function tryPost(apiBase, payload, isLocal = false) {
+    const MAX_RETRIES = isLocal ? 1 : 5; // Don't retry local host
+    let delay = 1000;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const url = `${apiBase.replace(/\/$/, '')}/api/clients`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        let json = null;
+        try { json = await resp.json(); } catch (e) { /* ignore parse errors */ }
+        
+        // If successful or client error (4xx), return immediately
+        if (resp.ok || resp.status < 500) {
+          return { ok: resp.ok, status: resp.status, json, resp };
+        }
+        
+        // If server error (5xx) and not local, continue to the next retry attempt
+      } catch (err) {
+        // Network error, continue to retry
+      }
+
+      // Prepare for next retry if not local
+      if (!isLocal && attempt < MAX_RETRIES - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
+    }
+    
+    return { ok: false, error: new Error(`Failed to connect to API after ${MAX_RETRIES} attempts.`) };
+  }
+
+  async function submitForm() {
+    const formData = new FormData(form);
+
+    // assemble payload matching your server.js Client schema exactly
+    const payload = {
+      fullName: formData.get('fullName')?.trim() || '',
+      title: formData.get('title')?.trim() || '',
+      company: formData.get('company')?.trim() || '',
+      phone1: formData.get('phone1')?.trim() || '',
+      phone2: formData.get('phone2')?.trim() || '',
+      phone3: formData.get('phone3')?.trim() || '',
+      email1: formData.get('email1')?.trim() || '',
+      email2: formData.get('email2')?.trim() || '',
+      email3: formData.get('email3')?.trim() || '',
+      businessWebsite: formData.get('businessWebsite')?.trim() || '',
+      portfolioWebsite: formData.get('portfolioWebsite')?.trim() || '',
+      locationMap: formData.get('locationMap')?.trim() || '',
+      bio: formData.get('bio')?.trim() || '',
+      address: formData.get('address')?.trim() || '',
+      socialLinks: {},
+      workingHours: {}
+    };
+
+    // social links
+    ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k => {
+      const v = formData.get(k)?.trim();
+      if (v) payload.socialLinks[k] = v;
+    });
+
+    // working hours (server expects monFriStart etc.)
+    ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
+      const v = formData.get(k);
+      if (v && v.trim) payload.workingHours[k] = v.trim();
+    });
+
+    // validation
+    if (!payload.fullName || !payload.phone1 || !payload.email1 || !payload.company) {
+      throw new Error("Please fill in all required fields: Full Name, Phone 1, Email 1, and Company.");
+    }
+
+    // 1. Try Main Render API (with 5 retries/backoff for resilience)
+    let res = await tryPost(MAIN_API, payload, false);
+    
+    if (!res.ok) {
+      // 2. Fallback to Local Dev API (no retries)
+      res = await tryPost(LOCAL_API, payload, true);
+    }
+
+    // handle final result
+    if (res && res.ok) {
+      const json = res.json || {};
+      const recordId =
+        (json && json.data && (json.data.recordId || json.data._id)) ||
+        json.recordId ||
+        json.id ||
+        (json && json.data && typeof json.data === 'string' ? json.data : null) ||
+        "N/A";
+
+      return { success: true, recordId, raw: json, message: json?.message || "Saved. Pending admin processing." };
+    } else {
+      // construct a friendly error message
+      if (res && res.json && res.json.message) {
+        throw new Error(res.json.message);
+      } else if (res && res.status) {
+        throw new Error(`Server error: status ${res.status}`);
+      } else if (res && res.error) {
+        // This handles the final error after all retries
+        throw new Error(String(res.error.message || res.error));
+      } else {
+        throw new Error("Submission failed. Please try again later.");
+      }
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector("button[type=submit]");
+    btn.disabled = true;
+    try {
+      // The redundant placeholder check is now removed as the URL is hardcoded.
+      
+      showMessage("Submitting formâ€¦", "info");
+      const result = await submitForm();
+      showMessage(`âœ” Success! Your Record ID: ${result.recordId}`, "success");
+      form.reset();
+    } catch (err) {
+      showMessage(`âŒ ${err.message}`, "error");
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartCardLink Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>ðŸ”—</text></svg>">
+    <style>
+        /* --- DESIGN & STYLES (PRESERVED) --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem;
+            background: none;
+            position: relative;
+            color: #e2e8f0;
+            transition: all 0.5s ease-in-out;
+        }
+        #bg-video {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            z-index: -100;
+            filter: brightness(0.4) saturate(1.2);
+            object-fit: cover;
+        }
+        .dashboard-card {
+            background-color: #111;
+            border-radius: 1rem;
+            padding: 2rem;
+            width: 100%;
+            max-width: 1200px;
+            border: 1px solid #333;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            animation: fadeIn 1s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h1.title {
+            color: #FFD700;
+            font-size: 1.75rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 2rem;
+            letter-spacing: 0.05em;
+        }
+        .controls-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .search-container {
+            display: flex;
+            gap: 0.5rem;
+            flex-grow: 1;
+        }
+        input, select, textarea {
+            flex-grow: 1;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #555;
+            box-sizing: border-box;
+            background-color: #222;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #FFD700;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            border: 1px solid #FFD700;
+            background-color: #1a1a1a;
+            color: #FFD700;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        button:hover {
+            background-color: #FFD700;
+            color: black;
+        }
+        button:disabled {
+            background-color: #444;
+            color: #888;
+            cursor: not-allowed;
+            border-color: #555;
+        }
+        .table-container {
+            overflow-x: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1200px;
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th {
+            background-color: #222;
+            color: #FFD700;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        td {
+            background-color: #1a1a1a;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+        }
+        tbody tr:hover {
+            background-color: #2d2d2d;
+        }
+        tbody tr.row-success {
+            background-color: #38a1694d !important;
+            transition: background-color 0.5s ease-out;
+        }
+        tbody tr.selected {
+            background-color: #3b3b3b;
+            outline: 2px solid #FFD700;
+        }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: white;
+            white-space: nowrap;
+        }
+        .status-Pending { background-color: #d69e2e; }
+        .status-Processed { background-color: #4299e1; }
+        .status-Active { background-color: #38a169; }
+        .status-Disabled { background-color: #e53e3e; }
+        .status-Deleted { background-color: #4a5568; }
+        .client-photo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #555;
+        }
+        .qr-code {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+        }
+        .actions-cell {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
+        }
+        .actions-cell button {
+            flex-grow: 1;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .btn-action-process { background-color: #3b82f6; color: white; border-color: #3b82f6;}
+        .btn-action-disable { background-color: #ef4444; color: white; border-color: #ef4444;}
+        .btn-action-reactivate { background-color: #22c55e; color: white; border-color: #22c55e;}
+        .btn-action-delete { background-color: #a8a29e; color: white; border-color: #a8a29e;}
+        .section-header {
+            background-color: #1f2937;
+            color: #FFD700;
+            padding: 0.75rem;
+            text-align: center;
+            border-radius: 0.375rem;
+            font-weight: 600;
+        }
+        /* MODAL CSS */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .modal-content { 
+            background-color: #1a1a1a; 
+            margin: 15% auto; 
+            padding: 20px; 
+            border: 1px solid #555; 
+            width: 80%; 
+            max-width: 400px; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
+            display: flex; 
+            flex-direction: column;
+            gap: 15px;
+        }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; align-self: flex-end; }
+        .modal-content h2 { color: #FFD700; margin-top: 0; }
+        .modal-content textarea { min-height: 100px; }
+        .modal-content button { width: 100%; margin-top: 5px; }
+        
+        /* TOAST CSS */
+        .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 1000; display: flex; flex-direction: column-reverse; gap: 0.5rem; }
+        .toast { background-color: #333; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 0; transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; transform: translateY(20px); display: flex; justify-content: space-between; align-items: center;}
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background-color: #ef4444; }
+        .toast.success { background-color: #22c55e; }
+    </style>
+</head>
+<body>
+    <video autoplay muted loop playsinline id="bg-video">
+        <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    </video>
+
+    <div id="dashboardContainer" class="dashboard-card" style="display: block;"> 
+        <h1 class="title">SmartCardLink Admin Dashboard</h1>
+        
+        <div class="controls-container">
+            <div class="search-container">
+                <input type="text" id="filterInput" placeholder="Search clients by name, email, phone or company" />
+                <button id="searchBtn">Search</button>
+            </div>
+            <select id="statusFilter">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Processed">Processed</option>
+                <option value="Active">Active</option>
+                <option value="Disabled">Disabled</option>
+                <option value="Deleted">Deleted</option>
+            </select>
+            <button id="refreshBtn" onclick="fetchAllClients()">
+                <i class="fas fa-sync-alt"></i> Re-fetch
+            </button>
+            <button id="exportBtn" onclick="exportToCsv()">
+                <i class="fas fa-file-export"></i> Export CSV
+            </button>
+        </div>
+        
+        <div id="totals" class="section-header" style="display: none;"></div>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Photo</th>
+                        <th>Name</th>
+                        <th>Company</th> 
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>vCard</th>
+                        <th>QR Code</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="clientTableBody">
+                    <tr><td colspan="9" style="text-align:center;">Loading client data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="noResults" style="text-align:center; color: #aaa; padding: 20px; display: none;">No results found matching your criteria.</div>
+    </div>
+    
+    <div id="notesModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modalTitle">Reason for Action</h2>
+            <textarea id="modalTextarea" placeholder="Please provide a reason for this action."></textarea>
+            <button id="modalConfirmBtn">Confirm</button>
+        </div>
+    </div>
+    <div class="toast-container" id="toast-container"></div>
+
+   <script>
+    // CRITICAL FIX: Directs all API calls to the live Render Backend URL.
+    window.SCL_CONFIG = { 
+        API_ROOT: "https://smartcardlink-api.onrender.com/api", 
+        ADMIN_FORM_URL: "admin-form.html"
+    };
+</script>
+    
+    <script src="adminDashboard.js"></script>
+</body>
+</html>
+// C:\Users\ADMIN\Desktop\smartcardlink-app\public\js\adminDashboard.js
+
+// --- Global Variables ---
+let allClientData = [];
+const MAX_RETRIES = 3;
+let isFetching = false;
+
+// CRITICAL: Robust API_ROOT configuration using window.SCL_CONFIG
+const API_ROOT = window.SCL_CONFIG?.API_ROOT || `${window.location.origin}/api`;
+const ADMIN_FORM_URL = window.SCL_CONFIG?.ADMIN_FORM_URL || 'admin-form.html';
+
+// --- DOM Elements (Defensive checks are kept) ---
+const dashboardContainer = document.getElementById('dashboardContainer');
+const clientTableBody = document.getElementById('clientTableBody');
+const filterInput = document.getElementById('filterInput'); 
+const statusFilter = document.getElementById('statusFilter');
+const exportBtn = document.getElementById('exportBtn');
+const noResultsDiv = document.getElementById('noResults'); 
+const totalsDiv = document.getElementById('totals');       
+const searchBtn = document.getElementById('searchBtn');
+
+// --- Modal & Toast Elements (New) ---
+const notesModal = document.getElementById('notesModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalTextarea = document.getElementById('modalTextarea');
+const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+const modalCloseBtn = document.querySelector('.modal-content .close-btn'); 
+const toastContainer = document.getElementById('toast-container');
+
+
+// --- UI Feedback & Helper Functions ---
+
+function showToast(message, type = 'success') {
+    if (!toastContainer) return;
+    
+    // 1. Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // 2. Add message and close button
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button class="toast-close-btn" style="background: none; border: none; color: white; margin-left: 10px; cursor: pointer;">&times;</button>
+    `;
+    
+    // 3. Handle manual close
+    const closeBtn = toast.querySelector('.toast-close-btn');
+    const closeToast = () => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove());
+    };
+    closeBtn.addEventListener('click', closeToast);
+
+    // 4. Append and show
+    toastContainer.appendChild(toast);
+    setTimeout(() => { toast.classList.add('show'); }, 10);
+    
+    // 5. Auto-dismiss after 5 seconds
+    setTimeout(closeToast, 5000);
+}
+
+function hideModal() {
+    if (notesModal) {
+        notesModal.style.display = 'none';
+        modalTextarea.value = ''; // Clear notes when hiding
+    }
+}
+
+function getStatusBadge(status) {
+    const statusClean = status 
+        ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() 
+        : 'Pending';
+    const statusClass = statusClean.replace(/\s/g, ''); 
+    return `<span class="status-badge status-${statusClass}">${statusClean}</span>`;
+}
+
+function getLoadingHtml(attempt = 0) {
+    // Adding aria-live="polite" for accessibility announcement
+    const spinner = `<i class="fas fa-spinner fa-spin" style="margin-right: 10px;"></i>`;
+    const attemptMsg = attempt > 0 ? ` (Attempt ${attempt}/${MAX_RETRIES})` : '';
+    return `<span aria-live="polite">${spinner} Loading client data...${attemptMsg}</span>`;
+}
+
+function showFinalError(message) {
+    if (!clientTableBody) return;
+    
+    // Also show toast notification for better UX
+    showToast(`Failed to load data: ${message}`, 'error');
+    
+    clientTableBody.innerHTML = `
+        <tr>
+            <td colspan="9" style="text-align:center; color: #ef4444; padding: 20px;">
+                <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
+                Failed to load data: ${message}
+                <button onclick="fetchAllClients()" style="margin-left: 15px; background: #FFD700; color: black; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+function showNotesModal(action, clientId, newStatus) {
+    if (!notesModal || !modalTitle || !modalTextarea || !modalConfirmBtn) return;
+
+    modalTitle.innerText = `Reason for ${action} Action`;
+    modalTextarea.placeholder = `Please provide a MANDATORY reason for this ${action} action.`;
+    modalTextarea.value = '';
+
+    // UX Improvement: Focus on the textarea when modal opens
+    setTimeout(() => { modalTextarea.focus(); }, 10); 
+
+    modalConfirmBtn.onclick = () => {
+        const notes = modalTextarea.value.trim();
+        if (!notes) {
+            showToast('A reason is required to proceed.', 'error');
+            return;
+        }
+
+        hideModal(); 
+        
+        if (action === 'Process') {
+            processClient(clientId, notes); 
+        } else {
+            changeClientStatus(clientId, newStatus, notes);
+        }
+    };
+    
+    notesModal.style.display = 'block';
+}
+
+function renderTable(data) {
+    if (!clientTableBody) return;
+
+    clientTableBody.innerHTML = '';
+    
+    if (data.length === 0) {
+        if (noResultsDiv) {
+            noResultsDiv.style.display = 'block';
+            clientTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No clients found.</td></tr>';
+        }
+        if (totalsDiv) totalsDiv.style.display = 'none';
+        return;
+    }
+
+    if (noResultsDiv) noResultsDiv.style.display = 'none';
+    
+    data.forEach(client => {
+        const tr = document.createElement('tr');
+        tr.dataset.clientId = client._id; 
+        
+        // Row Click: Opens modal for Process/View
+        tr.onclick = (e) => {
+             // CRITICAL: Ensure click target is not a button or part of a button
+             if (e.target.closest('button')) return; 
+             showNotesModal('Process', client._id, null);
+        };
+
+        const currentStatus = client.status || 'Pending';
+        
+        // SECURITY NOTE: In a real-world scenario, all URL/text inputs injected via innerHTML
+        // (like photoUrl, vcardUrl, qrCodeUrl) should be sanitized if they can be
+        // user-submitted to prevent XSS. Assuming they are safe, backend-generated URLs here.
+        
+        tr.innerHTML = `
+            <td><img src="${client.photoUrl || 'https://placehold.co/50x50?text=No+Photo'}" alt="Client Photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
+            <td>${client.fullName || 'N/A'}</td>
+            <td>${client.company || 'N/A'}</td>
+            <td>${client.email1 || 'N/A'}</td>
+            <td>${client.phone1 || 'N/A'}</td>
+            <td>${getStatusBadge(currentStatus)}</td>
+            <td>${client.vcardUrl ? `<a href="${client.vcardUrl}" target="_blank" class="text-blue-500 hover:underline">View</a>` : 'N/A'}</td>
+            <td>${client.qrCodeUrl ? `<a href="${client.qrCodeUrl}" download="qrcode.png"><img src="${client.qrCodeUrl}" alt="QR Code" class="qr-code mx-auto" /></a>` : 'N/A'}</td>
+            <td class="actions-cell">
+                ${currentStatus === 'Pending' ? 
+                    // event.stopPropagation() is crucial to prevent tr.onclick
+                    `<button class="action-btn btn-process" onclick="event.stopPropagation(); showNotesModal('Process', '${client._id}', null)">Process</button>` :
+                    `<button class="action-btn btn-view" onclick="event.stopPropagation(); showNotesModal('Process', '${client._id}', null)">View</button>`
+                }
+                ${currentStatus === 'Active' ? 
+                    `<button class="action-btn btn-disable" onclick="event.stopPropagation(); showNotesModal('Disable', '${client._id}', 'Disabled')">Disable</button>` :
+                    currentStatus === 'Disabled' ?
+                    `<button class="action-btn btn-enable" onclick="event.stopPropagation(); showNotesModal('Enable', '${client._id}', 'Active')">Enable</button>` :
+                    ''
+                }
+                ${currentStatus !== 'Deleted' ?
+                    `<button class="action-btn btn-delete" onclick="event.stopPropagation(); showNotesModal('Delete', '${client._id}', 'Deleted')">Delete</button>` :
+                    ''
+                }
+            </td>
+        `;
+        clientTableBody.appendChild(tr);
+    });
+    
+    updateTotals(data);
+}
+
+function updateTotals(data) {
+    if (!totalsDiv) return; 
+    
+    const activeCount = data.filter(client => client.status === 'Active').length;
+    const pendingCount = data.filter(client => client.status === 'Pending').length;
+    const processedCount = data.filter(client => client.status === 'Processed').length;
+    const disabledCount = data.filter(client => client.status === 'Disabled').length;
+    const deletedCount = data.filter(client => client.status === 'Deleted').length;
+    
+    totalsDiv.style.display = 'block';
+    totalsDiv.innerHTML = `
+        Total Clients: ${data.length} | 
+        Active: ${activeCount} | 
+        Pending: ${pendingCount} | 
+        Processed: ${processedCount} |
+        Disabled: ${disabledCount} |
+        Deleted: ${deletedCount}
+    `;
+}
+
+function filterAndSearch() {
+    if (!filterInput || !statusFilter) return;
+
+    const searchTerm = filterInput.value.toLowerCase(); 
+    const selectedStatus = statusFilter.value;
+    
+    const filteredData = allClientData.filter(client => {
+        const matchesSearch = 
+            (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
+            (client.phone1 && client.phone1.toLowerCase().includes(searchTerm)) ||
+            (client.email1 && client.email1.toLowerCase().includes(searchTerm)) ||
+            (client.company && client.company.toLowerCase().includes(searchTerm)); 
+        
+        const matchesStatus = selectedStatus === '' || client.status === selectedStatus;
+        
+        return matchesSearch && matchesStatus;
+    });
+    
+    renderTable(filteredData);
+}
+
+function exportToCsv() {
+    if (allClientData.length === 0) {
+        showToast("No client data loaded to export.", 'error');
+        return;
+    }
+    
+    const headers = ["ID", "Name", "Company", "Email", "Phone", "Status", "vCard URL", "QR Code URL"];
+    
+    const data = allClientData.map(client => [
+        client._id || '',
+        client.fullName || '',
+        client.company || '',
+        client.email1 || '',
+        client.phone1 || '',
+        client.status || 'Pending',
+        client.vcardUrl || '',
+        client.qrCodeUrl || ''
+    ]);
+
+    let csvContent = headers.join(",") + "\n";
+    data.forEach(row => {
+        const rowString = row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(",");
+        csvContent += rowString + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `smartcardlink_clients_${new Date().toISOString().slice(0, 10)}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Successfully generated and downloaded CSV for ${allClientData.length} clients.`);
+}
+
+async function changeClientStatus(clientId, newStatus, notes) {
+    if (!API_ROOT) return showToast('Configuration Error: API root not defined.', 'error');
+
+    try {
+        const response = await fetch(`${API_ROOT}/clients/${clientId}/status/${newStatus}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes }) 
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+        }
+        
+        showToast(`Status updated to ${newStatus}. Reason: ${notes.substring(0, 30)}...`);
+        
+        const row = document.querySelector(`tr[data-client-id="${clientId}"]`);
+        if (row) {
+            row.classList.add('row-success');
+            setTimeout(() => { row.classList.remove('row-success'); }, 2000); 
+        }
+
+        await fetchAllClients(); 
+    } catch (error) {
+        console.error("Error changing client status:", error);
+        showToast(`Failed to change status: ${error.message}`, 'error');
+    }
+}
+
+async function fetchAllClients() {
+    if (isFetching || !API_ROOT) return;
+    
+    isFetching = true;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        if (clientTableBody) clientTableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">${getLoadingHtml(attempt)}</td></tr>`;
+        
+        try {
+            // CORRECTION: Use the Admin API route /admin/clients which should exist on the backend.
+            const response = await fetch(`${API_ROOT}/admin/clients`);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Server responded with error status.' }));
+                throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+            }
+            
+            allClientData = await response.json();
+            renderTable(allClientData);
+            isFetching = false;
+            return; 
+
+        } catch (error) {
+            console.error(`Attempt ${attempt} failed:`, error);
+            
+            if (attempt === MAX_RETRIES) {
+                // Final failure: show both inline error and toast
+                showFinalError(error.message); 
+                isFetching = false;
+                return;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1500 * attempt)); 
+        }
+    }
+}
+
+function processClient(clientId, notes = 'No reason provided') {
+    // Log notes for auditing purposes (e.g., in a separate audit service or log file)
+    console.log(`Processing client ${clientId}. Admin notes: ${notes}`); 
+    showToast(`Opening client form for ${clientId}. Notes logged.`);
+
+    const url = new URL(ADMIN_FORM_URL, window.location.href);
+    url.searchParams.set('id', clientId);
+    window.open(url.toString(), '_blank');
+}
+
+// --- Event Listeners ---
+if (searchBtn) searchBtn.addEventListener('click', filterAndSearch);
+if (filterInput) filterInput.addEventListener('keyup', filterAndSearch); 
+if (statusFilter) statusFilter.addEventListener('change', filterAndSearch);
+if (exportBtn) exportBtn.addEventListener('click', exportToCsv);
+
+// Modal close listeners
+if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideModal);
+if (notesModal) {
+    window.addEventListener('click', (event) => {
+        if (event.target === notesModal) hideModal();
+    });
+}
+
+// --- Initialization ---
+async function init() {
+    if (!API_ROOT) {
+         console.error('CRITICAL: API_ROOT is not configured. Check the SCL_CONFIG block in adminDashboard.html.');
+         if (clientTableBody) clientTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: red;">API Configuration Missing. Check Console.</td></tr>';
+         return;
+    }
+
+    if (dashboardContainer) dashboardContainer.style.display = 'block';
+    
+    await fetchAllClients();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// Expose functions to the global scope for onclick attributes in HTML
+window.changeClientStatus = changeClientStatus;
+window.processClient = processClient;
+window.fetchAllClients = fetchAllClients;
+window.exportToCsv = exportToCsv;
+window.showNotesModal = showNotesModal;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink vCard Client Dashboard | Production</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>ðŸ”—</text></svg>">
+  
+  <style>
+    /* --- CSS Configuration & Core Styles --- */
+    :root {
+      --primary-color: #FFD700; /* Gold */
+      --text-color: #e2e8f0;
+      --bg-color: #111;
+      --card-bg: #1a1a1a;
+      --border-color: #333;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 2rem 1rem;
+      background: none;
+      color: var(--text-color);
+    }
+    /* Background Video (from provided snippet) */
+    #bg-video {
+      position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -100;
+      filter: brightness(0.4) saturate(1.2); object-fit: cover;
+    }
+    .dashboard-card {
+      background-color: var(--bg-color); border-radius: 1rem; padding: 2rem; width: 100%;
+      max-width: 1200px; border: 1px solid var(--border-color); box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+      overflow: hidden; animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    h1.title { color: var(--primary-color); font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: 2rem; }
+    .controls-container { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .search-container { display: flex; gap: 0.5rem; flex-grow: 1; max-width: 400px; }
+    
+    input, select, textarea { 
+      flex-grow: 1; padding: 0.75rem; border-radius: 0.375rem; border: 1px solid #555; background-color: #222; 
+      color: white; transition: all 0.3s ease; box-sizing: border-box;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+    
+    .button-group { display: flex; gap: 0.5rem; }
+    button { 
+      padding: 0.75rem 1.2rem; border-radius: 0.375rem; border: 1px solid var(--primary-color); 
+      background-color: var(--card-bg); color: var(--primary-color); font-weight: 700; 
+      cursor: pointer; transition: all 0.3s; white-space: nowrap; 
+    }
+    button:hover { background-color: var(--primary-color); color: var(--bg-color); }
+    
+    /* Table Styles */
+    .table-container { overflow-x: auto; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+    th { background-color: #222; color: var(--primary-color); font-weight: 600; white-space: nowrap; }
+    td { background-color: var(--card-bg); color: var(--text-color); font-size: 0.9rem; }
+    tbody tr:hover { background-color: #2d2d2d; }
+    tbody tr.row-success { 
+      background-color: #38a1694d !important; /* Green highlight for update */
+      transition: background-color 0.5s ease-out; 
+    }
+
+    /* Status Badges */
+    .status-badge { 
+      padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; color: white; white-space: nowrap; 
+    }
+    .status-Pending { background-color: #d69e2e; } 
+    .status-Processed { background-color: #4299e1; } 
+    .status-Active { background-color: #38a169; } 
+    .status-Disabled { background-color: #e53e3e; } 
+    .status-Deleted { background-color: #4a5568; } 
+    .client-photo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #555; }
+    .actions-cell button { padding: 0.5rem 0.75rem; font-size: 0.8rem; margin-right: 0.25rem; }
+    
+    /* Modal Styles */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+    .modal-content { 
+        background-color: var(--card-bg); margin: 10% auto; padding: 20px; border: 1px solid #555; 
+        width: 90%; max-width: 450px; border-radius: 0.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
+        display: flex; flex-direction: column; gap: 15px;
+    }
+    .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; align-self: flex-end; }
+    .modal-content h2 { color: var(--primary-color); margin-top: 0; font-size: 1.4rem; }
+    .modal-content textarea { min-height: 120px; resize: vertical; }
+
+    /* Toast Notifications */
+    .toast-container { position: fixed; top: 1rem; right: 1rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 1000; }
+    .toast {
+      padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; 
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); transition: all 0.3s ease-in-out; 
+      transform: translateX(100%); opacity: 0; display: flex; justify-content: space-between; align-items: center;
+      min-width: 250px;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background-color: #10b981; color: white; } 
+    .toast.error { background-color: #f43f5e; color: white; } 
+    .toast-close-btn { background: none; border: none; color: white; margin-left: 10px; cursor: pointer; font-size: 1.2rem; line-height: 1; }
+    .toast-close-btn:hover { color: var(--primary-color); }
+    
+    /* Loading States */
+    #loadingMessage { text-align: center; padding: 2rem; color: var(--primary-color); display: none; }
+    #noResults { text-align: center; padding: 2rem; color: #aaa; display: none; }
+    .loading-spinner { 
+      border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; 
+      width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 0.5rem; 
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 768px) {
+      .dashboard-card { padding: 1rem; }
+      .controls-container { flex-direction: column; align-items: stretch; }
+      .search-container { max-width: 100%; }
+      .button-group { width: 100%; justify-content: space-between; }
+      .button-group button { flex-grow: 1; padding: 0.75rem 0.5rem; }
+      .table-container { margin: 0 -1rem; width: calc(100% + 2rem); }
+      th, td { padding: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+
+  <div class="dashboard-card">
+    <h1 class="title">SmartCardLink vCard Client Dashboard</h1>
+
+    <div class="controls-container">
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search by name, phone, email, or company" aria-label="Search clients" />
+        <button id="searchBtn"><i class="fas fa-search"></i> Search</button>
+      </div>
+      <div class="button-group">
+        <select id="statusFilter" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <option value="Active">Active</option>
+          <option value="Disabled">Disabled</option>
+          <option value="Pending">Pending</option>
+          <option value="Processed">Processed</option>
+          <option value="Deleted">Deleted</option>
+        </select>
+        <button id="exportBtn" aria-label="Export to CSV">
+             <i class="fas fa-file-export"></i> Export CSV
+        </button>
+        <button id="resetBtn" aria-label="Reset Filters">
+             <i class="fas fa-undo"></i> Reset
+        </button>
+      </div>
+    </div>
+    
+    <div id="totals" style="text-align: center; color: var(--primary-color); padding: 0.5rem; margin-bottom: 1rem; display: none;"></div>
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Photo</th>
+            <th>Full Name</th>
+            <th>Company</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Date Created</th>
+            <th>Active Months</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="clientTableBody" role="alert" aria-live="polite">
+          </tbody>
+      </table>
+    </div>
+    
+    <div id="loadingMessage">
+        <div class="loading-spinner"></div>
+        <p>Loading all client data from MongoDB...</p>
+    </div>
+    <div id="noResults">No clients found matching your criteria.</div>
+  </div>
+  
+  <div id="notesModal" class="modal">
+      <div class="modal-content">
+          <span class="close-btn" id="modalCloseBtn">&times;</span>
+          <h2 id="modalTitle">Reason for Action</h2>
+          <textarea id="modalTextarea" placeholder="Please provide a mandatory reason for this action (e.g., 'Client requested a 6-month pause')." required></textarea>
+          <button id="modalConfirmBtn">Confirm Action</button>
+      </div>
+  </div>
+  
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    // --- Configuration Block (API URL) ---
+    
+    // CRITICAL: The base URL of the Render backend API, used for all data fetching and status updates.
+    const API_BASE_URL = "https://smartcardlink-api.onrender.com"; 
+    
+    // --- Global State & DOM Elements ---
+    let allClientData = []; // Stores the full, un-filtered client data from the last successful fetch.
+
+    // DOM References
+    const clientTableBody = document.getElementById('clientTableBody');
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const exportBtn = document.getElementById('exportBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const noResultsDiv = document.getElementById('noResults');
+    const totalsDiv = document.getElementById('totals');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const notesModal = document.getElementById('notesModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalTextarea = document.getElementById('modalTextarea');
+    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+    const modalCloseBtn = document.getElementById('modalCloseBtn'); 
+    const toastContainer = document.getElementById('toast-container');
+
+    // --- Utility Functions ---
+
+    /**
+     * Non-blocking Toast notification for user feedback.
+     */
+    function showToast(message, type = 'success') {
+        if (!toastContainer) return;
+        
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        toast.innerHTML = `
+            <span role="status" aria-live="polite">${message}</span>
+            <button class="toast-close-btn">&times;</button>
+        `;
+        
+        const closeBtn = toast.querySelector('.toast-close-btn');
+        const closeToast = () => {
+            toast.classList.remove('show');
+            // Remove element only after CSS transition finishes
+            toast.addEventListener('transitionend', () => toast.remove());
+        };
+        closeBtn.addEventListener('click', closeToast);
+
+        toastContainer.prepend(toast); 
+        setTimeout(() => { toast.classList.add('show'); }, 10);
+        
+        // Auto-dismiss after 6 seconds
+        setTimeout(closeToast, 6000);
+    }
+
+    /**
+     * Hides the audit notes modal and clears its state.
+     */
+    function hideModal() {
+        if (notesModal) {
+            notesModal.style.display = 'none';
+            modalTextarea.value = ''; 
+            // CRITICAL: Remove the previous event handler to prevent stacking
+            modalConfirmBtn.onclick = null; 
+        }
+    }
+
+    /**
+     * Creates HTML for a color-coded status badge.
+     */
+    function getStatusBadge(status) {
+      const statusClean = status 
+        ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() 
+        : 'Pending';
+      const statusClass = statusClean.replace(/\s/g, ''); 
+      return `<span class="status-badge status-${statusClass}">${statusClean}</span>`;
+    }
+
+    /**
+     * Calculates the approximate number of active months since the vCard was created.
+     */
+    function calculateActiveMonths(createdDateStr) {
+        if (!createdDateStr) return 'N/A';
+        const createdDate = new Date(createdDateStr);
+        const now = new Date();
+
+        let totalMonths = (now.getFullYear() - createdDate.getFullYear()) * 12;
+        totalMonths += now.getMonth() - createdDate.getMonth();
+        
+        if (now.getDate() < createdDate.getDate()) {
+            totalMonths--;
+        }
+        
+        return totalMonths > 0 ? `${totalMonths} months` : '0 months';
+    }
+    
+    /**
+     * Debounces a function call to prevent excessive execution (e.g., on input).
+     */
+    const debounce = (func, delay) => {
+        let timeoutId;
+        return (...args) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => { func.apply(this, args); }, delay);
+        };
+    };
+
+    // --- Core UI & Rendering Functions ---
+
+    /**
+     * Renders the table based on the provided (filtered) data array.
+     */
+    function renderTable(data) {
+      if (!clientTableBody) return;
+      
+      clientTableBody.innerHTML = '';
+
+      if (data.length === 0) {
+        noResultsDiv.style.display = 'block';
+        totalsDiv.style.display = 'none';
+        return;
+      }
+
+      noResultsDiv.style.display = 'none';
+      
+      data.forEach(client => {
+        const tr = document.createElement('tr');
+        // Unique identifier for in-place updates
+        tr.dataset.clientId = client._id; 
+        
+        const currentStatus = client.status || 'Pending';
+        const createdDate = client.vcardCreatedDate ? client.vcardCreatedDate.split('T')[0] : 'N/A';
+        const activeMonths = calculateActiveMonths(client.vcardCreatedDate);
+        const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
+
+        tr.innerHTML = `
+          <td><img src="${photoUrl}" alt="Client Photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
+          <td>${client.fullName || 'N/A'}</td>
+          <td>${client.company || 'N/A'}</td>
+          <td>${client.email1 || 'N/A'}</td>
+          <td>${client.phone1 || 'N/A'}</td>
+          <td>${createdDate}</td>
+          <td>${activeMonths}</td>
+          <td>${getStatusBadge(currentStatus)}</td>
+          <td class="actions-cell">
+            ${currentStatus === 'Active' ? 
+              `<button class="action-btn btn-disable" onclick="window.showNotesModal('Disable', '${client._id}', 'Disabled')"><i class="fas fa-ban"></i> Disable</button>` :
+              `<button class="action-btn btn-enable" onclick="window.showNotesModal('Enable', '${client._id}', 'Active')"><i class="fas fa-check-circle"></i> Enable</button>`
+            }
+            <button class="action-btn btn-delete" onclick="window.showNotesModal('Delete', '${client._id}', 'Deleted')"><i class="fas fa-trash-alt"></i> Delete</button>
+          </td>
+        `;
+        clientTableBody.appendChild(tr);
+      });
+      
+      updateTotals(data);
+    }
+
+    /**
+     * Filters the local data set (`allClientData`) and triggers a re-render of the table.
+     * This is used for search, filter, and post-status-change updates (in-place method).
+     */
+    function filterAndSearch() {
+        if (!searchInput || !statusFilter) return;
+        
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedStatus = statusFilter.value;
+        
+        const filteredData = allClientData.filter(client => {
+            const matchesSearch = 
+                (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
+                (client.phone1 && client.phone1.toLowerCase().includes(searchTerm)) ||
+                (client.email1 && client.email1.toLowerCase().includes(searchTerm)) ||
+                (client.company && client.company.toLowerCase().includes(searchTerm));
+            
+            const matchesStatus = selectedStatus === '' || client.status === selectedStatus;
+            
+            return matchesSearch && matchesStatus;
+        });
+        
+        renderTable(filteredData);
+    }
+
+    /**
+     * Updates the summary statistics below the controls.
+     */
+    function updateTotals(data) {
+        if (!totalsDiv) return;
+        
+        const counts = { Active: 0, Pending: 0, Processed: 0, Disabled: 0, Deleted: 0 };
+        data.forEach(client => {
+            const status = client.status || 'Pending';
+            if (counts.hasOwnProperty(status)) {
+                counts[status]++;
+            }
+        });
+        
+        totalsDiv.style.display = 'block';
+        totalsDiv.innerHTML = `
+            **Total Clients:** ${data.length} | 
+            **Active:** ${counts.Active} | 
+            **Pending:** ${counts.Pending} | 
+            **Processed:** ${counts.Processed} |
+            **Disabled:** ${counts.Disabled} |
+            **Deleted:** ${counts.Deleted}
+        `;
+    }
+
+    // --- API & Data Handling Functions ---
+
+    /**
+     * Initial fetch of all client data from the Render backend.
+     */
+    async function fetchAllClients() {
+      if (!API_BASE_URL || API_BASE_URL.includes("YOUR_RENDER_BACKEND_API_URL_HERE")) {
+          return showToast('Configuration Error: Please set your actual Render API URL in the HTML config.', 'error');
+      }
+      
+      loadingMessage.style.display = 'block';
+      noResultsDiv.style.display = 'none';
+      clientTableBody.innerHTML = '';
+      
+      try {
+        // NOTE: Authentication removed as per requirements (single-user dashboard)
+        const response = await fetch(`${API_BASE_URL}/clients/all`);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: `Server error, status: ${response.status}` }));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        // Ensure data array exists
+        allClientData = Array.isArray(result.data) ? result.data : [];
+        
+        filterAndSearch(); // Initial render uses filter logic on all data
+        showToast(`Successfully loaded ${allClientData.length} clients.`, 'success');
+      } catch (error) {
+        console.error("Error fetching all clients:", error);
+        showToast(`Failed to fetch clients: ${error.message}`, 'error');
+        noResultsDiv.style.display = 'block';
+      } finally {
+        loadingMessage.style.display = 'none';
+      }
+    }
+
+    /**
+     * Executes the API call to change a client's status, including mandatory notes.
+     * Updates the UI in-place by modifying the local state and re-rendering the filtered view.
+     */
+    async function changeClientStatus(clientId, newStatus, notes) {
+        const row = clientTableBody.querySelector(`tr[data-client-id="${clientId}"]`);
+        const originalHtml = row ? row.innerHTML : null;
+        
+        // Show row-level loading indicator
+        if (row) {
+             row.innerHTML = `<td colspan="9" style="text-align: center; color: var(--primary-color); padding: 0.5rem;">
+                <div class="loading-spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0 auto;"></div>
+                <small>Updating status...</small>
+            </td>`;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/clients/${clientId}/status/${newStatus}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // No Authorization header needed as per requirement 11
+                },
+                body: JSON.stringify({ notes }) 
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `Server error, status: ${response.status}` }));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            // --- Performance Optimization: In-Place UI/State Update ---
+            const clientIndex = allClientData.findIndex(c => c._id === clientId);
+            if (clientIndex > -1) {
+                // 1. Update the local data copy
+                allClientData[clientIndex].status = newStatus;
+                
+                // 2. Re-filter/Re-render the current view (fast, as it uses local data)
+                filterAndSearch(); 
+
+                // 3. Highlight the specific row (needs to be queried again after re-render)
+                const updatedRow = clientTableBody.querySelector(`tr[data-client-id="${clientId}"]`);
+                if (updatedRow) {
+                    updatedRow.classList.add('row-success');
+                    setTimeout(() => { updatedRow.classList.remove('row-success'); }, 2000); 
+                }
+            }
+            
+            showToast(`Status updated to ${newStatus}. Note: ${notes.substring(0, 30)}...`, 'success');
+
+        } catch (error) {
+            console.error("Error changing client status:", error);
+            showToast(`Failed to change status: ${error.message}`, 'error');
+            // Restore row content on error
+            if (row && originalHtml) {
+                row.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    /**
+     * Shows the mandatory notes modal and sets the unique confirmation handler.
+     */
+    function showNotesModal(action, clientId, newStatus) {
+        if (!notesModal) return;
+
+        modalTitle.innerText = `${action} Client Status`;
+        modalTextarea.placeholder = `Mandatory reason for changing status to '${newStatus}'.`;
+        modalTextarea.value = '';
+        notesModal.style.display = 'block';
+
+        setTimeout(() => { modalTextarea.focus(); }, 10); 
+
+        // Set the unique handler for this action
+        modalConfirmBtn.onclick = () => {
+            const notes = modalTextarea.value.trim();
+            if (!notes) {
+                showToast('Audit reason is required to proceed.', 'error');
+                return;
+            }
+
+            hideModal(); 
+            changeClientStatus(clientId, newStatus, notes);
+        };
+    }
+
+    /**
+     * Exports the *entire* loaded data set (`allClientData`) to a CSV file.
+     */
+    function exportToCsv() {
+        if (allClientData.length === 0) {
+            return showToast("No client data loaded to export.", 'error');
+        }
+        
+        const headers = ["ID", "Full Name", "Company", "Email", "Phone", "Status", "Date Created", "Active Months"];
+        
+        const data = allClientData.map(client => [
+            client._id || '',
+            client.fullName || '',
+            client.company || '',
+            client.email1 || '',
+            client.phone1 || '',
+            client.status || 'Pending',
+            client.vcardCreatedDate ? client.vcardCreatedDate.split('T')[0] : '',
+            calculateActiveMonths(client.vcardCreatedDate)
+        ]);
+
+        let csvContent = headers.join(",") + "\n";
+        data.forEach(row => {
+            // Proper CSV escaping: surround field with quotes, double inner quotes
+            const rowString = row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(",");
+            csvContent += rowString + "\n";
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `client_data_${new Date().toISOString().slice(0, 10)}.csv`);
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast(`Successfully exported ${allClientData.length} clients to CSV.`, 'success');
+    }
+
+    // --- Initialization and Event Listeners ---
+    function init() {
+      // Data Fetch on Load
+      fetchAllClients();
+
+      // Attach Search & Filter Handlers (using debounced function for input)
+      if (searchInput) searchInput.addEventListener('input', debouncedFilterAndSearch);
+      if (statusFilter) statusFilter.addEventListener('change', filterAndSearch);
+      if (document.getElementById('searchBtn')) document.getElementById('searchBtn').addEventListener('click', filterAndSearch);
+      
+      // Attach Action Handlers
+      if (exportBtn) exportBtn.addEventListener('click', exportToCsv);
+      
+      // Reset Handler
+      if (resetBtn) resetBtn.addEventListener('click', () => { 
+        searchInput.value = ''; 
+        statusFilter.value = ''; 
+        filterAndSearch(); // Triggers a re-render of all original data
+      });
+
+      // Modal Close Handlers (using direct element references)
+      if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideModal);
+      if (notesModal) {
+          window.addEventListener('click', (event) => {
+              if (event.target === notesModal) hideModal();
+          });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    // Expose required functions to the global scope for HTML inline calls (Action buttons)
+    window.showNotesModal = showNotesModal;
+  </script>
+</body>
+</html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SmartCardLink — vCard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/libs/fontawesome/all.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-bg">
+    <main class="vcard" id="vcard">
+
+      <div class="card-surface" id="popup1">
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner">
+          <div class="photo-area" id="photoArea"></div>
+          
+          <div class="personal-info">
+            <div id="fullName" class="full-name"></div>
+            <div id="jobName" class="job-name"></div>
+            <div id="titlePosition" class="title-position"></div>
+          </div>
+
+          <div class="contact-section">
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Phone:</div>
+                <div class="contact-primary-wrap">
+                  <span id="phoneMain" class="contact-primary"></span>
+                  <button id="phoneDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="phoneList" class="box-list" hidden></div>
+            </div>
+
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Email:</div>
+                <div class="contact-primary-wrap">
+                  <span id="emailMain" class="contact-primary"></span>
+                  <button id="emailDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="emailList" class="box-list" hidden></div>
+            </div>
+          </div>
+
+          <div class="actions-grid">
+            <div class="col">
+              <button id="callBtn" class="action-btn"><i class="fa fa-phone"></i> Call</button>
+              <button id="smsBtn" class="action-btn"><i class="fa fa-comment"></i> Message</button>
+              <button id="waBtn" class="action-btn"><i class="fa-brands fa-whatsapp"></i> Whatsapp</button>
+            </div>
+            <div class="col">
+              <button id="mailBtn" class="action-btn"><i class="fa fa-envelope"></i> Email</button>
+              <button id="printBtn" class="action-btn"><i class="fa fa-print"></i> Print</button>
+              <button id="saveBtn" class="action-btn"><i class="fa fa-address-card"></i> Save</button>
+            </div>
+          </div>
+
+          <div class="nav-row">
+            <button id="moreInfoBtn" class="more-info-btn">More Info</button>
+          </div>
+        </div>
+      </div>
+
+      <section id="popup2" class="popup" hidden>
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner card-scroll">
+          
+          <div class="about-header">
+            <div class="about-title">More About Me</div>
+            <div class="about-bio-box">
+              <div class="bio-label">Bio</div>
+              <div id="bioText" class="bio-text"></div>
+            </div>
+          </div>
+
+          <div class="links-grid-4">
+            <div class="links-col">
+              <button id="businessWebsite" class="link-btn">Business URL</button>
+              <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+            </div>
+            <div class="links-col">
+              <button id="locationMap" class="link-btn">Location Map</button>
+              <button id="physicalAddress" class="link-btn">Physical Address</button>
+            </div>
+          </div>
+
+          <div class="hours-section">
+            <table class="hours-table" id="hoursTable">
+              <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
+
+          <div class="social-grid">
+            <div class="col">
+              <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
+              <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
+              <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
+            </div>
+            <div class="col">
+              <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
+              <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
+              <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
+            </div>
+          </div>
+
+          <div class="nav-row">
+            <button id="backBtn" class="back-btn">Back</button>
+          </div>
+
+          <footer class="popup-footer">
+            <div class="powered">Powered by</div>
+            <div class="store">Perfect Parcels Store</div>
+            <div class="location-time">Nairobi, KENYA — <span id="liveTime"></span></div>
+          </footer>
+        </div>
+      </section>
+
+    </main>
+  </div>
+  <script src="/js/vcard.js" defer></script>
+</body>
+</html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Popup1</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="vcard">
+      <div class="card-surface" id="popup1">
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner">
+          <div class="photo-area" id="photoArea"></div>
+          <div class="personal-info">
+            <div id="fullName" class="full-name"></div>
+            <div id="jobName" class="job-name"></div>
+            <div id="titlePosition" class="title-position"></div>
+          </div>
+          <div class="contact-section">
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Phone:</div>
+                <div class="contact-primary-wrap">
+                  <span id="phoneMain" class="contact-primary"></span>
+                  <button id="phoneDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="phoneList" class="box-list" hidden></div>
+            </div>
+            <div class="contact-box">
+              <div class="box-main">
+                <div class="contact-label">Email:</div>
+                <div class="contact-primary-wrap">
+                  <span id="emailMain" class="contact-primary"></span>
+                  <button id="emailDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                </div>
+              </div>
+              <div id="emailList" class="box-list" hidden></div>
+            </div>
+          </div>
+          <div class="actions-grid">
+            <div class="col">
+              <button id="callBtn" class="action-btn"><i class="fa fa-phone"></i> Call</button>
+              <button id="smsBtn" class="action-btn"><i class="fa fa-comment"></i> Message</button>
+              <button id="waBtn" class="action-btn"><i class="fa-brands fa-whatsapp"></i> Whatsapp</button>
+            </div>
+            <div class="col">
+              <button id="mailBtn" class="action-btn"><i class="fa fa-envelope"></i> Email</button>
+              <button id="printBtn" class="action-btn"><i class="fa fa-print"></i> Print</button>
+              <button id="saveBtn" class="action-btn"><i class="fa fa-address-card"></i> Save</button>
+            </div>
+          </div>
+          <div class="nav-row">
+            <button id="moreInfoBtn" class="more-info-btn">More Info</button>
+          </div>
+        </div>
+      </div>
+  </div>
+</body>
+</html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Popup2</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="vcard">
+      <section id="popup2" class="popup">
+        <div class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner card-scroll">
+          <div class="about-header">
+            <div class="about-title">More About Me</div>
+            <div class="about-bio-box">
+              <div class="bio-label">Bio</div>
+              <div id="bioText" class="bio-text"></div>
+            </div>
+          </div>
+          <div class="links-grid-4">
+            <div class="links-col">
+              <button id="businessWebsite" class="link-btn">Business URL</button>
+              <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+            </div>
+            <div class="links-col">
+              <button id="locationMap" class="link-btn">Location Map</button>
+              <button id="physicalAddress" class="link-btn">Physical Address</button>
+            </div>
+          </div>
+          <div class="hours-section">
+            <table class="hours-table" id="hoursTable">
+              <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
+          <div class="social-grid">
+            <div class="col">
+              <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
+              <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
+              <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
+            </div>
+            <div class="col">
+              <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
+              <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
+              <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
+            </div>
+          </div>
+          <div class="nav-row">
+            <button id="backBtn" class="back-btn">Back</button>
+          </div>
+          <footer class="popup-footer">
+            <div class="powered">Powered by</div>
+            <div class="store">Perfect Parcels Store</div>
+            <div class="location-time">Nairobi, Kenya â€” <span id="liveTime"></span></div>
+          </footer>
+        </div>
+      </section>
+  </div>
+</body>
+</html>
+// public/js/vcard.js - POPUP SIZE FIX & DYNAMIC HOURS
+(function () {
+  'use strict';
+
+  const el = id => document.getElementById(id);
+
+  // DOM References
+  const popup1 = el('popup1');
+  const popup2 = el('popup2');
+  const photoArea = el('photoArea');
+
+  // Text Fields
+  const fullName = el('fullName');
+  const jobName = el('jobName');
+  const titlePosition = el('titlePosition');
+  const phoneMain = el('phoneMain');
+  const emailMain = el('emailMain');
+
+  // Lists
+  const phoneList = el('phoneList');
+  const emailList = el('emailList');
+  const phoneDropdownBtn = el('phoneDropdownBtn');
+  const emailDropdownBtn = el('emailDropdownBtn');
+
+  // Action Buttons (Popup1)
+  const actions = {
+    call: el('callBtn'),
+    sms: el('smsBtn'),
+    wa: el('waBtn'),
+    mail: el('mailBtn'),
+    print: el('printBtn'),
+    save: el('saveBtn')
+  };
+
+  // Popup2 Action Buttons
+  const buttons = {
+    moreInfo: el('moreInfoBtn'),
+    back: el('backBtn'),
+    book: el('bookAppointmentBtn'),
+    business: el('businessWebsite'),
+    portfolio: el('portfolioWebsite'),
+    location: el('locationMap'),
+    physical: el('physicalAddress'),
+    facebook: el('facebookBtn'),
+    instagram: el('instagramBtn'),
+    x: el('xBtn'),
+    linkedin: el('linkedinBtn'),
+    tiktok: el('tiktokBtn'),
+    youtube: el('youtubeBtn')
+  };
+
+  // Popup2 Fields
+  const bioText = el('bioText');
+  const liveTime = el('liveTime');
+  const hoursTable = document.querySelector('#hoursTable tbody');
+
+  // UTILS
+  function setHidden(node, hidden) {
+    if (!node) return;
+    if (hidden) {
+      node.setAttribute('hidden', '');
+      node.setAttribute('aria-hidden', 'true');
+    } else {
+      node.removeAttribute('hidden');
+      node.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  function alertMsg(msg) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({ title: msg, icon: 'info', confirmButtonColor: '#FFD700' });
+    } else {
+      alert(msg);
+    }
+  }
+
+  async function fetchProfileData() {
+    try {
+      const res = await fetch('/api/clients/all');
+      if (!res.ok) throw new Error('API Error');
+      const json = await res.json();
+      return (json.data && json.data.length > 0) ? json.data[0] : null;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  }
+
+  function renderPhoto(url) {
+    photoArea.innerHTML = '';
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url; // Treated verbatim as Cloudinary public URL
+      img.alt = "Profile";
+      img.onerror = () => { photoArea.innerHTML = '<div class="not-provided">Photo not provided</div>'; };
+      photoArea.appendChild(img);
+    } else {
+      photoArea.innerHTML = '<div class="not-provided">Photo not provided</div>';
+    }
+  }
+
+  function buildList(container, items, type) {
+    container.innerHTML = '';
+    const validItems = (items || []).filter(i => i && i.trim());
+    if (validItems.length === 0) {
+      const div = document.createElement('div');
+      div.className = 'list-item disabled';
+      div.textContent = 'No additional contacts';
+      container.appendChild(div);
+      return;
+    }
+    validItems.forEach(val => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      div.textContent = val;
+      div.onclick = () => {
+        if (!div.classList.contains('disabled')) {
+          if (type === 'phone') window.location.href = `tel:${val.replace(/\s+/g,'')}`;
+          if (type === 'email') window.location.href = `mailto:${val}`;
+        }
+      };
+      container.appendChild(div);
+    });
+  }
+
+  function renderHours(hours) {
+    if (!hoursTable) return;
+    hoursTable.innerHTML = '';
+    
+    if (!hours || Object.keys(hours).length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="3">Hours not provided</td>`;
+      hoursTable.appendChild(tr);
+      return;
+    }
+
+    const days = [
+      { label: 'Mon–Fri', start: hours.monFriStart, end: hours.monFriEnd },
+      { label: 'Sat', start: hours.satStart, end: hours.satEnd },
+      { label: 'Sun', start: hours.sunStart, end: hours.sunEnd }
+    ];
+
+    days.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.label}</td><td>${d.start || '-'}</td><td>${d.end || '-'}</td>`;
+      hoursTable.appendChild(tr);
+    });
+  }
+
+  function setupPopup1Actions(client) {
+    const phone = client.phone1;
+    const email = client.email1;
+
+    actions.call.onclick = () => {
+      if(phone) window.location.href = `tel:${phone}`;
+      else alertMsg("Phone Not Provided");
+    };
+    
+    actions.sms.onclick = () => {
+      if(phone) window.location.href = `sms:${phone}`;
+      else alertMsg("Phone Not Provided");
+    };
+
+    actions.wa.onclick = () => {
+      if(phone) {
+        const digits = phone.replace(/\D/g, '');
+        window.open(`https://wa.me/${digits}`, '_blank');
+      } else {
+        alertMsg("Phone Not Provided");
+      }
+    };
+
+    actions.mail.onclick = () => {
+      if(email) window.location.href = `mailto:${email}`;
+      else alertMsg("Email Not Provided");
+    };
+
+    actions.print.onclick = () => window.print();
+
+    actions.save.onclick = () => {
+      if(client.vcfDownloadUrl) window.location.href = client.vcfDownloadUrl;
+      else alertMsg("Download link unavailable");
+    };
+  }
+
+  function setupPopup2Buttons(client) {
+    const openOrAlert = (url, fallback='URL Not Provided') => {
+      if (url && url.trim()) window.open(url, '_blank');
+      else alertMsg(fallback);
+    };
+
+    buttons.business.onclick = () => openOrAlert(client.businessUrl);
+    buttons.portfolio.onclick = () => openOrAlert(client.portfolioUrl);
+    buttons.location.onclick = () => openOrAlert(client.locationUrl, 'Location Not Provided');
+    buttons.physical.onclick = () => alertMsg(client.physicalAddress || 'Address Not Provided');
+
+    buttons.facebook.onclick = () => openOrAlert(client.facebookUrl);
+    buttons.instagram.onclick = () => openOrAlert(client.instagramUrl);
+    buttons.x.onclick = () => openOrAlert(client.xUrl);
+    buttons.linkedin.onclick = () => openOrAlert(client.linkedinUrl);
+    buttons.tiktok.onclick = () => openOrAlert(client.tiktokUrl);
+    buttons.youtube.onclick = () => openOrAlert(client.youtubeUrl);
+
+    buttons.book.onclick = () => {
+      const title = encodeURIComponent(client.fullName || 'Appointment');
+      const details = encodeURIComponent(client.bio || '');
+      const location = encodeURIComponent(client.physicalAddress || '');
+      const start = client.appointmentStart || '';
+      const end = client.appointmentEnd || '';
+      let url = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+      if(title) url += `&text=${title}`;
+      if(details) url += `&details=${details}`;
+      if(location) url += `&location=${location}`;
+      if(start) url += `&dates=${start.replace(/-|:|T/g,'')}Z/${end.replace(/-|:|T/g,'')}Z`;
+      window.open(url, '_blank');
+    };
+  }
+
+  async function init() {
+    const client = await fetchProfileData();
+
+    if (client) {
+      renderPhoto(client.photoUrl);
+      fullName.textContent = client.fullName || '';
+      jobName.textContent = client.company || '';
+      titlePosition.textContent = client.title || '';
+      phoneMain.textContent = client.phone1 || 'Not Provided';
+      emailMain.textContent = client.email1 || 'Not Provided';
+      buildList(phoneList, [client.phone2, client.phone3], 'phone');
+      buildList(emailList, [client.email2, client.email3], 'email');
+
+      bioText.textContent = client.bio || 'No bio provided.';
+      renderHours(client.workingHours);
+      setupPopup1Actions(client);
+      setupPopup2Buttons(client);
+    }
+
+    [ [phoneDropdownBtn, phoneList], [emailDropdownBtn, emailList] ].forEach(([btn, list]) => {
+      if(!btn) return;
+      setHidden(list, true);
+      btn.onclick = () => {
+        const hidden = list.hasAttribute('hidden');
+        setHidden(list, !hidden);
+        btn.querySelector('i').className = hidden ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
+      };
+    });
+
+    // Popup Navigation & Sizing Logic (FIXED)
+    buttons.moreInfo.onclick = () => {
+      // 1. Measure the current height of Popup1
+      const height = popup1.offsetHeight;
+      
+      // 2. Freeze the main container (pulse wrapper) height
+      // This ensures the pulse animation doesn't shrink or jump
+      el('vcard').style.height = height + 'px';
+
+      // 3. Force Popup2 to match this exact height
+      popup2.style.height = height + 'px';
+      
+      setHidden(popup1, true);
+      setHidden(popup2, false);
+      
+      // 4. Ensure content starts at top
+      popup2.scrollTop = 0;
+    };
+    
+    buttons.back.onclick = () => {
+      setHidden(popup2, true);
+      setHidden(popup1, false);
+      // Optional: Release fixed height if needed, but keeping it is stable
+    };
+
+    // Live Time Update
+    setInterval(() => {
+      if(liveTime) {
+        const options = { 
+          day: 'numeric', month: 'short', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit', second: '2-digit', 
+          hour12: false, timeZone: 'Africa/Nairobi' 
+        };
+        const dateStr = new Date().toLocaleString('en-GB', options);
+        liveTime.textContent = dateStr.replace(',', ' —');
+      }
+    }, 1000);
+
+    setHidden(popup1, false);
+    setHidden(popup2, true);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+
+})();
+// server/models/Profile.js
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
+
+const ProfileSchema = new Schema({
+  name: { type: String, required: true },
+  title: { type: String }, // e.g., CEO, Founder
+  company: { type: String },
+  
+  // Phones and emails
+  phone1: { type: String },
+  phone2: { type: String },
+  phone3: { type: String },
+  email1: { type: String },
+  email2: { type: String },
+  email3: { type: String },
+  
+  photoURL: { type: String }, // Profile photo
+  
+  bio: { type: String },
+  businessWebsite: { type: String },
+  portfolioWebsite: { type: String },
+  locationMapURL: { type: String },
+  
+  socialLinks: {
+    facebook: String,
+    instagram: String,
+    x: String,
+    linkedin: String,
+    tiktok: String,
+    youtube: String
+  },
+  
+  workingHours: {
+    monFriStart: String,
+    monFriEnd: String,
+    satStart: String,
+    satEnd: String,
+    sunStart: String,
+    sunEnd: String
+  },
+  
+  cardDesign: { type: String }, // Selected design
+  card_url: { type: String },   // Generated card URL (if any)
+  
+  createdAt: { type: Date, default: Date.now }
+});
+
+// Prevent model overwrite error in watch mode / nodemon
+module.exports = mongoose.models.Profile || mongoose.model('Profile', ProfileSchema);

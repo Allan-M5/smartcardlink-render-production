@@ -349,16 +349,16 @@
     };
 
     // social links
-    ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k => {
-      const v = formData.get(k)?.trim();
-      if (v) payload.socialLinks[k] = v;
+    ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k => { 
+      const v = formData.get(k)?.trim(); 
+      if (v) payload.socialLinks[k] = v; 
     });
 
-    // working hours (server expects monFriStart etc.)
-    ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
-      const v = formData.get(k);
-      if (v && v.trim) payload.workingHours[k] = v.trim();
-    });
+    // CRITICAL FIX: Add working hours population to ensure server receives the structure
+    ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(k => { 
+      const v = formData.get(k)?.trim(); 
+      if (v) payload.workingHours[k] = v; 
+    }); 
 
     // validation
     if (!payload.fullName || !payload.phone1 || !payload.email1 || !payload.company) {

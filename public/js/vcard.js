@@ -1,292 +1,421 @@
-﻿// public/js/vcard.js - POPUP SIZE FIX & DYNAMIC HOURS
+﻿// public/js/vcard.js - VCard Data Fetch and Logic
 (function () {
-  'use strict';
+  'use strict';
 
-  const el = id => document.getElementById(id);
+  // CRITICAL FIX: Use the explicit API root or window.location.origin for consistency
+  // Using window.location.origin is generally best practice for connected frontends/backends
+  const API_ROOT = window.location.origin; 
+  const el = id => document.getElementById(id);
 
-  // DOM References
-  const popup1 = el('popup1');
-  const popup2 = el('popup2');
-  const photoArea = el('photoArea');
+  // DOM References
+  const vcardContainer = el('vcard'); // Assuming the main wrapper has this ID for full control
+  const popup1 = el('popup1');
+  const popup2 = el('popup2');
+  const photoArea = el('photoArea');
 
-  // Text Fields
-  const fullName = el('fullName');
-  const jobName = el('jobName');
-  const titlePosition = el('titlePosition');
-  const phoneMain = el('phoneMain');
-  const emailMain = el('emailMain');
+  // Text Fields
+  const fullName = el('fullName');
+  const jobName = el('jobName');
+  const titlePosition = el('titlePosition');
+  const phoneMain = el('phoneMain');
+  const emailMain = el('emailMain');
 
-  // Lists
-  const phoneList = el('phoneList');
-  const emailList = el('emailList');
-  const phoneDropdownBtn = el('phoneDropdownBtn');
-  const emailDropdownBtn = el('emailDropdownBtn');
+  // Lists
+  const phoneList = el('phoneList');
+  const emailList = el('emailList');
+  const phoneDropdownBtn = el('phoneDropdownBtn');
+  const emailDropdownBtn = el('emailDropdownBtn');
 
-  // Action Buttons (Popup1)
-  const actions = {
-    call: el('callBtn'),
-    sms: el('smsBtn'),
-    wa: el('waBtn'),
-    mail: el('mailBtn'),
-    print: el('printBtn'),
-    save: el('saveBtn')
-  };
+  // Action Buttons (Popup1)
+  const actions = {
+    call: el('callBtn'),
+    sms: el('smsBtn'),
+    wa: el('waBtn'),
+    mail: el('mailBtn'),
+    print: el('printBtn'),
+    save: el('saveBtn')
+  };
 
-  // Popup2 Action Buttons
-  const buttons = {
-    moreInfo: el('moreInfoBtn'),
-    back: el('backBtn'),
-    book: el('bookAppointmentBtn'),
-    business: el('businessWebsite'),
-    portfolio: el('portfolioWebsite'),
-    location: el('locationMap'),
-    physical: el('physicalAddress'),
-    facebook: el('facebookBtn'),
-    instagram: el('instagramBtn'),
-    x: el('xBtn'),
-    linkedin: el('linkedinBtn'),
-    tiktok: el('tiktokBtn'),
-    youtube: el('youtubeBtn')
-  };
+  // Popup2 Action Buttons
+  const buttons = {
+    moreInfo: el('moreInfoBtn'),
+    back: el('backBtn'),
+    book: el('bookAppointmentBtn'),
+    business: el('businessWebsite'),
+    portfolio: el('portfolioWebsite'),
+    location: el('locationMap'),
+    physical: el('physicalAddress'),
+    facebook: el('facebookBtn'),
+    instagram: el('instagramBtn'),
+    x: el('xBtn'),
+    linkedin: el('linkedinBtn'),
+    tiktok: el('tiktokBtn'),
+    youtube: el('youtubeBtn')
+  };
 
-  // Popup2 Fields
-  const bioText = el('bioText');
-  const liveTime = el('liveTime');
-  const hoursTable = document.querySelector('#hoursTable tbody');
+  // Popup2 Fields
+  const bioText = el('bioText');
+  const liveTime = el('liveTime');
+  const hoursTable = document.querySelector('#hoursTable tbody');
 
-  // UTILS
-  function setHidden(node, hidden) {
-    if (!node) return;
-    if (hidden) {
-      node.setAttribute('hidden', '');
-      node.setAttribute('aria-hidden', 'true');
-    } else {
-      node.removeAttribute('hidden');
-      node.setAttribute('aria-hidden', 'false');
-    }
-  }
+  // --- UTILITY FUNCTIONS ---
+  function setHidden(node, hidden) {
+    if (!node) return;
+    // Using 'display: none' for clean UI toggling
+    node.style.display = hidden ? 'none' : 'block';
+    node.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+  }
 
-  function alertMsg(msg) {
-    if (typeof Swal !== 'undefined') {
-      Swal.fire({ title: msg, icon: 'info', confirmButtonColor: '#FFD700' });
-    } else {
-      alert(msg);
-    }
-  }
+  function alertMsg(msg) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({ title: msg, icon: 'info', confirmButtonColor: '#FFD700' });
+    } else {
+      alert(msg);
+    }
+  }
+  
+  /**
+   * Manages global messages (loading, success, error) at the top of the VCard.
+   */
+  function showMessage(msg, isError = false) {
+    if (!vcardContainer) return;
 
-  async function fetchProfileData() {
-    try {
-      const res = await fetch('/api/clients/all');
-      if (!res.ok) throw new Error('API Error');
-      const json = await res.json();
-      return (json.data && json.data.length > 0) ? json.data[0] : null;
-    } catch (err) {
-      console.error(err);
-      return null;
-    }
-  }
+    // Hide main content popups
+    setHidden(popup1, true);
+    setHidden(popup2, true);
 
-  function renderPhoto(url) {
-    photoArea.innerHTML = '';
-    if (url) {
-      const img = document.createElement('img');
-      img.src = url; // Treated verbatim as Cloudinary public URL
-      img.alt = "Profile";
-      img.onerror = () => { photoArea.innerHTML = '<div class="not-provided">Photo not provided</div>'; };
-      photoArea.appendChild(img);
-    } else {
-      photoArea.innerHTML = '<div class="not-provided">Photo not provided</div>';
-    }
-  }
+    let msgEl = el('messageArea'); 
+    if (!msgEl) {
+        msgEl = document.createElement('div');
+        msgEl.id = 'messageArea';
+        msgEl.style.cssText = 'text-align: center; padding: 20px;';
+        vcardContainer.prepend(msgEl);
+    }
+    msgEl.style.color = isError ? '#ef4444' : '#FFD700';
+    msgEl.innerHTML = `<h3 style="margin: 0; padding: 0;">${msg}</h3>`;
+    setHidden(msgEl, false);
+  }
 
-  function buildList(container, items, type) {
-    container.innerHTML = '';
-    const validItems = (items || []).filter(i => i && i.trim());
-    if (validItems.length === 0) {
-      const div = document.createElement('div');
-      div.className = 'list-item disabled';
-      div.textContent = 'No additional contacts';
-      container.appendChild(div);
-      return;
-    }
-    validItems.forEach(val => {
-      const div = document.createElement('div');
-      div.className = 'list-item';
-      div.textContent = val;
-      div.onclick = () => {
-        if (!div.classList.contains('disabled')) {
-          if (type === 'phone') window.location.href = `tel:${val.replace(/\s+/g,'')}`;
-          if (type === 'email') window.location.href = `mailto:${val}`;
-        }
-      };
-      container.appendChild(div);
-    });
-  }
+  /**
+   * Checks if a URL is non-empty and starts with http(s).
+   * @param {string} url 
+   * @returns {boolean}
+   */
+  function isValidUrl(url) {
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+        return false;
+    }
+    const lowerUrl = url.toLowerCase();
+    return lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
+  }
+  
+  /**
+   * Handles opening a social media link with validation and logging.
+   * @param {string} url 
+   * @param {string} platform 
+   */
+  function openSocialLink(url, platform) {
+      if (isValidUrl(url)) {
+          window.open(url, '_blank');
+      } else {
+          alertMsg(`${platform} URL Not Provided or Invalid`);
+      }
+  }
 
-  function renderHours(hours) {
-    if (!hoursTable) return;
-    hoursTable.innerHTML = '';
-    
-    if (!hours || Object.keys(hours).length === 0) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="3">Hours not provided</td>`;
-      hoursTable.appendChild(tr);
-      return;
-    }
+  // --- DATA FETCHING ---
+  async function fetchProfileData() {
+    try {
+      // Extract the slug from the URL path (e.g., if path is /john-doe, slug is john-doe)
+      const pathSegments = window.location.pathname.split('/').filter(s => s.length > 0);
+      const clientSlug = pathSegments.pop(); // Get the last segment
+      
+      if (!clientSlug) {
+          throw new Error('VCard not found. Invalid URL.');
+      }
 
-    const days = [
-      { label: 'Mon–Fri', start: hours.monFriStart, end: hours.monFriEnd },
-      { label: 'Sat', start: hours.satStart, end: hours.satEnd },
-      { label: 'Sun', start: hours.sunStart, end: hours.sunEnd }
-    ];
+      // Display loading state
+      showMessage(`
+        <span class="loading-spinner" style="
+            border: 3px solid #f3f3f3; border-top: 3px solid #FFD700; 
+            border-radius: 50%; width: 16px; height: 16px; 
+            animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; 
+            margin-right: 5px;"></span>
+        Loading VCard...
+      `);
+      
+      // CRITICAL FIX: Use the specific API slug endpoint
+      const res = await fetch(`${API_ROOT}/api/clients/slug/${clientSlug}`); 
+      
+      if (!res.ok) {
+          throw new Error('Network error or server unavailable.');
+      }
+      
+      const json = await res.json();
+      
+      if (json.status !== 'success' || !json.data) {
+          // Use the message from the API if provided
+          const msg = json.message || 'Card not found or currently inactive.';
+          throw new Error(msg); 
+      }
+      
+      // Hide message area on success
+      setHidden(el('messageArea'), true); 
 
-    days.forEach(d => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${d.label}</td><td>${d.start || '-'}</td><td>${d.end || '-'}</td>`;
-      hoursTable.appendChild(tr);
-    });
-  }
+      return json.data || null; 
+      
+    } catch (err) {
+      console.error("Error fetching profile data:", err);
+      showMessage(err.message || 'Failed to load profile data.', true);
+      return null;
+    }
+  }
 
-  function setupPopup1Actions(client) {
-    const phone = client.phone1;
-    const email = client.email1;
+  // --- RENDERING FUNCTIONS ---
 
-    actions.call.onclick = () => {
-      if(phone) window.location.href = `tel:${phone}`;
-      else alertMsg("Phone Not Provided");
-    };
-    
-    actions.sms.onclick = () => {
-      if(phone) window.location.href = `sms:${phone}`;
-      else alertMsg("Phone Not Provided");
-    };
+  function renderPhoto(url) {
+    if (!photoArea) return;
+    photoArea.innerHTML = '';
+    const defaultPhoto = '/public/images/default-photo.png';
+    
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url; 
+      img.alt = "Profile Photo";
+      // Fallback to a default image on error
+      img.onerror = () => { img.src = defaultPhoto; }; 
+      photoArea.appendChild(img);
+    } else {
+      photoArea.innerHTML = `<img src="${defaultPhoto}" alt="Default Profile Photo">`;
+    }
+  }
 
-    actions.wa.onclick = () => {
-      if(phone) {
-        const digits = phone.replace(/\D/g, '');
-        window.open(`https://wa.me/${digits}`, '_blank');
-      } else {
-        alertMsg("Phone Not Provided");
-      }
-    };
+  function buildList(container, items, type) {
+    if (!container) return;
+    container.innerHTML = '';
+    
+    const validItems = (items || []).filter(i => i && i.trim()); 
+    if (validItems.length === 0) {
+      const div = document.createElement('div');
+      div.className = 'list-item disabled';
+      div.textContent = 'No additional contacts';
+      container.appendChild(div);
+      return;
+    }
 
-    actions.mail.onclick = () => {
-      if(email) window.location.href = `mailto:${email}`;
-      else alertMsg("Email Not Provided");
-    };
+    validItems.forEach(val => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      div.textContent = val;
+      div.onclick = () => {
+        if (type === 'phone') window.location.href = `tel:${val.replace(/\s+/g,'')}`;
+        if (type === 'email') window.location.href = `mailto:${val}`;
+      };
+      container.appendChild(div);
+    });
+  }
 
-    actions.print.onclick = () => window.print();
+  function renderHours(hours) {
+    if (!hoursTable) return;
+    hoursTable.innerHTML = '';
+    
+    // Determine if the whole table should be hidden
+    const hasHours = hours && Object.values(hours).some(h => h && h.trim());
+    const hoursSection = el('hoursSection'); // Assuming there is a wrapper for the table
+    if (!hasHours) {
+      if (hoursSection) setHidden(hoursSection, true);
+      return;
+    }
+    if (hoursSection) setHidden(hoursSection, false);
 
-    actions.save.onclick = () => {
-      if(client.vcfDownloadUrl) window.location.href = client.vcfDownloadUrl;
-      else alertMsg("Download link unavailable");
-    };
-  }
+    const days = [
+      { label: 'Mon–Fri', start: hours.monFriStart, end: hours.monFriEnd },
+      { label: 'Sat', start: hours.satStart, end: hours.satEnd },
+      { label: 'Sun', start: hours.sunStart, end: hours.sunEnd }
+    ];
 
-  function setupPopup2Buttons(client) {
-    const openOrAlert = (url, fallback='URL Not Provided') => {
-      if (url && url.trim()) window.open(url, '_blank');
-      else alertMsg(fallback);
-    };
+    days.forEach(d => {
+      const tr = document.createElement('tr');
+      // Display '-' if data is missing for start or end time
+      tr.innerHTML = `<td>${d.label}</td><td>${d.start || '-'}</td><td>${d.end || '-'}</td>`;
+      hoursTable.appendChild(tr);
+    });
+  }
 
-    buttons.business.onclick = () => openOrAlert(client.businessUrl);
-    buttons.portfolio.onclick = () => openOrAlert(client.portfolioUrl);
-    buttons.location.onclick = () => openOrAlert(client.locationUrl, 'Location Not Provided');
-    buttons.physical.onclick = () => alertMsg(client.physicalAddress || 'Address Not Provided');
+  // --- ACTION SETUP ---
 
-    buttons.facebook.onclick = () => openOrAlert(client.facebookUrl);
-    buttons.instagram.onclick = () => openOrAlert(client.instagramUrl);
-    buttons.x.onclick = () => openOrAlert(client.xUrl);
-    buttons.linkedin.onclick = () => openOrAlert(client.linkedinUrl);
-    buttons.tiktok.onclick = () => openOrAlert(client.tiktokUrl);
-    buttons.youtube.onclick = () => openOrAlert(client.youtubeUrl);
+  function setupPopup1Actions(client) {
+    const phone = client.phone1;
+    const email = client.email1;
+    const vcfDownloadUrl = client.vcardUrl; 
 
-    buttons.book.onclick = () => {
-      const title = encodeURIComponent(client.fullName || 'Appointment');
-      const details = encodeURIComponent(client.bio || '');
-      const location = encodeURIComponent(client.physicalAddress || '');
-      const start = client.appointmentStart || '';
-      const end = client.appointmentEnd || '';
-      let url = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-      if(title) url += `&text=${title}`;
-      if(details) url += `&details=${details}`;
-      if(location) url += `&location=${location}`;
-      if(start) url += `&dates=${start.replace(/-|:|T/g,'')}Z/${end.replace(/-|:|T/g,'')}Z`;
-      window.open(url, '_blank');
-    };
-  }
+    // Helper to disable/enable buttons based on data availability
+    const setAction = (btn, callback, condition) => {
+      if (!btn) return;
+      if (condition) {
+        btn.onclick = callback;
+        btn.classList.remove('disabled');
+      } else {
+        btn.onclick = () => alertMsg(btn.textContent + " is not provided");
+        btn.classList.add('disabled');
+      }
+    };
 
-  async function init() {
-    const client = await fetchProfileData();
+    setAction(actions.call, () => window.location.href = `tel:${phone}`, phone);
+    setAction(actions.sms, () => window.location.href = `sms:${phone}`, phone);
+    setAction(actions.mail, () => window.location.href = `mailto:${email}`, email);
 
-    if (client) {
-      renderPhoto(client.photoUrl);
-      fullName.textContent = client.fullName || '';
-      jobName.textContent = client.company || '';
-      titlePosition.textContent = client.title || '';
-      phoneMain.textContent = client.phone1 || 'Not Provided';
-      emailMain.textContent = client.email1 || 'Not Provided';
-      buildList(phoneList, [client.phone2, client.phone3], 'phone');
-      buildList(emailList, [client.email2, client.email3], 'email');
+    setAction(actions.wa, () => {
+      const digits = phone.replace(/\D/g, '');
+      window.open(`https://wa.me/${digits}`, '_blank');
+    }, phone);
 
-      bioText.textContent = client.bio || 'No bio provided.';
-      renderHours(client.workingHours);
-      setupPopup1Actions(client);
-      setupPopup2Buttons(client);
-    }
+    setAction(actions.save, () => window.location.href = vcfDownloadUrl, vcfDownloadUrl);
 
-    [ [phoneDropdownBtn, phoneList], [emailDropdownBtn, emailList] ].forEach(([btn, list]) => {
-      if(!btn) return;
-      setHidden(list, true);
-      btn.onclick = () => {
-        const hidden = list.hasAttribute('hidden');
-        setHidden(list, !hidden);
-        btn.querySelector('i').className = hidden ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
-      };
-    });
+    // Print button is always active
+    if(actions.print) actions.print.onclick = () => window.print();
+  }
 
-    // Popup Navigation & Sizing Logic (FIXED)
-    buttons.moreInfo.onclick = () => {
-      // 1. Measure the current height of Popup1
-      const height = popup1.offsetHeight;
-      
-      // 2. Freeze the main container (pulse wrapper) height
-      // This ensures the pulse animation doesn't shrink or jump
-      el('vcard').style.height = height + 'px';
+  function setupPopup2Buttons(client) {
+    const socialLinks = client.socialLinks || {};
 
-      // 3. Force Popup2 to match this exact height
-      popup2.style.height = height + 'px';
-      
-      setHidden(popup1, true);
-      setHidden(popup2, false);
-      
-      // 4. Ensure content starts at top
-      popup2.scrollTop = 0;
-    };
-    
-    buttons.back.onclick = () => {
-      setHidden(popup2, true);
-      setHidden(popup1, false);
-      // Optional: Release fixed height if needed, but keeping it is stable
-    };
+    // Helper for non-social URLs
+    const openOrAlert = (btn, url, fallback='URL Not Provided') => {
+      if (!btn) return;
+      if (url && url.trim()) {
+        btn.onclick = () => window.open(url, '_blank');
+        btn.classList.remove('disabled');
+      } else {
+        btn.onclick = () => alertMsg(fallback);
+        btn.classList.add('disabled');
+      }
+    };
+    
+    // Helper for social links
+    const setSocialAction = (btn, platformKey, platformName) => {
+      if (!btn) return;
+      const url = socialLinks[platformKey];
+      if (url && url.trim()) {
+        btn.onclick = () => openSocialLink(url, platformName);
+        btn.classList.remove('disabled');
+      } else {
+        btn.onclick = () => alertMsg(`${platformName} Not Provided`);
+        btn.classList.add('disabled');
+      }
+    };
 
-    // Live Time Update
-    setInterval(() => {
-      if(liveTime) {
-        const options = { 
-          day: 'numeric', month: 'short', year: 'numeric', 
-          hour: '2-digit', minute: '2-digit', second: '2-digit', 
-          hour12: false, timeZone: 'Africa/Nairobi' 
-        };
-        const dateStr = new Date().toLocaleString('en-GB', options);
-        liveTime.textContent = dateStr.replace(',', ' —');
-      }
-    }, 1000);
+    // Website Links
+    openOrAlert(buttons.business, client.businessWebsite || client.website, 'Business Website Not Provided'); 
+    openOrAlert(buttons.portfolio, client.portfolioWebsite, 'Portfolio Website Not Provided');
+    openOrAlert(buttons.location, client.locationMap, 'Location Map Not Provided');
+    
+    // Physical Address (is just information, so alert text content)
+    if(buttons.physical) {
+      const address = client.address;
+      if(address) {
+        buttons.physical.onclick = () => alertMsg(address);
+        buttons.physical.classList.remove('disabled');
+      } else {
+        buttons.physical.onclick = () => alertMsg('Physical Address Not Provided');
+        buttons.physical.classList.add('disabled');
+      }
+    }
 
-    setHidden(popup1, false);
-    setHidden(popup2, true);
-  }
+    // Social Media Buttons
+    setSocialAction(buttons.facebook, 'facebook', 'Facebook');
+    setSocialAction(buttons.instagram, 'instagram', 'Instagram');
+    setSocialAction(buttons.x, 'twitter', 'X (Twitter)'); // Maps 'xBtn' to 'twitter' schema field
+    setSocialAction(buttons.linkedin, 'linkedin', 'LinkedIn');
+    setSocialAction(buttons.tiktok, 'tiktok', 'TikTok');
+    setSocialAction(buttons.youtube, 'youtube', 'YouTube');
 
-  document.addEventListener('DOMContentLoaded', init);
+    // Book Appointment Logic (Assumes presence of an appointment link)
+    if (buttons.book) {
+      openOrAlert(buttons.book, client.appointmentLink, 'Appointment Link Not Provided');
+    }
+  }
+
+  // --- INITIALIZATION ---
+  async function init() {
+    const client = await fetchProfileData();
+
+    if (client) {
+      // Populate Popup 1 Data
+      renderPhoto(client.photoUrl);
+      fullName.textContent = client.fullName || '';
+      jobName.textContent = client.company || '';
+      titlePosition.textContent = client.title || '';
+      
+      phoneMain.textContent = client.phone1 || 'Not Provided';
+      phoneMain.href = client.phone1 ? `tel:${client.phone1}` : '#';
+      
+      emailMain.textContent = client.email1 || 'Not Provided';
+      emailMain.href = client.email1 ? `mailto:${client.email1}` : '#';
+
+      // Additional Contacts
+      // Filter out falsy values like null/undefined/empty string from phone2/3, email2/3
+      buildList(phoneList, [client.phone2, client.phone3].filter(Boolean), 'phone');
+      buildList(emailList, [client.email2, client.email3].filter(Boolean), 'email');
+
+      // Populate Popup 2 Data
+      bioText.textContent = client.bio || 'No bio provided.';
+      renderHours(client.workingHours);
+      
+      // Setup all buttons
+      setupPopup1Actions(client);
+      setupPopup2Buttons(client);
+
+      // Show the main VCard popup
+      setHidden(popup1, false);
+      setHidden(popup2, true);
+    }
+
+    // Dropdown Toggles (Kept intact)
+    [ [phoneDropdownBtn, phoneList], [emailDropdownBtn, emailList] ].forEach(([btn, list]) => {
+      if(!btn || !list) return;
+      setHidden(list, true);
+      btn.onclick = () => {
+        const isHidden = list.style.display === 'none';
+        setHidden(list, !isHidden);
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = isHidden ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
+      };
+    });
+
+    // Popup Navigation & Sizing Logic (Kept intact)
+    if (buttons.moreInfo && popup1 && popup2) {
+      buttons.moreInfo.onclick = () => {
+        // Set dynamic height for a smoother transition
+        const height = popup1.offsetHeight;
+        if(vcardContainer) vcardContainer.style.height = height + 'px';
+        popup2.style.height = height + 'px';
+        
+        setHidden(popup1, true);
+        setHidden(popup2, false);
+        popup2.scrollTop = 0;
+      };
+    }
+    
+    if (buttons.back) {
+      buttons.back.onclick = () => {
+        setHidden(popup2, true);
+        setHidden(popup1, false);
+      };
+    }
+
+    // Live Time Update (Kept intact)
+    if (liveTime) {
+      setInterval(() => {
+        const options = { 
+          day: 'numeric', month: 'short', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit', second: '2-digit', 
+          hour12: false, timeZone: 'Africa/Nairobi' 
+        };
+        const dateStr = new Date().toLocaleString('en-GB', options);
+        liveTime.textContent = dateStr.replace(',', ' —');
+      }, 1000);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
 
 })();
