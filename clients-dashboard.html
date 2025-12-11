@@ -1,764 +1,617 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clients Dashboard - Smart Card Link</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLMDJc5nIzjQYw6b8w6L9cT3q/iG8xS1L62T/qT4g2sT1K4c1x5J9p5Q5h5w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>ðŸ”—</text></svg>">
-    <style>
-        /* --- CSS Configuration & Core Styles --- */
-        :root {
-            --primary-color: #FFD700; /* Gold */
-            --text-color: #e2e8f0;
-            --bg-color: #111827; /* Dark Slate Gray */
-            --card-bg-color: #1f2937; /* Lighter Dark Slate Gray */
-            --success-color: #38a169;
-            --error-color: #e53e3e;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink vCard Client Dashboard | Production</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
+  
+  <style>
+    /* --- CSS Configuration & Core Styles --- */
+    :root {
+      --primary-color: #FFD700; /* Gold */
+      --text-color: #e2e8f0;
+      --bg-color: #111;
+      --card-bg: #1a1a1a;
+      --border-color: #333;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 2rem 1rem;
+      background: none;
+      color: var(--text-color);
+    }
+    /* Background Video (RESTORED) */
+    #bg-video {
+      position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -100;
+      filter: brightness(0.4) saturate(1.2); object-fit: cover;
+    }
+    .dashboard-card {
+      background-color: var(--bg-color); border-radius: 1rem; padding: 2rem; width: 100%;
+      max-width: 1200px; border: 1px solid var(--border-color); box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+      overflow: hidden; animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    h1.title { color: var(--primary-color); font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: 2rem; }
+    .controls-container { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .search-container { display: flex; gap: 0.5rem; flex-grow: 1; max-width: 400px; }
+    
+    input, select, textarea { 
+      flex-grow: 1; padding: 0.75rem; border-radius: 0.375rem; border: 1px solid #555; background-color: #222; 
+      color: white; transition: all 0.3s ease; box-sizing: border-box;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+    
+    .button-group { display: flex; gap: 0.5rem; }
+    button { 
+      padding: 0.75rem 1.2rem; border-radius: 0.375rem; border: 1px solid var(--primary-color); 
+      background-color: var(--card-bg); color: var(--primary-color); font-weight: 700; 
+      cursor: pointer; transition: all 0.3s; white-space: nowrap; 
+    }
+    button:hover { background-color: var(--primary-color); color: var(--bg-color); }
+    
+    /* Table Styles */
+    .table-container { overflow-x: auto; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+    th { background-color: #222; color: var(--primary-color); font-weight: 600; white-space: nowrap; }
+    td { background-color: var(--card-bg); color: var(--text-color); font-size: 0.9rem; }
+    tbody tr:hover { background-color: #2d2d2d; }
+    tbody tr.row-success { 
+      background-color: #38a1694d !important; /* Green highlight for update */
+      transition: background-color 0.5s ease-out; 
+    }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 2rem 1rem;
-        }
+    /* Status Badges */
+    .status-badge { 
+      padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; color: white; white-space: nowrap; 
+    }
+    .status-Pending { background-color: #d69e2e; } 
+    .status-Processed { background-color: #4299e1; } 
+    .status-Active { background-color: #38a169; } 
+    .status-Disabled { background-color: #e53e3e; } 
+    .status-Deleted { background-color: #4a5568; } 
+    .client-photo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #555; }
+    .actions-cell button { padding: 0.5rem 0.75rem; font-size: 0.8rem; margin-right: 0.25rem; }
+    
+    /* Modal Styles */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+    .modal-content { 
+        background-color: var(--card-bg); margin: 10% auto; padding: 20px; border: 1px solid #555; 
+        width: 90%; max-width: 450px; border-radius: 0.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
+        display: flex; flex-direction: column; gap: 15px;
+    }
+    .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; align-self: flex-end; }
+    .modal-content h2 { color: var(--primary-color); margin-top: 0; font-size: 1.4rem; }
+    .modal-content textarea { min-height: 120px; resize: vertical; }
 
-        .container {
-            width: 100%;
-            max-width: 1400px;
-            padding: 2rem;
-            background-color: var(--card-bg-color);
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-
-        /* --- Utility Styles --- */
-        .status-Pending { background-color: #ecc94b; }
-        .status-Active { background-color: var(--success-color); }
-        .status-Suspended { background-color: #e53e3e; }
-        .status-Deleted { background-color: #4a5568; }
-
-        /* --- Table Styles --- */
-        .client-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-
-        .client-table th, .client-table td {
-            text-align: left;
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid #2d3748;
-            font-size: 0.9rem;
-            white-space: nowrap;
-        }
-
-        .client-table th {
-            background-color: #2d3748;
-            color: var(--primary-color);
-            font-weight: 600;
-            cursor: pointer;
-            position: sticky;
-            top: 0;
-        }
-        
-        .client-table tbody tr:hover {
-            background-color: #2d3748;
-        }
-
-        .status-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-weight: 600;
-            color: var(--bg-color);
-            font-size: 0.8rem;
-        }
-
-        .client-photo {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid var(--primary-color);
-        }
-
-        .qr-code {
-            width: 40px;
-            height: 40px;
-            object-fit: contain;
-        }
-
-        .actions-cell {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: nowrap;
-        }
-
-        .actions-cell button {
-            padding: 0.4rem 0.6rem;
-            font-size: 0.8rem;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            color: var(--bg-color);
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-
-        .actions-cell .btn-view { background-color: #4299e1; }
-        .actions-cell .btn-process { background-color: #4299e1; }
-        .actions-cell .btn-enable { background-color: var(--success-color); }
-        .actions-cell .btn-disable { background-color: #e53e3e; }
-        .actions-cell .btn-delete { background-color: #4a5568; }
-        .actions-cell .btn-download { background-color: var(--primary-color); color: var(--bg-color); }
-        .actions-cell .btn-download:hover { background-color: #e0ac00; }
-        .actions-cell .btn-view:hover { background-color: #3182ce; }
-        .actions-cell .btn-process:hover { background-color: #3182ce; }
-        .actions-cell .btn-enable:hover { background-color: #2f855a; }
-        .actions-cell .btn-disable:hover { background-color: #c53030; }
-        .actions-cell .btn-delete:hover { background-color: #2d3748; }
-        
-        /* Filter and Search Styles */
-        .filter-controls {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            align-items: center;
-        }
-
-        .filter-controls label {
-            font-weight: 600;
-            white-space: nowrap;
-        }
-
-        .filter-controls input, .filter-controls select, .filter-controls button {
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            border: 1px solid #4a5568;
-            background-color: #2d3748;
-            color: var(--text-color);
-            font-size: 1rem;
-            box-shadow: none;
-        }
-
-        .filter-controls input:focus, .filter-controls select:focus {
-            border-color: var(--primary-color);
-            outline: none;
-        }
-        
-        .export-button {
-            margin-left: auto; /* Push to the right */
-            background-color: var(--success-color);
-            color: var(--bg-color);
-            font-weight: 700;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .export-button:hover {
-            background-color: #2f855a;
-        }
-        
-        /* Modal Styles */
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1000; 
-            left: 0;
-            top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgba(0,0,0,0.7); 
-        }
-
-        .modal-content {
-            background-color: var(--card-bg-color);
-            margin: 15% auto; 
-            padding: 30px;
-            border: 1px solid #4a5568;
-            width: 80%; 
-            max-width: 500px;
-            border-radius: 8px;
-            position: relative;
-        }
-
-        .close-btn {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close-btn:hover,
-        .close-btn:focus {
-            color: var(--primary-color);
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        #modalTextarea {
-            width: 100%;
-            height: 100px;
-            margin-top: 15px;
-            padding: 10px;
-            border: 1px solid #4a5568;
-            background-color: #2d3748;
-            color: var(--text-color);
-            border-radius: 4px;
-            resize: vertical;
-        }
-
-        #modalConfirmBtn {
-            width: 100%;
-            padding: 10px;
-            margin-top: 15px;
-            background-color: var(--primary-color);
-            color: var(--bg-color);
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-
-        #modalConfirmBtn:hover {
-            background-color: #e0ac00;
-        }
-
-        /* Toast Notification Styles */
-        .toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1050;
-        }
-
-        .toast {
-            background-color: #333;
-            color: var(--text-color);
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            opacity: 0;
-            transition: opacity 0.5s, transform 0.5s;
-            transform: translateY(20px);
-            min-width: 250px;
-            display: flex;
-            align-items: center;
-        }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .toast.error {
-            background-color: var(--error-color);
-        }
-
-        .toast.success {
-            background-color: var(--success-color);
-        }
-
-        .toast i {
-            margin-right: 10px;
-        }
-
-        /* Loading Spinner */
-        .loading-spinner {
-            border: 3px solid #f3f3f3; 
-            border-top: 3px solid var(--primary-color); 
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 5px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .row-success {
-            background-color: rgba(56, 161, 105, 0.3) !important; 
-            transition: background-color 0.5s;
-        }
-
-        .no-results {
-            color: #aaa;
-            padding: 20px;
-            text-align: center;
-        }
-
-    </style>
+    /* Toast Notifications */
+    .toast-container { position: fixed; top: 1rem; right: 1rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 1000; }
+    .toast {
+      padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; 
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); transition: all 0.3s ease-in-out; 
+      transform: translateX(100%); opacity: 0; display: flex; justify-content: space-between; align-items: center;
+      min-width: 250px;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background-color: #10b981; color: white; } 
+    .toast.error { background-color: #f43f5e; color: white; } 
+    .toast-close-btn { background: none; border: none; color: white; margin-left: 10px; cursor: pointer; font-size: 1.2rem; line-height: 1; }
+    .toast-close-btn:hover { color: var(--primary-color); }
+    
+    /* Loading States */
+    #loadingMessage { text-align: center; padding: 2rem; color: var(--primary-color); display: none; }
+    #noResults { text-align: center; padding: 2rem; color: #aaa; display: none; }
+    .loading-spinner { 
+      border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; 
+      width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 0.5rem; 
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 768px) {
+      .dashboard-card { padding: 1rem; }
+      .controls-container { flex-direction: column; align-items: stretch; }
+      .search-container { max-width: 100%; }
+      .button-group { width: 100%; justify-content: space-between; }
+      .button-group button { flex-grow: 1; padding: 0.75rem 0.5rem; }
+      .table-container { margin: 0 -1rem; width: calc(100% + 2rem); }
+      th, td { padding: 0.75rem; }
+    }
+  </style>
 </head>
 <body>
-    <div class="toast-container"></div>
-    <div class="container">
-        <div class="header">
-            <h1>Clients Dashboard</h1>
-            <div class="filter-controls">
-                <label for="statusFilter">Filter by Status:</label>
-                <select id="statusFilter">
-                    <option value="All">All Statuses</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended</option>
-                    <option value="Deleted">Deleted</option>
-                </select>
-                <input type="text" id="searchInput" placeholder="Search by Name, Phone, or Email..." />
-                <button id="exportCsvBtn" class="export-button">Export to CSV</button>
-            </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="client-table">
-                <thead>
-                    <tr>
-                        <th onclick="sortTable(0)">Photo</th>
-                        <th onclick="sortTable(1)">Name/Company</th>
-                        <th onclick="sortTable(2)">Contact 1 (P/E)</th>
-                        <th onclick="sortTable(3)">URL/Slug</th>
-                        <th onclick="sortTable(4)">Status</th>
-                        <th onclick="sortTable(5)">vCard</th>
-                        <th onclick="sortTable(6)">QR Code</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="clientTableBody">
-                    <tr><td colspan="8" style="text-align:center;">Loading client data...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="noResults" class="no-results" style="display: none;">No results found matching your criteria.</div>
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+
+  <div class="dashboard-card">
+    <h1 class="title">SmartCardLink vCard Client Dashboard</h1>
+
+    <div class="controls-container">
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search by name, phone, email, or company" aria-label="Search clients" />
+        <button id="searchBtn"><i class="fas fa-search"></i> Search</button>
+      </div>
+      <div class="button-group">
+        <select id="statusFilter" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <option value="Active">Active</option>
+          <option value="Disabled">Disabled</option>
+          <option value="Pending">Pending</option>
+          <option value="Processed">Processed</option>
+          <option value="Deleted">Deleted</option>
+        </select>
+        <button id="exportBtn" aria-label="Export to CSV">
+             <i class="fas fa-file-export"></i> Export CSV
+        </button>
+        <button id="resetBtn" aria-label="Reset Filters">
+             <i class="fas fa-undo"></i> Reset
+        </button>
+      </div>
     </div>
     
-    <div id="notesModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2 id="modalTitle">Reason for Action</h2>
-            <textarea id="modalTextarea" placeholder="Please provide a reason for this action."></textarea>
-            <button id="modalConfirmBtn">Confirm</button>
-        </div>
+    <div id="totals" style="text-align: center; color: var(--primary-color); padding: 0.5rem; margin-bottom: 1rem; display: none;"></div>
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Photo</th>
+            <th>Full Name</th>
+            <th>Company</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Date Created</th>
+            <th>Active Months</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="clientTableBody" role="alert" aria-live="polite">
+          </tbody>
+      </table>
     </div>
+    
+    <div id="loadingMessage">
+        <div class="loading-spinner"></div>
+        <p>Loading all client data from MongoDB...</p>
+    </div>
+    <div id="noResults">No clients found matching your criteria.</div>
+  </div>
+  
+  <div id="notesModal" class="modal">
+      <div class="modal-content">
+          <span class="close-btn" id="modalCloseBtn">&times;</span>
+          <h2 id="modalTitle">Reason for Action</h2>
+          <textarea id="modalTextarea" placeholder="Please provide a mandatory reason for this action (e.g., 'Client requested a 6-month pause')." required></textarea>
+          <button id="modalConfirmBtn">Confirm Action</button>
+      </div>
+  </div>
+  
+  <div class="toast-container" id="toast-container"></div>
 
-    <script>
-        const API_BASE_URL = window.location.origin;
-        let allClientData = [];
-        let sortColumn = 0;
-        let sortDirection = 'asc';
+  <script>
+    // --- Configuration Block (API URL) ---
+    
+    // CRITICAL: The base URL of the Render backend API, used for all data fetching and status updates.
+    const API_BASE_URL = "https://smartcardlink-api.onrender.com"; 
+    
+    // --- Global State & DOM Elements ---
+    let allClientData = []; // Stores the full, un-filtered client data from the last successful fetch.
 
-        const clientTableBody = document.getElementById('clientTableBody');
-        const searchInput = document.getElementById('searchInput');
-        const statusFilter = document.getElementById('statusFilter');
-        const exportCsvBtn = document.getElementById('exportCsvBtn');
-        const noResultsDiv = document.getElementById('noResults');
+    // DOM References
+    const clientTableBody = document.getElementById('clientTableBody');
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const exportBtn = document.getElementById('exportBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const noResultsDiv = document.getElementById('noResults');
+    const totalsDiv = document.getElementById('totals');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const notesModal = document.getElementById('notesModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalTextarea = document.getElementById('modalTextarea');
+    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+    const modalCloseBtn = document.getElementById('modalCloseBtn'); 
+    const toastContainer = document.getElementById('toast-container');
 
-        // Modal elements
-        const notesModal = document.getElementById('notesModal');
-        const closeBtn = notesModal.querySelector('.close-btn');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalTextarea = document.getElementById('modalTextarea');
-        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
-        let currentActionDetails = {};
+    // --- Utility Functions ---
 
-        // --- Utility Functions ---
-
-        function showToast(message, type = 'success') {
-            const container = document.querySelector('.toast-container');
-            if (!container) return;
-
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'}"></i> ${message}`;
-
-            container.appendChild(toast);
-            
-            // Show
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 10);
-
-            // Hide
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    toast.remove();
-                }, 500);
-            }, 5000);
-        }
-
-        // -------------------------------------------------------------
-        // TABLE RENDERING & FILTERING
-        // -------------------------------------------------------------
+    /**
+     * Non-blocking Toast notification for user feedback.
+     */
+    function showToast(message, type = 'success') {
+        if (!toastContainer) return;
         
-        /**
-         * The core function for filtering and searching the client data.
-         * It takes the current `allClientData`, filters it based on search/status,
-         * sorts it, and then re-renders the table. 
-         */
-        function filterAndSearch() {
-            if (!searchInput || !statusFilter) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        toast.innerHTML = `
+            <span role="status" aria-live="polite">${message}</span>
+            <button class="toast-close-btn">&times;</button>
+        `;
+        
+        const closeBtn = toast.querySelector('.toast-close-btn');
+        const closeToast = () => {
+            toast.classList.remove('show');
+            // Remove element only after CSS transition finishes
+            toast.addEventListener('transitionend', () => toast.remove());
+        };
+        closeBtn.addEventListener('click', closeToast);
 
-            const searchTerm = searchInput.value.toLowerCase().trim();
-            const selectedStatus = statusFilter.value;
+        toastContainer.prepend(toast); 
+        setTimeout(() => { toast.classList.add('show'); }, 10);
+        
+        // Auto-dismiss after 6 seconds
+        setTimeout(closeToast, 6000);
+    }
 
-            const filteredData = allClientData.filter(client => {
-                const matchesSearch = 
-                    (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
-                    (client.phone1 && client.phone1.toLowerCase().includes(searchTerm)) ||
-                    (client.email1 && client.email1.toLowerCase().includes(searchTerm)) ||
-                    (client.slug && client.slug.toLowerCase().includes(searchTerm));
-                
-                const matchesStatus = selectedStatus === 'All' || client.status === selectedStatus;
-                
-                return matchesSearch && matchesStatus;
-            });
-
-            // Sort the filtered data
-            const sortedData = filteredData.sort((a, b) => {
-                let aVal, bVal;
-                
-                // Column mapping: 0: Photo (by name), 1: Name/Company, 2: Contact, 3: URL/Slug, 4: Status
-                switch(sortColumn) {
-                    case 0:
-                    case 1: 
-                        aVal = (a.fullName || a.company || '').toLowerCase();
-                        bVal = (b.fullName || b.company || '').toLowerCase();
-                        break;
-                    case 2:
-                        aVal = (a.phone1 || a.email1 || '').toLowerCase();
-                        bVal = (b.phone1 || b.email1 || '').toLowerCase();
-                        break;
-                    case 3:
-                        aVal = (a.slug || '').toLowerCase();
-                        bVal = (b.slug || '').toLowerCase();
-                        break;
-                    case 4:
-                        aVal = (a.status || '').toLowerCase();
-                        bVal = (b.status || '').toLowerCase();
-                        break;
-                    default:
-                        aVal = (a.fullName || '').toLowerCase();
-                        bVal = (b.fullName || '').toLowerCase();
-                        break;
-                }
-
-                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-
-            renderTable(sortedData);
-        }
-
-        function sortTable(columnIndex) {
-            if (sortColumn === columnIndex) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortColumn = columnIndex;
-                sortDirection = 'asc'; // Default to ascending when changing columns
-            }
-            // Re-run filter and search to apply the new sort order
-            filterAndSearch();
-        }
-
-
-        function renderTable(clients) {
-            if (!clientTableBody) return;
-
-            if (clients.length === 0) {
-                clientTableBody.innerHTML = '';
-                noResultsDiv.style.display = 'block';
-                return;
-            }
-
-            noResultsDiv.style.display = 'none';
-            const rows = clients.map(client => {
-                const publicVcardPage = `${API_BASE_URL}/${client.slug}`;
-                const contactInfo = client.phone1 || client.email1 || 'N/A';
-                const mainUrl = client.website || client.businessWebsite || client.portfolioWebsite || 'N/A';
-                const currentStatus = client.status || 'Pending';
-                
-                const deleteBtn = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); showNotesModal('Delete', '${client._id}', 'Deleted')">Delete</button>`;
-                
-                const actionButtons = `
-                    ${currentStatus === 'Pending' ? 
-                        `<button class="action-btn btn-process" onclick="event.stopPropagation(); showNotesModal('Process', '${client._id}', 'Active')">Process</button>` : 
-                        `<button class="action-btn btn-view" onclick="event.stopPropagation(); window.open('${publicVcardPage}', '_blank')">View</button>` 
-                    }
-                    ${currentStatus === 'Active' ?
-                        `<button class="action-btn btn-disable" onclick="event.stopPropagation(); showNotesModal('Disable', '${client._id}', 'Suspended')">Disable</button>` : 
-                        currentStatus === 'Suspended' ?
-                        `<button class="action-btn btn-enable" onclick="event.stopPropagation(); showNotesModal('Enable', '${client._id}', 'Active')">Enable</button>` :
-                        currentStatus === 'Deleted' ?
-                        `<button class="action-btn btn-view" disabled>View (Deleted)</button>` :
-                        ''
-                    }
-                    ${currentStatus !== 'Deleted' ? deleteBtn : ''}
-                `;
-
-                return `
-                    <tr data-client-id="${client._id}">
-                        <td><img src="${client.photoUrl || '/default-photo.png'}" alt="${client.fullName || 'Client'}'s Photo" class="client-photo" onerror="this.onerror=null;this.src='/default-photo.png';"></td>
-                        <td>${client.fullName || 'N/A'}<br><small style="color: #9ca3af;">${client.company || ''}</small></td>
-                        <td>${contactInfo}</td>
-                        <td><a href="${publicVcardPage}" target="_blank" style="color: var(--primary-color); text-decoration: none;">${client.slug}</a></td>
-                        <td><span class="status-badge status-${currentStatus.replace(/\s/g, '')}">${currentStatus}</span></td>
-                        <td>
-                            ${client.vcardUrl ? `<a href="${client.vcardUrl}" target="_blank" title="Download vCard"><i class="fas fa-address-book" style="color: var(--primary-color);"></i></a>` : 'N/A'}
-                        </td>
-                        <td>
-                            ${client.qrCodeUrl ? `<a href="${client.qrCodeUrl}" target="_blank" title="View QR Code"><i class="fas fa-qrcode" style="color: var(--primary-color);"></i></a>` : 'N/A'}
-                        </td>
-                        <td class="actions-cell">${actionButtons}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            clientTableBody.innerHTML = rows;
-        }
-
-        // -------------------------------------------------------------
-        // MODAL & STATUS UPDATE LOGIC
-        // -------------------------------------------------------------
-
-        function showNotesModal(action, clientId, newStatus) {
-            notesModal.style.display = 'block';
-            modalTitle.textContent = `Reason for ${action}`;
-            modalTextarea.value = '';
-            
-            // Store details for confirmation
-            currentActionDetails = { action, clientId, newStatus };
-            
-            // Focus on textarea when modal opens
-            setTimeout(() => modalTextarea.focus(), 100);
-        }
-
-        closeBtn.onclick = () => {
+    /**
+     * Hides the audit notes modal and clears its state.
+     */
+    function hideModal() {
+        if (notesModal) {
             notesModal.style.display = 'none';
-        };
+            modalTextarea.value = ''; 
+            // CRITICAL: Remove the previous event handler to prevent stacking
+            modalConfirmBtn.onclick = null; 
+        }
+    }
 
-        window.onclick = (event) => {
-            if (event.target === notesModal) {
-                notesModal.style.display = 'none';
+    /**
+     * Creates HTML for a color-coded status badge.
+     */
+    function getStatusBadge(status) {
+      const statusClean = status 
+        ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() 
+        : 'Pending';
+      const statusClass = statusClean.replace(/\s/g, ''); 
+      return `<span class="status-badge status-${statusClass}">${statusClean}</span>`;
+    }
+
+    /**
+     * Calculates the approximate number of active months since the vCard was created.
+     */
+    function calculateActiveMonths(createdDateStr) {
+        if (!createdDateStr) return 'N/A';
+        const createdDate = new Date(createdDateStr);
+        const now = new Date();
+
+        let totalMonths = (now.getFullYear() - createdDate.getFullYear()) * 12;
+        totalMonths += now.getMonth() - createdDate.getMonth();
+        
+        if (now.getDate() < createdDate.getDate()) {
+            totalMonths--;
+        }
+        
+        return totalMonths > 0 ? `${totalMonths} months` : '0 months';
+    }
+    
+    /**
+     * Debounces a function call to prevent excessive execution (e.g., on input).
+     */
+    const debounce = (func, delay) => {
+        let timeoutId;
+        return (...args) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => { func.apply(this, args); }, delay);
+        };
+    };
+    
+    // Create the debounced function immediately for input handling
+    const debouncedFilterAndSearch = debounce(filterAndSearch, 300);
+
+    // --- Core UI & Rendering Functions ---
+
+    /**
+     * Renders the table based on the provided (filtered) data array.
+     */
+    function renderTable(data) {
+      if (!clientTableBody) return;
+      
+      clientTableBody.innerHTML = '';
+
+      if (data.length === 0) {
+        noResultsDiv.style.display = 'block';
+        totalsDiv.style.display = 'none';
+        return;
+      }
+
+      noResultsDiv.style.display = 'none';
+      
+      data.forEach(client => {
+        const tr = document.createElement('tr');
+        // Unique identifier for in-place updates
+        tr.dataset.clientId = client._id; 
+        
+        const currentStatus = client.status || 'Pending';
+        const createdDate = client.vcardCreatedDate ? client.vcardCreatedDate.split('T')[0] : 'N/A';
+        const activeMonths = calculateActiveMonths(client.vcardCreatedDate);
+        const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
+
+        tr.innerHTML = `
+          <td><img src="${photoUrl}" alt="Client Photo" class="client-photo" onerror="this.onerror=null; this.src='https://placehold.co/50x50/111/fff?text=No+Photo';" /></td>
+          <td>${client.fullName || 'N/A'}</td>
+          <td>${client.company || 'N/A'}</td>
+          <td>${client.email1 || 'N/A'}</td>
+          <td>${client.phone1 || 'N/A'}</td>
+          <td>${createdDate}</td>
+          <td>${activeMonths}</td>
+          <td>${getStatusBadge(currentStatus)}</td>
+          <td class="actions-cell">
+            ${currentStatus === 'Active' ? 
+              `<button class="action-btn btn-disable" onclick="window.showNotesModal('Disable', '${client._id}', 'Disabled')"><i class="fas fa-ban"></i> Disable</button>` :
+              `<button class="action-btn btn-enable" onclick="window.showNotesModal('Enable', '${client._id}', 'Active')"><i class="fas fa-check-circle"></i> Enable</button>`
             }
-        };
+            <button class="action-btn btn-delete" onclick="window.showNotesModal('Delete', '${client._id}', 'Deleted')"><i class="fas fa-trash-alt"></i> Delete</button>
+          </td>
+        `;
+        clientTableBody.appendChild(tr);
+      });
+      
+      updateTotals(data);
+    }
 
+    /**
+     * Filters the local data set (`allClientData`) and triggers a re-render of the table.
+     * This is used for search, filter, and post-status-change updates (in-place method).
+     */
+    function filterAndSearch() {
+        if (!searchInput || !statusFilter) return;
+        
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedStatus = statusFilter.value;
+        
+        const filteredData = allClientData.filter(client => {
+            const matchesSearch = 
+                (client.fullName && client.fullName.toLowerCase().includes(searchTerm)) ||
+                (client.phone1 && client.phone1.toLowerCase().includes(searchTerm)) ||
+                (client.email1 && client.email1.toLowerCase().includes(searchTerm)) ||
+                (client.company && client.company.toLowerCase().includes(searchTerm));
+            
+            const matchesStatus = selectedStatus === '' || client.status === selectedStatus;
+            
+            return matchesSearch && matchesStatus;
+        });
+        
+        renderTable(filteredData);
+    }
+
+    /**
+     * Updates the summary statistics below the controls.
+     */
+    function updateTotals(data) {
+        if (!totalsDiv) return;
+        
+        const counts = { Active: 0, Pending: 0, Processed: 0, Disabled: 0, Deleted: 0 };
+        data.forEach(client => {
+            const status = client.status || 'Pending';
+            if (counts.hasOwnProperty(status)) {
+                counts[status]++;
+            }
+        });
+        
+        totalsDiv.style.display = 'block';
+        totalsDiv.innerHTML = `
+            **Total Clients:** ${data.length} | 
+            **Active:** ${counts.Active} | 
+            **Pending:** ${counts.Pending} | 
+            **Processed:** ${counts.Processed} |
+            **Disabled:** ${counts.Disabled} |
+            **Deleted:** ${counts.Deleted}
+        `;
+    }
+
+    // --- API & Data Handling Functions ---
+
+    /**
+     * Initial fetch of all client data from the Render backend.
+     */
+    async function fetchAllClients() {
+      if (!API_BASE_URL || API_BASE_URL.includes("YOUR_RENDER_BACKEND_API_URL_HERE")) {
+          return showToast('Configuration Error: Please set your actual Render API URL in the HTML config.', 'error');
+      }
+      
+      loadingMessage.style.display = 'block';
+      noResultsDiv.style.display = 'none';
+      clientTableBody.innerHTML = '';
+      
+      try {
+        // FIX 2: Corrected API endpoint to include '/api/' prefix
+        const response = await fetch(`${API_BASE_URL}/api/clients/all`);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: `Server error, status: ${response.status}` }));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        // Ensure data array exists
+        allClientData = Array.isArray(result.data) ? result.data : [];
+        
+        filterAndSearch(); // Initial render uses filter logic on all data
+        showToast(`Successfully loaded ${allClientData.length} clients.`, 'success');
+      } catch (error) {
+        console.error("Error fetching all clients:", error);
+        showToast(`Failed to fetch clients: ${error.message}`, 'error');
+        noResultsDiv.style.display = 'block';
+      } finally {
+        loadingMessage.style.display = 'none';
+      }
+    }
+
+    /**
+     * Executes the API call to change a client's status, including mandatory notes.
+     * Updates the UI in-place by modifying the local state and re-rendering the filtered view.
+     */
+    async function changeClientStatus(clientId, newStatus, notes) {
+        const row = clientTableBody.querySelector(`tr[data-client-id="${clientId}"]`);
+        const originalHtml = row ? row.innerHTML : null;
+        
+        // Show row-level loading indicator
+        if (row) {
+             row.innerHTML = `<td colspan="9" style="text-align: center; color: var(--primary-color); padding: 0.5rem;">
+                <div class="loading-spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0 auto;"></div>
+                <small>Updating status...</small>
+            </td>`;
+        }
+
+        try {
+            // FIX 3: Corrected API endpoint for status update to include '/api/' prefix
+            const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/status/${newStatus}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ notes }) 
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `Server error, status: ${response.status}` }));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            // --- Performance Optimization: In-Place UI/State Update ---
+            const clientIndex = allClientData.findIndex(c => c._id === clientId);
+            if (clientIndex > -1) {
+                // 1. Update the local data copy
+                allClientData[clientIndex].status = newStatus;
+                
+                // 2. Re-filter/Re-render the current view (fast, as it uses local data)
+                filterAndSearch(); 
+
+                // 3. Highlight the specific row (needs to be queried again after re-render)
+                const updatedRow = clientTableBody.querySelector(`tr[data-client-id="${clientId}"]`);
+                if (updatedRow) {
+                    updatedRow.classList.add('row-success');
+                    setTimeout(() => { updatedRow.classList.remove('row-success'); }, 2000); 
+                }
+            }
+            
+            showToast(`Status updated to ${newStatus}. Note: ${notes.substring(0, 30)}...`, 'success');
+
+        } catch (error) {
+            console.error("Error changing client status:", error);
+            showToast(`Failed to change status: ${error.message}`, 'error');
+            // Restore row content on error
+            if (row && originalHtml) {
+                row.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    /**
+     * Shows the mandatory notes modal and sets the unique confirmation handler.
+     */
+    function showNotesModal(action, clientId, newStatus) {
+        if (!notesModal) return;
+
+        modalTitle.innerText = `${action} Client Status`;
+        modalTextarea.placeholder = `Mandatory reason for changing status to '${newStatus}'.`;
+        modalTextarea.value = '';
+        notesModal.style.display = 'block';
+
+        setTimeout(() => { modalTextarea.focus(); }, 10); 
+
+        // Set the unique handler for this action
         modalConfirmBtn.onclick = () => {
             const notes = modalTextarea.value.trim();
             if (!notes) {
-                showToast("Please provide a reason before confirming.", 'error');
+                showToast('Audit reason is required to proceed.', 'error');
                 return;
             }
-            
-            notesModal.style.display = 'none';
-            changeClientStatus(currentActionDetails.clientId, currentActionDetails.newStatus, notes);
+
+            hideModal(); 
+            changeClientStatus(clientId, newStatus, notes);
         };
+    }
 
-
-        async function changeClientStatus(clientId, newStatus, notes) {
-            const row = document.querySelector(`tr[data-client-id="${clientId}"]`);
-            const originalHtml = row ? row.innerHTML : null;
-            
-            if (row) {
-                 row.innerHTML = ` <td colspan="8" style="text-align: center; color: var(--primary-color); padding: 0.5rem;"> 
-                                        <div class="loading-spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0 auto;"></div> 
-                                        <small>Updating status...</small> 
-                                   </td>`;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/status/${newStatus}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ notes })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: `Server returned status: ${response.status}` }));
-                    throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
-                }
-                
-                showToast(`Status updated to ${newStatus}. Reason: ${notes.substring(0, 30)}${notes.length > 30 ? '...' : ''}`);
-                
-                // Flash success color
-                if (row) { 
-                    row.classList.add('row-success');
-                    setTimeout(() => { row.classList.remove('row-success'); }, 2000); 
-                }
-
-                await fetchAllClients(); // Re-fetch all data to ensure the table is fully up-to-date
-
-            } catch (error) {
-                console.error("Error changing client status:", error);
-                showToast(`Failed to change status: ${error.message}`, 'error');
-                // Restore original row content on error if needed, or just rely on the full re-fetch
-                if (row && originalHtml) {
-                     row.innerHTML = originalHtml;
-                } else {
-                    fetchAllClients(); // fallback re-fetch
-                }
-            }
+    /**
+     * Exports the *entire* loaded data set (`allClientData`) to a CSV file.
+     */
+    function exportToCsv() {
+        if (allClientData.length === 0) {
+            return showToast("No client data loaded to export.", 'error');
         }
+        
+        const headers = ["ID", "Full Name", "Company", "Email", "Phone", "Status", "Date Created", "Active Months"];
+        
+        const data = allClientData.map(client => [
+            client._id || '',
+            client.fullName || '',
+            client.company || '',
+            client.email1 || '',
+            client.phone1 || '',
+            client.status || 'Pending',
+            client.vcardCreatedDate ? client.vcardCreatedDate.split('T')[0] : '',
+            calculateActiveMonths(client.vcardCreatedDate)
+        ]);
 
-
-        // -------------------------------------------------------------
-        // DATA FETCHING 
-        // -------------------------------------------------------------
-
-        function getLoadingRow(attempt = 0) {
-            const spinner = '<div class="loading-spinner"></div>';
-            const MAX_RETRIES = 3;
-            const attemptMsg = attempt > 0 ? ` (Attempt ${attempt}/${MAX_RETRIES})` : '';
-            return `<span aria-live="polite">${spinner} Loading client data...${attemptMsg}</span>`;
-        }
-
-        function showFinalError(message) {
-            if (!clientTableBody) return;
-            // Also show toast notification for better UX
-            showToast(`Failed to load data: ${message}`, 'error');
-
-            clientTableBody.innerHTML = `
-                <tr>
-                    <td colspan="8" style="text-align:center; color: var(--error-color); padding: 20px;">
-                        <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i> Failed to load data: ${message}
-                        <button onclick="fetchAllClients()" class="actions-cell btn-enable" style="margin-left: 1rem;">Retry</button>
-                    </td>
-                </tr>
-            `;
-        }
-
-
-        async function fetchAllClients(attempt = 0) {
-            if (!clientTableBody) return;
-            
-            const MAX_RETRIES = 3;
-            attempt++;
-
-            clientTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center;">${getLoadingRow(attempt)}</td></tr>`;
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/clients`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                
-                const result = await response.json();
-                if (result.status !== 'success') {
-                    throw new Error(result.message || 'API returned an error status.');
-                }
-
-                allClientData = result.data || [];
-                filterAndSearch(); // Filter, sort, and render the initial data
-                
-            } catch (error) {
-                console.error("Fetch clients failed:", error);
-                if (attempt < MAX_RETRIES) {
-                    // Wait a bit before retrying
-                    setTimeout(() => fetchAllClients(attempt), 2000 * attempt);
-                } else {
-                    showFinalError(error.message || 'Unknown network error.');
-                }
-            }
-        }
-
-
-        // -------------------------------------------------------------
-        // CSV EXPORT
-        // -------------------------------------------------------------
-
-        function exportToCsv() {
-            const dataToExport = allClientData.map(client => ({
-                id: client._id,
-                fullName: client.fullName,
-                title: client.title,
-                company: client.company,
-                phone1: client.phone1,
-                email1: client.email1,
-                status: client.status,
-                slug: client.slug,
-                website: client.website,
-                businessWebsite: client.businessWebsite,
-                portfolioWebsite: client.portfolioWebsite,
-                address: client.address,
-                bio: client.bio,
-                // Add more fields if necessary
-                createdAt: client.createdAt,
-                updatedAt: client.updatedAt,
-            }));
-
-            if (dataToExport.length === 0) {
-                showToast("No data to export.", 'error');
-                return;
-            }
-
-            const headers = Object.keys(dataToExport[0]);
-            let csvContent = headers.join(",") + "\n";
-
-            dataToExport.forEach(item => {
-                const row = headers.map(header => item[header]);
-                // Basic CSV escaping: surround field with quotes, double inner quotes
-                const rowString = row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(",");
-                csvContent += rowString + "\n";
-            });
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `client_data_${new Date().toISOString().split('T')[0]}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showToast("Client data exported successfully.");
-        }
-
-
-        // -------------------------------------------------------------
-        // INITIALIZATION
-        // -------------------------------------------------------------
-
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchAllClients();
-            
-            // Add event listeners for filter and search
-            searchInput?.addEventListener('input', filterAndSearch);
-            statusFilter?.addEventListener('change', filterAndSearch);
-            exportCsvBtn?.addEventListener('click', exportToCsv);
+        let csvContent = headers.join(",") + "\n";
+        data.forEach(row => {
+            // Proper CSV escaping: surround field with quotes, double inner quotes
+            const rowString = row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(",");
+            csvContent += rowString + "\n";
         });
 
-    </script>
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `client_data_${new Date().toISOString().slice(0, 10)}.csv`);
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast(`Successfully exported ${allClientData.length} clients to CSV.`, 'success');
+    }
+
+    // --- Initialization and Event Listeners ---
+    function init() {
+      // Data Fetch on Load
+      fetchAllClients();
+
+      // Attach Search & Filter Handlers (using debounced function for input)
+      if (searchInput) searchInput.addEventListener('input', debouncedFilterAndSearch);
+      if (statusFilter) statusFilter.addEventListener('change', filterAndSearch);
+      if (document.getElementById('searchBtn')) document.getElementById('searchBtn').addEventListener('click', filterAndSearch);
+      
+      // Attach Action Handlers
+      if (exportBtn) exportBtn.addEventListener('click', exportToCsv);
+      
+      // Reset Handler
+      if (resetBtn) resetBtn.addEventListener('click', () => { 
+        searchInput.value = ''; 
+        statusFilter.value = ''; 
+        filterAndSearch(); // Triggers a re-render of all original data
+      });
+
+      // Modal Close Handlers (using direct element references)
+      if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideModal);
+      if (notesModal) {
+          window.addEventListener('click', (event) => {
+              if (event.target === notesModal) hideModal();
+          });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    // Expose required functions to the global scope for HTML inline calls (Action buttons)
+    window.showNotesModal = showNotesModal;
+  </script>
 </body>
 </html>
