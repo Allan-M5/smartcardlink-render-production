@@ -1,13 +1,16 @@
 (function () {
     'use strict';
 
+
     // Set global API base URL for stable API calls
     // Note: Using a fixed API base is more reliable than deriving from window.location.origin
-    const API_BASE = "https://smartcardlink-api.onrender.com"; 
-    const API_URL = `${API_BASE}/api`; 
+    const API_BASE = "https://smartcardlink-api.onrender.com"; 
+    const API_URL = `${API_BASE}/api`; 
+
 
     const params = new URLSearchParams(window.location.search);
     const urlClientId = params.get('id'); // Renamed to clearly indicate source
+
 
     // ------------------------
     // DOM Elements
@@ -29,8 +32,9 @@
     const qrCodeImage = document.getElementById('qr-code-image');
     const qrCodeLink = document.getElementById('qr-code-link');
 
+
     let isSaving = false;
-    
+    
     // ADDED: State variables for cancellation logic (PDF)
     let pdfAbortController = null;
     let isPdfGenerating = false;
@@ -38,9 +42,11 @@
     let lastVcardUrl = null;
 
 
+
     // ------------------------
     // Helper Constants and Functions
     // ------------------------
+
 
     const SOCIAL_PREFIXES = {
       facebook: 'https://facebook.com/',
@@ -48,8 +54,9 @@
       twitter: 'https://twitter.com/',
       linkedin: 'https://linkedin.com/in/',
       tiktok: 'https://tiktok.com/@',
-      youtube: 'https://youtube.com/', 
+      youtube: 'https://youtube.com/', 
     };
+
 
     /**
       * Normalizes a social media link to the required full URL format.
@@ -57,19 +64,22 @@
     const normalizeSocialLink = (platform, input) => {
       if (!input || typeof input !== 'string' || input.trim() === '') return null;
 
+
       let value = input.trim();
       const prefix = SOCIAL_PREFIXES[platform];
       if (!prefix) return null;
 
+
       // 1. Check if already a correct URL (enforce https)
       if (value.startsWith('http')) {
           value = value.replace('http:', 'https:');
-          return value; 
+          return value; 
       }
+
 
       // 2. Clean common prefixes and handles
       value = value.replace(/^(www\.)?/, '');
-      
+      
       if (platform === 'linkedin') {
           value = value.replace(/^linkedin\.com\/(in\/|pub\/)?/i, '');
       } else if (platform === 'tiktok') {
@@ -78,22 +88,26 @@
       } else if (platform === 'instagram' || platform === 'twitter' || platform === 'facebook') {
           value = value.replace(/^(instagram|twitter|facebook)\.com\//i, '');
           // Fix: Use toLowerCase() correctly
-          value = value.toLowerCase().replace(/^@/, ''); 
+          value = value.toLowerCase().replace(/^@/, ''); 
       } else if (platform === 'youtube') {
           value = value.replace(/^youtube\.com\//i, '');
       }
 
+
       // 3. Remove trailing slashes
       value = value.replace(/\/$/, '');
-      
+      
       if (value === '') return null;
+
 
       // 4. Reconstruct the final, correct URL
       if (platform === 'linkedin') return prefix + value;
       if (platform === 'tiktok' && !value.startsWith('@')) return prefix + value;
 
+
       return prefix + value;
     };
+
 
     /**
       * Validates if a string is a valid email format.
@@ -103,16 +117,17 @@
       return emailRegex.test(email.trim());
     };
 
+
     /**
       * Validates if a string is a valid phone number (no letters, >= 10 digits).
       */
     const isValidPhone = (phone) => {
-      if (!phone || phone.trim() === '') return true; 
-      if (/[a-zA-Z]/.test(phone)) return false; 
-      const cleaned = phone.replace(/\D/g, ''); 
+      if (!phone || phone.trim() === '') return true; 
+      if (/[a-zA-Z]/.test(phone)) return false; 
+      const cleaned = phone.replace(/\D/g, ''); 
       return cleaned.length >= 10;
     };
-    
+    
     /**
       * Displays a toast message to the user.
       */
@@ -125,27 +140,7 @@
         toastMessage.style.display = 'none';
       }, 3000);
     };
-    
-    /**
-     * ADDED: Utility function to trigger a secure file download using a temporary anchor tag.
-     * @param {string} url - The URL of the file to download.
-     * @param {string} filename - The name to save the file as.
-     */
-    const downloadFile = (url, filename) => {
-      try {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename; // Suggests a filename
-        link.target = '_blank'; // Open in new tab (often needed for download to work)
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (error) {
-        console.error('Error during file download initiation:', error);
-        throw new Error('Could not initiate file download.');
-      }
-    };
-
+    
     /**
      * ADDED: Resets the state of a download button element.
      * @param {HTMLElement} button - The button element to reset.
@@ -156,10 +151,10 @@
         button.innerHTML = defaultText;
         button.classList.remove('pressed');
         // Re-enable only if a client ID exists
-        button.disabled = !clientIdInput.value; 
+        button.disabled = !clientIdInput.value; 
       }
     };
-    
+    
     /**
       * ADDED: Helper to update vCard/QR code display area
       */
@@ -182,6 +177,7 @@
     };
 
 
+
     /**
       * Populates form fields from a client data object fetched from the backend.
       */
@@ -189,10 +185,12 @@
       // Set hidden ID
       clientIdInput.value = data._id || '';
 
+
       const setValue = (id, value) => {
         const el = document.getElementById(id);
         if (el && value) el.value = value;
       };
+
 
       // Personal Details
       setValue('fullName', data.fullName);
@@ -204,11 +202,13 @@
       setValue('email2', data.email2);
       setValue('email3', data.email3);
 
+
       // Business Details
       setValue('companyName', data.company); // Mapped from 'company'
       setValue('businessWebsite', data.businessWebsite);
       setValue('portfolioWebsite', data.portfolioWebsite);
       setValue('locationMapUrl', data.locationMap); // Mapped from 'locationMap'
+
 
       // Photo URL
       if (data.photoUrl) {
@@ -223,12 +223,14 @@
         photoPreviewContainer.style.display = 'none';
       }
 
+
       // Working Hours
       if (data.workingHours) {
         ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(day => {
           setValue(day, data.workingHours[day]);
         });
       }
+
 
       // Social Links (Need to show the normalized URL in the input fields)
       if (data.socialLinks) {
@@ -237,10 +239,11 @@
         });
       }
 
+
       // Bio & Address
       setValue('bio', data.bio);
       setValue('address', data.address);
-      
+      
       // UPDATED: Save the last VCard URL and update UI if it exists
       lastVcardUrl = data.vcardUrl || null;
       if (lastVcardUrl) {
@@ -252,9 +255,11 @@
       }
     };
 
+
     // ------------------------
     // Core Application Logic
     // ------------------------
+
 
     const fetchClientData = async (id) => {
       try {
@@ -265,7 +270,7 @@
         }
         const json = await response.json();
         // Ensure consistent data retrieval from response
-        const data = json.data || json; 
+        const data = json.data || json; 
         populateForm(data);
         console.log(`Form populated with client data for ID: ${id}`);
       } catch (error) {
@@ -274,34 +279,41 @@
       }
     };
 
+
     const uploadPhoto = async (file) => {
       if (!file) return;
 
+
       const formData = new FormData();
-      formData.append('photo', file); 
+      formData.append('photo', file); 
+
 
       try {
         photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
         photoUploadLabel.style.backgroundColor = '#3b82f6';
+
 
         const response = await fetch(`${API_URL}/upload-photo`, {
           method: 'POST',
           body: formData,
         });
 
+
         const json = await response.json();
+
 
         if (!response.ok || json.status !== 'success') {
           throw new Error(json.message || 'Photo upload failed on the server.');
         }
 
+
         // Correctly retrieve photoUrl from response structure
         const photoUrl = json.data?.photoUrl || json.photoUrl;
-        
+        
         if (!photoUrl) {
           throw new Error("Server returned success but no public photo URL.");
         }
-        
+        
         photoUrlInput.value = photoUrl;
         photoUploadLabel.textContent = 'Photo Uploaded';
         photoUploadLabel.style.backgroundColor = '#22c55e';
@@ -318,20 +330,23 @@
       }
     };
 
+
     const handleFormSubmission = async (e) => {
       e.preventDefault();
       // Get the client ID from the hidden input field
-      const currentId = clientIdInput.value; 
+      const currentId = clientIdInput.value; 
+
 
       if (isSaving) return;
       isSaving = true;
       saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
       saveBtn.disabled = true;
-      
+      
       // UPDATED: Reset vCard button/display on save as the vCard data might change
       lastVcardUrl = null;
       resetVcardButton();
       updateQrCodeDisplay(null, null);
+
 
       const formData = new FormData(form);
       const payload = {};
@@ -339,18 +354,19 @@
       const workingHours = {};
       const workingHoursKeys = ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'];
       const socialLinksKeys = ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'];
-      
+      
       for (const [key, value] of formData.entries()) {
         // Exclude file input and the hidden clientId field, and empty strings
-        if (key !== 'photoFile' && key !== 'clientId' && value !== '') { 
+        if (key !== 'photoFile' && key !== 'clientId' && value !== '') { 
           payload[key] = value.trim();
         }
       }
-      
+      
       try {
         // --- Validation of Phone and Email ---
         const phoneFields = ['phone1', 'phone2', 'phone3'];
         const emailFields = ['email1', 'email2', 'email3'];
+
 
         for (const key of phoneFields) {
             if (payload[key] && !isValidPhone(payload[key])) {
@@ -358,35 +374,37 @@
             }
         }
 
+
         for (const key of emailFields) {
             if (payload[key] && !isValidEmail(payload[key])) {
               throw new Error(`Invalid email address for ${key}.`);
             }
         }
 
+
         // 1. Data Normalization for Backend Schema
-        
+        
         // Map companyName field to the expected 'company' schema field
         if (payload.companyName) {
           payload.company = payload.companyName;
           delete payload.companyName;
         }
-        
+        
         // Map locationMapUrl field to the expected 'locationMap' schema field
         if (payload.locationMapUrl) {
           payload.locationMap = payload.locationMapUrl;
           delete payload.locationMapUrl;
         }
-        
+        
         // Populate nested workingHours
         for (const key of workingHoursKeys) {
           // Treat empty string or default time as null/undefined
           if (payload[key] && payload[key] !== '00:00') {
             workingHours[key] = payload[key];
           }
-          delete payload[key]; 
+          delete payload[key]; 
         }
-        
+        
         // Populate nested socialLinks with normalization
         for (const key of socialLinksKeys) {
           const normalizedUrl = normalizeSocialLink(key, payload[key]);
@@ -394,31 +412,35 @@
             socialLinks[key] = normalizedUrl;
           }
           // Always delete the flat key from the main payload
-          delete payload[key]; 
+          delete payload[key]; 
         }
+
 
         if (Object.keys(workingHours).length > 0) payload.workingHours = workingHours;
         if (Object.keys(socialLinks).length > 0) payload.socialLinks = socialLinks;
 
+
         // 2. API Call (PUT/POST)
         const url = currentId ? `${API_URL}/clients/${currentId}` : `${API_URL}/clients`;
         const method = currentId ? 'PUT' : 'POST';
+
 
         const response = await fetch(url, {
           method: method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        
+        
         const json = await response.json();
+
 
         // Check for both response.ok and status: 'success'
         if (!response.ok || json.status !== 'success') {
           throw new Error(json.message || 'Failed to save client info.');
         }
-        
+        
         showToast('Client info saved successfully!');
-        
+        
         // If creating a new client (POST), get the new ID and update the URL/UI
         const newId = json.data?._id || json._id;
         if (!currentId && newId) {
@@ -428,7 +450,7 @@
           viewPdfBtn.disabled = false;
           createVcardBtn.disabled = false;
         }
-        
+        
       } catch (error) {
         console.error('Save error:', error);
         showToast(`Save failed: ${error.message}`, true);
@@ -439,40 +461,45 @@
       }
     };
 
+
     // --- TASK 1: FIX THE "VIEW CLIENT INFO PDF" BUTTON ---
-    
+    
     const handleViewPdfClick = () => {
       // Using the generic file request handler for robust PDF generation/cancellation
       handleFileRequest(`/clients/${clientIdInput.value}/pdf`, 'PDF', viewPdfBtn);
     };
-    
+    
     /**
-      * ADDED: Handles the process of fetching a file (like PDF) from the backend and opening/downloading it.
+      * ADDED/REPLACED: Handles the process of fetching a file (like PDF) from the backend and opening/downloading it.
+      * Includes cancellation logic for PDF.
       * @param {string} endpoint - The API endpoint to hit (e.g., `/clients/:id/pdf`).
-      * @param {string} fileType - The type of file (e.g., 'PDF', 'vCard').
+      * @param {string} fileType - The type of file (e.g., 'PDF').
       * @param {HTMLElement} button - The button element being clicked.
       */
     const handleFileRequest = async (endpoint, fileType, button) => {
       const currentId = clientIdInput.value;
-      const defaultText = `View Client Info ${fileType}`; // Dynamic default text
-      
+      const defaultText = `View Client Info ${fileType}`; // Dynamic default text (PDF only)
+      
       if (!currentId) {
-        return showToast(`No ${fileType} available. Save client info first.`, true);
+        // TASK 1A: If missing ID, show specific toast
+        return showToast(`No PDF available. Save client info first.`, true);
       }
 
-      // Check for cancellation/in-progress state (only PDF uses cancellation for now)
+
+      // TASK 1B: Check for cancellation/in-progress state
       if (fileType === 'PDF' && isPdfGenerating) {
         pdfAbortController.abort();
         showToast(`${fileType} generation cancelled.`, false);
-        resetDownloadButton(button, defaultText);
+        resetDownloadButton(button, defaultText); // Reset state
         isPdfGenerating = false;
         return;
       }
-      
-      // Set button to loading state
-      button.innerHTML = `Generating ${fileType}... <span class="spinner"></span>`;
+      
+      // TASK 1C: Set button to loading state immediately
+      button.innerHTML = `Generating... <span class="spinner"></span>`;
       button.classList.add('pressed');
       button.disabled = true;
+
 
       // Create controller for cancellation (PDF)
       let signal = null;
@@ -482,62 +509,68 @@
         isPdfGenerating = true;
       }
 
+
       try {
         const response = await fetch(`${API_URL}${endpoint}`, {
           method: 'POST',
           signal: signal,
         });
-        
+        
         if (signal && signal.aborted) return; // Exit if aborted
+
 
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.message || `Failed to retrieve ${fileType}.`);
         }
-        
+        
         const json = await response.json();
-        const fileUrl = json.data?.url || json.url || json.data?.pdfUrl || json.pdfUrl; // Generic URL check
+        // TASK 1A: Correctly read pdfUrl from either json.data.pdfUrl or json.pdfUrl
+        const pdfUrl = json.data?.pdfUrl || json.pdfUrl;
 
-        if (fileUrl) {
-          // For PDF, we open it in a new tab for viewing.
-          if (fileType === 'PDF') {
-            window.open(fileUrl, '_blank');
-            showToast(`${fileType} opened successfully!`);
-          } else {
-            // For other files (like vCard download), we use the helper
-            downloadFile(fileUrl, `${currentId}.${fileType.toLowerCase()}`);
-            showToast(`${fileType} download initiated!`);
-          }
-          
+
+        if (pdfUrl) {
+          // TASK 1A: Open it in a new tab.
+          window.open(pdfUrl, '_blank');
+          showToast(`${fileType} opened successfully!`);
         } else {
-          throw new Error(`Server returned success but no public ${fileType} URL.`);
+          // TASK 1A: If missing or null, show toast.
+          showToast(`No PDF available. Save client info first.`, true);
+          throw new Error('PDF URL not returned by server.');
         }
-        
+        
       } catch (error) {
         if (error.name === 'AbortError') {
           console.log(`${fileType} generation aborted by user.`);
-          return;
+          return; // Do not run finally block if aborted
         }
-
-        console.error(`${fileType} retrieval error:`, error);
-        showToast(`${fileType} retrieval failed: ${error.message}`, true);
+        if (!error.message.includes("No PDF available")) {
+          console.error(`${fileType} retrieval error:`, error);
+          showToast(`PDF retrieval failed: ${error.message}`, true);
+        }
       } finally {
+        // TASK 1C: Must immediately reset after opening the PDF or upon error.
         if (fileType === 'PDF') isPdfGenerating = false;
         resetDownloadButton(button, defaultText);
       }
     };
-    
+    
     // --- TASK 2: FIX & ENHANCE THE “CREATE VCARD” BUTTON ---
 
-    // Helper to update vCard button to the success state
+
+    // Helper to update vCard button to the success state (TASK 2A)
     const updateVcardButton = (url) => {
       lastVcardUrl = url;
-      
-      // Get the URL segment for display
-      const urlPath = url.replace(/^https?:\/\//, '').split(/[/?#]/)[0];
-      
+      
+      // Use the hostname for display to keep it short, as requested in prompt.
+      let urlPath = url;
+      try {
+        const urlObj = new URL(url);
+        urlPath = urlObj.hostname;
+      } catch(e) { /* use full URL if parsing fails */ }
+      
       // A. Replace the button label with: “vCard Created — <vcardUrl> | Copy URL | ↻”
-      // Note: Since the element inner HTML is changed, event listeners for inner spans must be re-added.
+      // Note: innerHTML removal/replacement is necessary for dynamic children listeners.
       createVcardBtn.innerHTML = `
         vCard Created — ${urlPath}
         <span id="copy-vcard-url" style="color: #FFD700; cursor: pointer; margin-left: 5px;">| Copy URL</span>
@@ -545,15 +578,16 @@
       `;
       createVcardBtn.classList.remove('pressed');
       createVcardBtn.disabled = false;
-      
-      // Add event listeners for the dynamic elements
+
+
+      // Event listeners MUST be re-added as innerHTML replaced existing elements
       const copyBtn = document.getElementById('copy-vcard-url');
       const refreshBtn = document.getElementById('refresh-vcard-url');
-      
+      
       if (copyBtn) {
         copyBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent the parent click handler from firing
-          navigator.clipboard.writeText(lastVcardUrl).then(() => {
+          e.stopPropagation(); // Prevent the main button logic
+          navigator.clipboard.writeText(lastVcardUrl || url).then(() => {
             showToast('vCard URL copied to clipboard!');
           }).catch(err => {
             console.error('Copy failed:', err);
@@ -561,11 +595,11 @@
           });
         });
       }
-      
+      
       if (refreshBtn) {
         refreshBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent the parent click handler from firing
-          // Reopen the vcardUrl in a new tab.
+          e.stopPropagation(); // Prevent the main button logic
+          // A. The refresh icon (↻) must reopen the vcardUrl in a new tab.
           if (lastVcardUrl) {
             window.open(lastVcardUrl, '_blank');
             showToast('vCard link reopened.', false);
@@ -574,72 +608,63 @@
       }
     };
 
-    // Helper to restore the default vCard button state and re-attach listeners
+
+    // Helper to restore the default vCard button state (TASK 2C)
     const resetVcardButton = () => {
-      const currentBtn = document.getElementById('create-vcard-btn');
-      
-      // Only replace if the inner content is custom (i.e., contains 'Copy URL')
-      if (currentBtn && currentBtn.innerHTML.includes('Copy URL')) {
-        const newBtn = currentBtn.cloneNode(true);
-        newBtn.innerHTML = 'Create vCard'; // Reset inner text
-        
-        // Remove old listener, replace element, add new listener
-        currentBtn.parentNode.replaceChild(newBtn, currentBtn);
-        newBtn.addEventListener('click', handleCreateVcardClick);
-        newBtn.classList.remove('pressed');
-        newBtn.disabled = !clientIdInput.value;
-      } else if (currentBtn) {
-        // If already default state, just ensure it's correct
-        currentBtn.innerHTML = 'Create vCard';
-        currentBtn.classList.remove('pressed');
-        currentBtn.disabled = !clientIdInput.value;
-      }
+      // Reset the main button's inner HTML to default text
+      createVcardBtn.innerHTML = 'Create vCard'; // Restore label
+      createVcardBtn.classList.remove('pressed');
+      createVcardBtn.disabled = !clientIdInput.value; // Restore state
+      lastVcardUrl = null;
     };
+
 
     const handleCreateVcardClick = async () => {
       const currentId = clientIdInput.value;
       if (!currentId) return showToast('Please save client info first.', true);
 
-      // Must get the current button reference (since it might have been reset)
-      const currentCreateVcardBtn = document.getElementById('create-vcard-btn');
-      if (!currentCreateVcardBtn) return;
-      
-      currentCreateVcardBtn.classList.add('pressed');
-      currentCreateVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
-      currentCreateVcardBtn.disabled = true;
+
+      // Ensure button state is for "Creating"
+      createVcardBtn.classList.add('pressed');
+      createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
+      createVcardBtn.disabled = true;
+
 
       try {
+        // NOTE: This endpoint remains the same, ensuring email sending logic is kept intact (TASK 2B).
         const response = await fetch(`${API_URL}/clients/${currentId}/vcard`, {
           method: 'POST',
         });
+
 
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to create vCard.');
         }
 
+
         const json = await response.json();
-        
+        
         // Check both nested and top-level response structures
         const data = json.data || json;
         const vcardUrl = data.vcardUrl;
         const qrCodeUrl = data.qrCodeUrl;
-        
-        // D. If backend returns no vcardUrl: Show toast
-        if (!vcardUrl || !qrCodeUrl) {
-          showToast(`vCard creation failed: Missing URL or QR Code from server.`, true);
-          throw new Error("Missing URL or QR Code from server."); 
+        
+        // TASK 2D: If backend returns no vcardUrl: Show toast
+        if (!vcardUrl) {
+          showToast(`vCard creation failed: Missing URL from server.`, true);
+          throw new Error("Missing URL from server."); 
         }
-        
-        // A. & B. After vCard is successfully created, update button UI and open links.
+        
+        // TASK 2A: Update button UI for success (includes saving lastVcardUrl)
         updateVcardButton(vcardUrl);
         updateQrCodeDisplay(qrCodeUrl, vcardUrl);
         showToast('vCard and QR code created successfully! Email sent.', false);
-        
-        // B. Open vcardUrl in a new tab (to view the page).
+        
+        // TASK 2B: Open vcardUrl in a new tab.
         window.open(vcardUrl, '_blank');
-        
-        // B. Open a clean page displaying ONLY the QR code image 
+        
+        // TASK 2B: Open a clean page displaying ONLY the QR code 
         const qrCodeWindow = window.open('', '_blank');
         qrCodeWindow.document.write(`
           <html><head><title>QR Code</title>
@@ -649,29 +674,32 @@
           </body></html>
         `);
         qrCodeWindow.document.close();
-        
+        
       } catch (error) {
+        // Only show general error if not already handled by a specific toast (like missing URL)
         if (!error.message.includes("Missing URL")) {
           console.error('vCard creation error:', error);
           showToast(`vCard creation failed: ${error.message}`, true);
         }
-        
-        // C. Restore button state cleanly if there is an error.
+        
+        // TASK 2C: Restore button state cleanly if there is an error.
         resetVcardButton();
-      } 
+      } 
     };
-    
+    
+
 
     // ------------------------
     // Initialization & Event Listeners
     // ------------------------
+
 
     document.addEventListener('DOMContentLoaded', () => {
       if (urlClientId) {
         // Set initial ID from URL parameter and fetch data
         clientIdInput.value = urlClientId;
         fetchClientData(urlClientId);
-        // Buttons enabled by populateForm if vcardUrl exists, or enabled here for PDF
+        // Enable buttons (they will be disabled if fetch fails or data is new)
         viewPdfBtn.disabled = false;
         createVcardBtn.disabled = false;
       } else {
@@ -680,6 +708,7 @@
         createVcardBtn.disabled = true;
       }
     });
+
 
     photoUploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -692,14 +721,17 @@
         };
         reader.readAsDataURL(file);
 
+
         // Start network upload
         uploadPhoto(file);
       }
     });
 
+
     form.addEventListener('submit', handleFormSubmission);
     // Bind the initial event listeners
     viewPdfBtn.addEventListener('click', handleViewPdfClick);
     createVcardBtn.addEventListener('click', handleCreateVcardClick);
+
 
   })();
