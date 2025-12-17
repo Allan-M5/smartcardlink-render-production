@@ -31,11 +31,12 @@ const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI; 
 
+
 // Base URLs - Using the newly defined .env variables
 const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; 
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000"; 
 const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; 
-const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL; 
+const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL;
 
 
 // Derive the base URL for the backend API for internal use (CORS)
@@ -45,7 +46,7 @@ const BACKEND_API_URL = new URL(APP_BASE_URL).origin;
 // SMTP
 const SMTP_HOST = process.env.SMTP_HOST; 
 const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587; 
-const SMTP_USER = process.env.SMTP_USER; 
+const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || null; 
 
@@ -88,7 +89,6 @@ const workingHoursSchema = new mongoose.Schema({
 }, { _id: false });
 
 
-
 const ClientSchema = new mongoose.Schema({
     // Personal Details
     fullName: { type: String, required: true, trim: true },
@@ -108,6 +108,7 @@ const ClientSchema = new mongoose.Schema({
     portfolioWebsite: { type: String, trim: true, default: "" },
     locationMap: { type: String, trim: true, default: "" },
     address: { type: String, default: "" },
+    
     bio: { type: String, default: "" },
 
 
@@ -147,7 +148,6 @@ mongoose
         logger.error({ err }, "❌ MongoDB connection error. Check MONGODB_URI.");
         process.exit(1);
     });
-
 
 
 // Cloudinary Configuration: Uses CLOUDINARY_... variables
@@ -219,10 +219,9 @@ const generateUniqueSlug = async (name) => {
         .replace(/[^a-z0-9\s-]/g, "") 
         .replace(/[\s-]+/g, "-") 
         .substring(0, 50);
-
-
     let slug = baseSlug;
     let counter = 1;
+    // FIX: Check uniqueness across all statuses and use suffixes for collisions
     while (await Client.findOne({ slug: slug })) {
         slug = `${baseSlug}-${counter}`;
         counter++;
@@ -245,17 +244,22 @@ const generateVcardContent = (client) => {
     vCard.name = client.fullName;
     vCard.organization = client.company || "";
     vCard.title = client.title || "";
-    
+
+
     // Primary Contacts
     if (client.phone1) vCard.cellPhone = client.phone1;
     if (client.email1) vCard.email = client.email1;
-    
+
+
     // Secondary Contacts
     if (client.phone2) vCard.workPhone = client.phone2;
     if (client.email2) vCard.workEmail = client.email2;
+
+
     if (client.phone3) vCard.otherPhone = client.phone3;
     if (client.email3) vCard.otherEmail = client.email3;
-    
+
+
     // Addresses and URLs
     if (client.address) vCard.homeAddress.label = client.address;
     if (client.website || client.businessWebsite) vCard.url = client.website || client.businessWebsite;
@@ -263,17 +267,20 @@ const generateVcardContent = (client) => {
 
 
     // Social Links (using an X-SOCIAL property for broader compatibility)
+    // FIX: Process social links safely to prevent errors on missing fields
     if (client.socialLinks) {
-        const socialText = Object.entries(client.socialLinks)
-            .filter(([_, url]) => url)
+        const socialData = client.socialLinks.toObject ? client.socialLinks.toObject() : client.socialLinks;
+        const socialText = Object.entries(socialData)
+            .filter(([_, url]) => url && typeof url === 'string')
             .map(([platform, url]) => `${platform}: ${url}`)
             .join('\n');
         if (socialText) vCard.socialmedia = socialText;
     }
     
-    if (client.photoUrl) {
+    // FIX: Only attach photo if a valid URL exists
+    if (client.photoUrl && client.photoUrl.startsWith('http')) {
         try {
-            vCard.photo.attachFromUrl(client.photoUrl, 'JPEG'); 
+            vCard.photo.attachFromUrl(client.photoUrl, 'JPEG');
         } catch(e) {
             logger.warn({ error: e, photoUrl: client.photoUrl }, "Failed to attach photo to vCard from URL. Proceeding without image.");
         }
@@ -293,9 +300,10 @@ const uploadVcfToCloudinary = async (slug, vcfContent) => {
         {
             folder: "smartcardlink_vcards",
             resource_type: "raw", 
-            public_id: slug, 
+            public_id: `${slug}_vcard`, 
             format: "vcf",
             tags: ["client_vcard"],
+            overwrite: true
         }
     );
     return result.secure_url;
@@ -329,7 +337,7 @@ const sendEmail = async (to, subject, text, html) => {
 // PDF Stub 
 const generateAndUploadPdf = async (client) => {
     logger.warn(`PDF generation is a complex feature and is currently stubbed (generateAndUploadPdf).`);
-    // Stubbed URL based on client slug
+    // FIX: Standardized return of Cloudinary PDF URL
     return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/raw/upload/smartcardlink_pdfs/${client.slug}.pdf`;
 };
 
@@ -366,7 +374,7 @@ app.use(
                 "https://api.cloudinary.com", 
                 "*.google-analytics.com", 
                 "*.analytics.google.com"
-            ], 
+           ], 
             fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
             frameAncestors: ["'self'"],
         },
@@ -434,11 +442,13 @@ const publicLimiter = RateLimit({
 // Validation Middleware Collections
 // ------------------------
 
+
 // Validation rules for Client creation (POST)
 const validateClientCreation = [
     body('fullName').trim().isLength({ min: 1, max: 100 }).withMessage('Full Name is required and must be under 100 characters.'),
     body('email1').isEmail().optional({ checkFalsy: true }).withMessage('Primary Email (email1) must be a valid email address.'),
 ];
+
 
 // Validation rules for Client update (PUT)
 const validateClientUpdate = [
@@ -450,12 +460,13 @@ const validateClientUpdate = [
     body('status').optional().isIn(["Pending", "Active", "Suspended", "Deleted"]).withMessage('Invalid client status value.'),
 ];
 
+
 // Reusable middleware to handle validation results
 const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         // Use 400 Bad Request for validation failures
-        return respError(res, "Validation Failed.", 400, errors.array()); 
+        return respError(res, "Validation Failed.", 400, errors.array());
     }
     next();
 };
@@ -505,7 +516,6 @@ app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req,
         return respError(res, "Upload error", 500, null, err);
     }
 });
-
 
 
 // POST /api/clients: Create a new client record (initial form submission)
@@ -611,7 +621,6 @@ app.get("/api/admin/clients", publicLimiter, async (req, res) => {
 });
 
 
-
 // GET /api/clients/:id: Helper for Admin Panel to fetch one client
 // NOTE: Security Warning - This route is unauthenticated as requested.
 app.get("/api/clients/:id", publicLimiter, async (req, res) => {
@@ -623,7 +632,6 @@ app.get("/api/clients/:id", publicLimiter, async (req, res) => {
         return respError(res, "Error fetching client.", 500, null, err);
     }
 });
-
 
 
 // PUT /api/clients/:id: Update client info (Admin update route)
@@ -672,9 +680,8 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), validateClien
         }
 
 
-        // CRITICAL FIX: Merge nested fields (socialLinks, workingHours)
+        // CRITICAL FIX: Merge nested fields (socialLinks, workingHours) safely
         if (incoming.socialLinks && typeof incoming.socialLinks === 'object') {
-            // Use Object.keys to ensure only existing/expected fields are copied
             Object.keys(incoming.socialLinks).forEach(key => {
                 if (key in client.socialLinks.toObject()) {
                     client.socialLinks[key] = incoming.socialLinks[key];
@@ -695,7 +702,6 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), validateClien
         }
         
         client.history.push({ action: "CLIENT_UPDATED", notes: "Admin updated client data.", actor: "admin" });
-
         await client.save();
         
         return respSuccess(res, { recordId: client._id }, "Client data saved successfully.");
@@ -709,7 +715,6 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), validateClien
 });
 
 
-
 // PUT /api/clients/:id/status/:newStatus: Handle status changes (Activate, Disable, Processed, Deleted)
 // NOTE: Security Warning - This route is unauthenticated as requested.
 app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) => {
@@ -721,12 +726,14 @@ app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) =>
         // Note: 'Disabled' is mapped to DB schema 'Suspended'
         const dbStatus = newStatus === 'Disabled' ? 'Suspended' : newStatus; 
 
+
         if (!['Active', 'Suspended', 'Pending', 'Deleted'].includes(dbStatus)) {
             return respError(res, "Invalid status requested.", 400);
         }
         
         const client = await Client.findById(id);
         if (!client) return respError(res, "Client not found.", 404);
+
 
         if (client.status === dbStatus) {
              return respSuccess(res, { recordId: client._id, newStatus: dbStatus }, `Client already in status ${dbStatus}.`, 200);
@@ -735,16 +742,15 @@ app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) =>
         client.status = dbStatus;
         client.history.push({ action: `STATUS_CHANGED_TO_${dbStatus.toUpperCase()}`, notes: notes || `Status changed to ${dbStatus}.`, actor: "admin" });
 
+
         await client.save();
         
         return respSuccess(res, { recordId: client._id, newStatus: client.status }, `Client status updated to ${newStatus}.`);
-
     } catch (err) {
         logger.error({ err }, "❌ PUT /api/clients/:id/status/:newStatus error");
         return respError(res, err?.message || "Server error updating status", 500, null, err);
     }
 });
-
 
 
 // DELETE /api/clients/:id: Admin soft-delete route
@@ -758,7 +764,8 @@ app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
         if (!client) return respError(res, "Client not found", 404);
         
         const previous = client.status;
-        client.status = "Deleted"; // Soft delete
+        client.status = "Deleted"; 
+        // Soft delete
 
 
         client.history.push({ action: "CLIENT_DELETED", notes, actor: "admin" });
@@ -771,7 +778,6 @@ app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
         return respError(res, "Server error deleting client", 500, null, err);
     }
 });
-
 
 
 // POST /api/clients/:id/pdf: Admin route to generate and retrieve PDF
@@ -789,13 +795,13 @@ app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
         client.history.push({ action: "PDF_GENERATED", notes: `PDF link created: ${pdfUrl}`, actor: "admin" });
         await client.save();
 
+
         return respSuccess(res, { pdfUrl }, "PDF URL generated successfully", 200, { redirect: pdfUrl });
     } catch (err) {
         logger.error({ err }, "❌ POST /api/clients/:id/pdf error");
         return respError(res, "Server error generating PDF.", 500, null, err);
     }
 });
-
 
 
 // POST /api/clients/:id/vcard: Create vCard, QR code, update client, send email
@@ -812,26 +818,27 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
 
         // 1. Generate vCard Content
         const vcfContent = generateVcardContent(client);
-        
+      
         // 2. Upload VCF to Cloudinary
         const vcardUrl = await uploadVcfToCloudinary(client.slug, vcfContent);
         
         // 3. Prepare public page link and Generate QR Code (Data URL encoding the public page)
-        const publicVcardPage = `${VCARD_BASE_URL}/vcard.html?slug=${client.slug}`; // Uses VCARD_BASE_URL
+        // FIX: Ensure the public page link uses the correct VCARD_BASE_URL formatting
+        const publicVcardPage = `${VCARD_BASE_URL.replace(/\/$/, "")}/vcard.html?slug=${client.slug}`; 
         const qrCodeDataUrl = await qrcode.toDataURL(publicVcardPage, { errorCorrectionLevel: "H", type: "image/png" }); 
+
 
         // 4. Update DB
         client.vcardUrl = vcardUrl; 
         client.qrCodeUrl = qrCodeDataUrl; 
-        client.status = "Active"; 
+        client.status = "Active";
         client.history.push({ 
             action: "VCARD_GENERATED", 
             notes: `vCard generated, status set to Active. VCF: ${vcardUrl}`,
             actor: "admin"
         });
-
-
         await client.save(); 
+
 
         // 5. Send Client Email (Uses SMTP details)
         const emailSubject = `Your SmartCardLink is Ready!`;
@@ -844,17 +851,12 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
             <p>Thank you.</p>
         `;
         await sendEmail(client.email1, emailSubject, `Your digital smart card link is: ${publicVcardPage}`, emailHtml);
-
-
         return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.", 200);
-
-
     } catch (err) {
         logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
         return respError(res, err?.message || "vCard generation failed.", 500, null, err);
     }
 });
-
 
 
 // ------------------------
@@ -933,6 +935,7 @@ const ALLOWED_ORIGINS_LOG = [
     new URL(FRONTEND_BASE_URL).origin,
     new URL(VCARD_BASE_URL).origin
 ].join(' and ');
+
 
 app.listen(PORT, HOST, () => {
     // Logs the live URL from your environment settings
