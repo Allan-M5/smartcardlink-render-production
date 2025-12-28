@@ -125,6 +125,29 @@
 
     </main>
   </div>
+
   <script src="/js/vcard.js" defer></script>
+
+  <!-- Small fix: Ensure popups load after DOM -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const popup1 = document.getElementById('popup1');
+      const popup2 = document.getElementById('popup2');
+      const moreInfoBtn = document.getElementById('moreInfoBtn');
+      const backBtn = document.getElementById('backBtn');
+
+      if (moreInfoBtn && backBtn && popup1 && popup2) {
+        moreInfoBtn.addEventListener('click', () => {
+          popup1.hidden = true;
+          popup2.hidden = false;
+        });
+
+        backBtn.addEventListener('click', () => {
+          popup1.hidden = false;
+          popup2.hidden = true;
+        });
+      }
+    });
+  </script>
 </body>
 </html>
