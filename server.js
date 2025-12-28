@@ -824,7 +824,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
         
         // 3. Prepare public page link and Generate QR Code (Data URL encoding the public page)
         // FIX: Ensure the public page link uses the correct VCARD_BASE_URL formatting
-        const publicVcardPage = `${VCARD_BASE_URL.replace(/\/$/, "")}/vcard.html?slug=${client.slug}`; 
+        const publicVcardPage = `${VCARD_BASE_URL.replace(/\/$/, "")}/${client.slug}`;
         const qrCodeDataUrl = await qrcode.toDataURL(publicVcardPage, { errorCorrectionLevel: "H", type: "image/png" }); 
 
 
