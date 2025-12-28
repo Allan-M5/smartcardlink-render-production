@@ -803,61 +803,114 @@ app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
     }
 });
 
-
 // POST /api/clients/:id/vcard: Create vCard, QR code, update client, send email
 // NOTE: Security Warning - This route is unauthenticated as requested.
 app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
     try {
-        const id = req.params.id;
+        const { id } = req.params;
+
         const client = await Client.findById(id);
-
-
         if (!client) return respError(res, "Client not found.", 404);
-        if (!client.email1) return respError(res, "Cannot generate vCard: Client has no primary email address (email1).", 400);
+        if (!client.slug) return respError(res, "Client slug missing.", 400);
+        if (!client.email1) {
+            return respError(
+                res,
+                "Cannot generate vCard: Client has no primary email address (email1).",
+                400
+            );
+        }
 
-
-        // 1. Generate vCard Content
+        /* ---------------------------------------------------
+           1. Generate vCard (.vcf) content
+        --------------------------------------------------- */
         const vcfContent = generateVcardContent(client);
-      
-        // 2. Upload VCF to Cloudinary
+
+        /* ---------------------------------------------------
+           2. Upload .vcf to Cloudinary
+        --------------------------------------------------- */
         const vcardUrl = await uploadVcfToCloudinary(client.slug, vcfContent);
-        
-        // 3. Prepare public page link and Generate QR Code (Data URL encoding the public page)
-        // FIX: Ensure the public page link uses the correct VCARD_BASE_URL formatting
-        const publicVcardPage = `${VCARD_BASE_URL.replace(/\/$/, "")}/${client.slug}`;
-        const qrCodeDataUrl = await qrcode.toDataURL(publicVcardPage, { errorCorrectionLevel: "H", type: "image/png" }); 
 
+        /* ---------------------------------------------------
+           3. Build CORRECT public vCard page URL
+           ✔ Uses index.html with ?slug=
+           ✔ Works with your existing vcard.js
+        --------------------------------------------------- */
+        const basePublicUrl = VCARD_BASE_URL.replace(/\/$/, "");
+        const publicVcardPage = `${basePublicUrl}/?slug=${client.slug}`;
 
-        // 4. Update DB
-        client.vcardUrl = vcardUrl; 
-        client.qrCodeUrl = qrCodeDataUrl; 
-        client.status = "Active";
-        client.history.push({ 
-            action: "VCARD_GENERATED", 
-            notes: `vCard generated, status set to Active. VCF: ${vcardUrl}`,
-            actor: "admin"
+        /* ---------------------------------------------------
+           4. Generate QR Code pointing to public page
+        --------------------------------------------------- */
+        const qrCodeDataUrl = await qrcode.toDataURL(publicVcardPage, {
+            errorCorrectionLevel: "H",
+            type: "image/png",
         });
-        await client.save(); 
 
+        /* ---------------------------------------------------
+           5. Update Client Record
+        --------------------------------------------------- */
+        client.vcardUrl = vcardUrl;
+        client.qrCodeUrl = qrCodeDataUrl;
+        client.status = "Active";
+        client.history.push({
+            action: "VCARD_GENERATED",
+            notes: `vCard generated. Public page: ${publicVcardPage}`,
+            actor: "admin",
+        });
 
-        // 5. Send Client Email (Uses SMTP details)
-        const emailSubject = `Your SmartCardLink is Ready!`;
+        await client.save();
+
+        /* ---------------------------------------------------
+           6. Send Client Email
+        --------------------------------------------------- */
+        const emailSubject = "Your SmartCardLink is Ready!";
         const emailHtml = `
             <p>Dear ${client.fullName},</p>
-            <p>Your digital smart card is now <strong>Active</strong> and ready to share.</p>
-            <p><strong>Public Page Link:</strong> <a href="${publicVcardPage}">${publicVcardPage}</a></p>
-            <p><strong>Direct Download vCard:</strong> <a href="${vcardUrl}">Click to Download Contact (.vcf)</a></p>
-            <p>Please save the downloaded .vcf file to your contacts.</p>
-            <p>Thank you.</p>
+            <p>Your SmartCardLink digital card is now <strong>Active</strong>.</p>
+
+            <p>
+                <strong>Public Smart Card:</strong><br/>
+                <a href="${publicVcardPage}">${publicVcardPage}</a>
+            </p>
+
+            <p>
+                <strong>Download vCard (.vcf):</strong><br/>
+                <a href="${vcardUrl}">Click here to save contact</a>
+            </p>
+
+            <p>You may share the public link or scan the QR code on your card.</p>
+            <p>— SmartCardLink Team</p>
         `;
-        await sendEmail(client.email1, emailSubject, `Your digital smart card link is: ${publicVcardPage}`, emailHtml);
-        return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.", 200);
+
+        await sendEmail(
+            client.email1,
+            emailSubject,
+            `Your SmartCardLink is ready: ${publicVcardPage}`,
+            emailHtml
+        );
+
+        /* ---------------------------------------------------
+           7. Success Response
+        --------------------------------------------------- */
+        return respSuccess(
+            res,
+            {
+                vcardUrl,
+                qrCodeUrl: qrCodeDataUrl,
+                publicVcardPage,
+            },
+            "vCard generated successfully.",
+            200
+        );
     } catch (err) {
         logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
-        return respError(res, err?.message || "vCard generation failed.", 500, null, err);
+        return respError(
+            res,
+            err?.message || "vCard generation failed.",
+            500
+        );
     }
 });
-
 
 // ------------------------
 // Public View Route (VCard page)
