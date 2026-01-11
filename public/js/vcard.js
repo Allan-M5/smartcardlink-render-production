@@ -122,6 +122,12 @@
    }
  }
 
+function releaseFocus(container) {
+  if (!container) return;
+  const active = document.activeElement;
+  if (container.contains(active)) active.blur();
+}
+
 // --- DATA FETCHING ---
 async function fetchProfileData() {
   try {
@@ -384,22 +390,31 @@ async function fetchProfileData() {
   // Popup Navigation & Sizing Logic (Kept intact)
   if (buttons.moreInfo && popup1 && popup2) {
    buttons.moreInfo.onclick = () => {
-    // Set dynamic height for a smoother transition
-    const height = popup1.offsetHeight;
-    if(vcardContainer) vcardContainer.style.height = height + 'px';
-    popup2.style.height = height + 'px';
-    
-    setHidden(popup1, true);
-    setHidden(popup2, false);
-    popup2.scrollTop = 0;
-   };
+  const height = popup1.offsetHeight;
+  if (vcardContainer) vcardContainer.style.height = height + "px";
+  popup2.style.height = height + "px";
+
+  releaseFocus(popup1);
+
+  setHidden(popup1, true);
+  setHidden(popup2, false);
+
+  const firstFocusable = popup2.querySelector("button, a, input, [tabindex]");
+  if (firstFocusable) firstFocusable.focus();
+
+  popup2.scrollTop = 0;
+};
   }
   
   if (buttons.back) {
    buttons.back.onclick = () => {
-    setHidden(popup2, true);
-    setHidden(popup1, false);
-   };
+  releaseFocus(popup2);
+
+  setHidden(popup2, true);
+  setHidden(popup1, false);
+
+  if (buttons.moreInfo) buttons.moreInfo.focus();
+};
   }
 
   // Live Time Update (Kept intact)
@@ -419,5 +434,7 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
+
 
 
