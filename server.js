@@ -1,4 +1,4 @@
-// C:\Users\ADMIN\Desktop\smartcardlink-app\server.js
+﻿// C:\Users\ADMIN\Desktop\smartcardlink-app\server.js
 // ------------------------
 // Imports
 // ------------------------
@@ -148,9 +148,9 @@ const staticPath = path.join(__dirname, "public");
 // MongoDB Connection: Uses MONGODB_URI
 mongoose
     .connect(MONGO_URI)
-    .then(() => logger.info("✅ MongoDB connected successfully"))
+    .then(() => logger.info("âœ… MongoDB connected successfully"))
     .catch((err) => {
-        logger.error({ err }, "❌ MongoDB connection error. Check MONGODB_URI.");
+        logger.error({ err }, "âŒ MongoDB connection error. Check MONGODB_URI.");
         process.exit(1);
     });
 
@@ -334,7 +334,7 @@ const sendEmail = async (to, subject, text, html) => {
         const info = await transporter.sendMail(mailOptions);
         logger.info(`Email sent to ${to}: ${info.messageId}`);
     } catch (err) {
-        logger.error({ err }, `❌ Failed to send email to ${to}`);
+        logger.error({ err }, `âŒ Failed to send email to ${to}`);
     }
 };
 
@@ -374,7 +374,7 @@ app.use(
                 "'self'", 
                 BACKEND_API_URL, 
                 new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
-                new URL(VCARD_BASE_URL).origin,   // Added for public vCard access
+                new URL(VCARD_BASE_URL).origin, Â  // Added for public vCard access
                 "res.cloudinary.com", 
                 "https://api.cloudinary.com", 
                 "*.google-analytics.com", 
@@ -477,8 +477,53 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 
-// Serve all static files from /public
-app.use(express.static(staticPath));
+// ------------------------
+// Public View Route (VCard page)
+// ------------------------// Serve all static files from /public
+ // ------------------------
+ // Public VCard JSON API
+ // ------------------------
+ app.get("/api/vcard/:slug", publicLimiter, async (req, res) => {
+     try {
+         const slug = req.params.slug;
+
+         const client = await Client.findOne({ slug, status: "Active" });
+         if (!client) {
+             await logAction("system", "VCARD_MISSING", null, `Missing or inactive slug: ${slug}`, { ip: req.ip });
+             return respError(res, "vCard not found or inactive.", 404);
+         }
+
+         await logAction("system", "VCARD_VISIT", client._id, `Public vCard viewed: ${slug}`, { ip: req.ip });
+
+         return respSuccess(res, {
+             fullName: client.fullName,
+             title: client.title,
+             company: client.company,
+             phone1: client.phone1,
+             phone2: client.phone2,
+             phone3: client.phone3,
+             email1: client.email1,
+             email2: client.email2,
+             email3: client.email3,
+             website: client.website || client.businessWebsite,
+             portfolioWebsite: client.portfolioWebsite,
+             locationMap: client.locationMap,
+             address: client.address,
+             bio: client.bio,
+             photoUrl: client.photoUrl,
+             vcardUrl: client.vcardUrl,
+             qrCodeUrl: client.qrCodeUrl,
+             socialLinks: client.socialLinks,
+             workingHours: client.workingHours
+         }, "vCard data retrieved successfully");
+
+     } catch (err) {
+         logger.error({ err }, "❌ GET /api/vcard/:slug error");
+         return respError(res, "Failed to load vCard.", 500, null, err);
+     }
+ });
+
+ app.use(express.static(staticPath));
 
 // Favicon check
 app.get("/favicon.ico", (req, res) => {
@@ -520,7 +565,7 @@ app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req,
         // Return a simplified JSON response for frontend consumption
         return respSuccess(res, { photoUrl: result.secure_url }, "Photo uploaded successfully");
     } catch (err) {
-        logger.error({ err }, "❌ POST /api/upload-photo error");
+        logger.error({ err }, "âŒ POST /api/upload-photo error");
         return respError(res, "Upload error", 500, null, err);
     }
 });
@@ -550,7 +595,7 @@ app.post("/api/clients", publicLimiter, validateClientCreation, handleValidation
         // Notify admin by email (Uses ADMIN_EMAIL and SMTP details)
         if (ADMIN_EMAIL) {
             const subject = `New SmartCardLink submission: ${clientDoc.fullName}`;
-            const text = `New client submitted. ID: ${clientDoc._id} — ${clientDoc.fullName}. Check admin panel to process.`;
+            const text = `New client submitted. ID: ${clientDoc._id} â€” ${clientDoc.fullName}. Check admin panel to process.`;
             await sendEmail(ADMIN_EMAIL, subject, text);
         }
         
@@ -559,7 +604,7 @@ app.post("/api/clients", publicLimiter, validateClientCreation, handleValidation
         if (err.name === 'ValidationError') {
             return respError(res, `Validation Error: ${err.message}`, 400, null, err);
         }
-        logger.error({ err }, "❌ POST /api/clients error");
+        logger.error({ err }, "âŒ POST /api/clients error");
         return respError(res, err?.message || "Server error", 500, null, err);
     }
 });
@@ -576,7 +621,7 @@ app.get("/api/clients/all", publicLimiter, async (req, res) => {
 
         return respSuccess(res, clients, "All clients retrieved successfully");
     } catch (err) {
-        logger.error({ err }, "❌ GET /api/clients/all error");
+        logger.error({ err }, "âŒ GET /api/clients/all error");
         return respError(res, "Server error fetching all clients", 500, null, err);
     }
 });
@@ -623,7 +668,7 @@ app.get("/api/admin/clients", publicLimiter, async (req, res) => {
 
         return respSuccess(res, clients, "Admin clients list retrieved successfully", 200, meta);
     } catch (err) {
-        logger.error({ err }, "❌ GET /api/admin/clients error");
+        logger.error({ err }, "âŒ GET /api/admin/clients error");
         return respError(res, "Server error fetching clients", 500, null, err);
     }
 });
@@ -717,7 +762,7 @@ app.put("/api/clients/:id", publicLimiter, upload.single("photo"), validateClien
         if (err.name === 'ValidationError') {
             return respError(res, `Validation Error: ${err.message}`, 400, null, err);
         }
-        logger.error({ err }, "❌ PUT /api/clients/:id error");
+        logger.error({ err }, "âŒ PUT /api/clients/:id error");
         return respError(res, "Server error saving client info.", 500, null, err);
     }
 });
@@ -755,7 +800,7 @@ app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) =>
         
         return respSuccess(res, { recordId: client._id, newStatus: client.status }, `Client status updated to ${newStatus}.`);
     } catch (err) {
-        logger.error({ err }, "❌ PUT /api/clients/:id/status/:newStatus error");
+        logger.error({ err }, "âŒ PUT /api/clients/:id/status/:newStatus error");
         return respError(res, err?.message || "Server error updating status", 500, null, err);
     }
 });
@@ -782,7 +827,7 @@ app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
         await logAction("admin", "CLIENT_DELETED", client._id, notes, { previousStatus: previous, newStatus: "Deleted" });
         return respSuccess(res, null, "Client soft-deleted successfully");
     } catch (err) {
-        logger.error({ err }, "❌ DELETE /api/clients/:id error");
+        logger.error({ err }, "âŒ DELETE /api/clients/:id error");
         return respError(res, "Server error deleting client", 500, null, err);
     }
 });
@@ -806,7 +851,7 @@ app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
 
         return respSuccess(res, { pdfUrl }, "PDF URL generated successfully", 200, { redirect: pdfUrl });
     } catch (err) {
-        logger.error({ err }, "❌ POST /api/clients/:id/pdf error");
+        logger.error({ err }, "âŒ POST /api/clients/:id/pdf error");
         return respError(res, "Server error generating PDF.", 500, null, err);
     }
 });
@@ -857,7 +902,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
         `;
         await sendEmail(client.email1, emailSubject, `Your digital smart card link is: ${publicVcardPage}`, emailHtml);
 
-        // ✅ REQUIRED SERVER RESPONSE CONTRACT (CORRECTED)
+        // âœ… REQUIRED SERVER RESPONSE CONTRACT (CORRECTED)
         // Returning email1 and slug allows the Action Bar buttons to work immediately.
         return respSuccess(res, { 
             vcardUrl: publicVcardPage, 
@@ -867,7 +912,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
             slug: client.slug 
         }, "vCard created, client active, email sent.", 200);
     } catch (err) {
-        logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
+        logger.error({ err }, "âŒ POST /api/clients/:id/vcard error");
         return respError(res, err?.message || "vCard generation failed.", 500, null, err);
     }
 })
@@ -877,51 +922,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
 // ------------------------
 
 
-// GET /:slug: Public route to fetch the client data for client-side rendering
-app.get("/:slug", publicLimiter, async (req, res) => {
-    try {
-        const slug = req.params.slug;
-        // Find the client and ensure status is Active
-        const client = await Client.findOne({ slug: slug, status: "Active" });
-        
-        if (!client) {
-            await logAction("system", "VCARD_MISSING", null, `Attempted access for missing/inactive slug: ${slug}`, { ip: req.ip });
-            // Redirect to the fallback URL from .env
-            return res.redirect(APP_FALLBACK_URL || "/404.html");  // Uses APP_FALLBACK_URL
-        }
-        
-        // Log the visit
-        await logAction("system", "VCARD_VISIT", client._id, `Visit to public page: ${slug}`, { ip: req.ip });
-        
-        // Data returned for client-side JavaScript rendering 
-        const vcardData = {
-            fullName: client.fullName,
-            title: client.title,
-            company: client.company,
-            phone1: client.phone1,
-            email1: client.email1,
-            website: client.website || client.businessWebsite, // Consolidated
-            address: client.address,
-            bio: client.bio,
-            photoUrl: client.photoUrl,
-            vcardUrl: client.vcardUrl,
-            qrCodeUrl: client.qrCodeUrl,
-            socialLinks: client.socialLinks, 
-            workingHours: client.workingHours,
-        };
-        
-        // Return the data as a JSON response for dynamic rendering on the client-side.
-        return respSuccess(res, vcardData, "vCard data retrieved successfully");
-
-
-    } catch (err) {
-        logger.error({ err }, "❌ GET /:slug error");
-        return respError(res, "Error retrieving vCard.", 500, null, err);
-    }
-});
-
-
-// ------------------------
+// GET /:slug: Public route to fetch the client data for client-side rendering// ------------------------
 // Health Check Route (For Render Deployment)
 // ------------------------
 app.get('/health', (req, res) => {
@@ -952,6 +953,12 @@ const ALLOWED_ORIGINS_LOG = [
 
 app.listen(PORT, HOST, () => {
     // Logs the live URL from your environment settings
-    logger.info(`🚀 Server live and listening on ${PUBLIC_URL}`); 
-    logger.info(`🌐 Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
+    logger.info(`ðŸš€ Server live and listening on ${PUBLIC_URL}`); 
+    logger.info(`ðŸŒ Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
 });
+
+
+
+
+
+
