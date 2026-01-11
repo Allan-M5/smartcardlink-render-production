@@ -288,7 +288,31 @@
  }
 
  // --- INITIALIZATION ---
- async function init() {
+ async function fetchProfileData() {
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get("slug");
+
+  if (!slug) {
+    console.error("Slug not found in URL");
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_ROOT}/api/vcard/${slug}`);
+    const result = await response.json();
+
+    if (result.status !== "success") {
+      console.error("Failed vCard fetch:", result);
+      return;
+    }
+
+    populateVCard(result.data);
+  } catch (err) {
+    console.error("vCard fetch error:", err);
+  }
+}
+
+async function init() {
   const client = await fetchProfileData();
 
   if (client) {
@@ -379,6 +403,9 @@
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
+
+
 
 
 
