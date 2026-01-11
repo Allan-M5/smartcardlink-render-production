@@ -125,7 +125,53 @@
 
  // --- RENDERING FUNCTIONS ---
 
- function renderPhoto(url) {
+/**
+ * Populates BOTH popup1 and popup2 using the API client payload.
+ * This was previously removed by regex edits, which is why you now see:
+ * "populateVCard is not defined"
+ */
+function populateVCard(client) {
+  if (!client) return;
+
+  // Hide any loading/error banner
+  const msg = el("messageArea");
+  if (msg) setHidden(msg, true);
+
+  // PHOTO + MAIN HEADER
+  renderPhoto(client.photoUrl);
+
+  if (fullName) fullName.textContent = client.fullName || "";
+  if (jobName) jobName.textContent = client.company || "";
+  if (titlePosition) titlePosition.textContent = client.title || "";
+
+  // MAIN CONTACTS
+  if (phoneMain) {
+    phoneMain.textContent = client.phone1 || "Not Provided";
+    phoneMain.href = client.phone1 ? `tel:${client.phone1}` : "#";
+  }
+
+  if (emailMain) {
+    emailMain.textContent = client.email1 || "Not Provided";
+    emailMain.href = client.email1 ? `mailto:${client.email1}` : "#";
+  }
+
+  // DROPDOWN LISTS
+  buildList(phoneList, [client.phone2, client.phone3].filter(Boolean), "phone");
+  buildList(emailList, [client.email2, client.email3].filter(Boolean), "email");
+
+  // POPUP2 FIELDS
+  if (bioText) bioText.textContent = client.bio || "No bio provided.";
+  renderHours(client.workingHours);
+
+  // BUTTON WIRING
+  setupPopup1Actions(client);
+  setupPopup2Buttons(client);
+
+  // START STATE: popup1 visible, popup2 hidden
+  setHidden(popup1, false);
+  setHidden(popup2, true);
+}
+function renderPhoto(url) {
   if (!photoArea) return;
   photoArea.innerHTML = '';
   const defaultPhoto = '/public/images/default-photo.png';
@@ -306,7 +352,6 @@
       return;
     }
 
-    populateVCard(result.data);
   } catch (err) {
     console.error("vCard fetch error:", err);
   }
@@ -314,95 +359,13 @@
 
 async function init() {
   const client = await fetchProfileData();
+  if (client) populateVCard(client);
+}
 
-  if (client) {
-   // Populate Popup 1 Data
-   renderPhoto(client.photoUrl);
-   fullName.textContent = client.fullName || '';
-   jobName.textContent = client.company || '';
-   titlePosition.textContent = client.title || '';
-   
-   phoneMain.textContent = client.phone1 || 'Not Provided';
-   phoneMain.href = client.phone1 ? `tel:${client.phone1}` : '#';
-   
-   emailMain.textContent = client.email1 || 'Not Provided';
-   emailMain.href = client.email1 ? `mailto:${client.email1}` : '#';
-
-   // Additional Contacts
-   // Filter out falsy values like null/undefined/empty string from phone2/3, email2/3
-   buildList(phoneList, [client.phone2, client.phone3].filter(Boolean), 'phone');
-   buildList(emailList, [client.email2, client.email3].filter(Boolean), 'email');
-
-   // Populate Popup 2 Data
-   bioText.textContent = client.bio || 'No bio provided.';
-   renderHours(client.workingHours);
-   
-   // Setup all buttons
-   setupPopup1Actions(client);
-   setupPopup2Buttons(client);
-
-   // Show the main VCard popup
-   setHidden(popup1, false);
-   setHidden(popup2, true);
-  }
-
-  // Dropdown Toggles (Kept intact)
-  [ [phoneDropdownBtn, phoneList], [emailDropdownBtn, emailList] ].forEach(([btn, list]) => {
-   if(!btn || !list) return;
-   setHidden(list, true);
-   btn.onclick = () => {
-    const isHidden = list.style.display === 'none';
-    setHidden(list, !isHidden);
-    const icon = btn.querySelector('i');
-    if (icon) icon.className = isHidden ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
-   };
-  });
-
-  // Popup Navigation & Sizing Logic (Kept intact)
-  if (buttons.moreInfo && popup1 && popup2) {
-   buttons.moreInfo.onclick = () => {
-  const height = popup1.offsetHeight;
-  if (vcardContainer) vcardContainer.style.height = height + "px";
-  popup2.style.height = height + "px";
-
-  setHidden(popup1, true);
-  setHidden(popup2, false);
-
-  const firstFocusable = popup2.querySelector(
-    "button, a, input, select, textarea, [tabindex]:not([tabindex='-1'])"
-  );
-  if (firstFocusable) firstFocusable.focus();
-
-  popup2.scrollTop = 0;
-};
-  }
-  
-  if (buttons.back) {
-   buttons.back.onclick = () => {
-  setHidden(popup2, true);
-  setHidden(popup1, false);
-
-  if (buttons.moreInfo) buttons.moreInfo.focus();
-};
-  }
-
-  // Live Time Update (Kept intact)
-  if (liveTime) {
-   setInterval(() => {
-    const options = { 
-     day: 'numeric', month: 'short', year: 'numeric', 
-     hour: '2-digit', minute: '2-digit', second: '2-digit', 
-     hour12: false, timeZone: 'Africa/Nairobi' 
-    };
-    const dateStr = new Date().toLocaleString('en-GB', options);
-    liveTime.textContent = dateStr.replace(',', ' ');
-   }, 1000);
-  }
- }
-
- document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
