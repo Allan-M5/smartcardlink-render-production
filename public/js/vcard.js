@@ -335,25 +335,22 @@ function renderPhoto(url) {
 
  // --- INITIALIZATION ---
  async function fetchProfileData() {
-  const params = new URLSearchParams(window.location.search);
-  const slug = params.get("slug");
-
-  if (!slug) {
-    console.error("Slug not found in URL");
-    return;
-  }
-
   try {
-    const response = await fetch(`${API_ROOT}/api/vcard/${slug}`);
-    const result = await response.json();
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get("slug");
 
-    if (result.status !== "success") {
-      console.error("Failed vCard fetch:", result);
-      return;
+    if (!slug) {
+      console.error("No slug provided in URL");
+      return null;
     }
 
+    const res = await fetch(`${API_BASE}/api/vcard/${slug}`);
+    if (!res.ok) throw new Error("Failed to fetch vCard");
+
+    return await res.json();
   } catch (err) {
     console.error("vCard fetch error:", err);
+    return null;
   }
 }
 
@@ -365,6 +362,7 @@ async function init() {
 document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
