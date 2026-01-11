@@ -59,20 +59,19 @@
  const hoursTable = document.querySelector('#hoursTable tbody');
 
  // --- UTILITY FUNCTIONS ---
- function setHidden(node, hidden) {
-  if (!node) return;
-  // Using 'display: none' for clean UI toggling
-  node.style.display = hidden ? 'none' : 'block';
-  node.setAttribute('aria-hidden', hidden ? 'true' : 'false');
- }
+ function setHidden(el, hidden) {
+  if (!el) return;
 
- function alertMsg(msg) {
-  if (typeof Swal !== 'undefined') {
-   Swal.fire({ title: msg, icon: 'info', confirmButtonColor: '#FFD700' });
+  if (hidden) {
+    el.style.display = "none";
+    el.setAttribute("aria-hidden", "true");
+    el.setAttribute("inert", "");
   } else {
-   alert(msg);
+    el.style.display = "flex";
+    el.setAttribute("aria-hidden", "false");
+    el.removeAttribute("inert");
   }
- }
+}
  
  /**
   * Manages global messages (loading, success, error) at the top of the VCard.
@@ -122,59 +121,7 @@
    }
  }
 
-function releaseFocus(container) {
-  if (!container) return;
-  const active = document.activeElement;
-  if (container.contains(active)) active.blur();
-}
 
-// --- DATA FETCHING ---
-async function fetchProfileData() {
-  try {
-    // FINAL FIX: Extract slug from Query Parameters (?slug=name) instead of Pathname
-    const urlParams = new URLSearchParams(window.location.search);
-    const clientSlug = urlParams.get('slug');
-    
-    if (!clientSlug) {
-        console.error("Missing vCard slug in URL parameters.");
-        throw new Error('VCard not found. Missing slug identifier.');
-    }
-   // Display loading state
-   showMessage(`
-    <span class="loading-spinner" style="
-      border: 3px solid #f3f3f3; border-top: 3px solid #FFD700; 
-      border-radius: 50%; width: 16px; height: 16px; 
-      animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; 
-      margin-right: 5px;"></span>
-    Loading VCard...
-   `);
-   
-   // CRITICAL FIX: Use the specific API slug endpoint
-   const res = await fetch(`${API_ROOT.replace(/\/$/, "")}/api/vcard/${clientSlug}`); 
-   
-   if (!res.ok) {
-     throw new Error('Network error or server unavailable.');
-   }
-   
-   const json = await res.json();
-   
-   if (json.status !== 'success' || !json.data) {
-     // Use the message from the API if provided
-     const msg = json.message || 'Card not found or currently inactive.';
-     throw new Error(msg); 
-   }
-   
-   // Hide message area on success
-   setHidden(el('messageArea'), true); 
-
-   return json.data || null; 
-   
-  } catch (err) {
-   console.error("Error fetching profile data:", err);
-   showMessage(err.message || 'Failed to load profile data.', true);
-   return null;
-  }
- }
 
  // --- RENDERING FUNCTIONS ---
 
@@ -394,12 +341,12 @@ async function fetchProfileData() {
   if (vcardContainer) vcardContainer.style.height = height + "px";
   popup2.style.height = height + "px";
 
-  releaseFocus(popup1);
-
   setHidden(popup1, true);
   setHidden(popup2, false);
 
-  const firstFocusable = popup2.querySelector("button, a, input, [tabindex]");
+  const firstFocusable = popup2.querySelector(
+    "button, a, input, select, textarea, [tabindex]:not([tabindex='-1'])"
+  );
   if (firstFocusable) firstFocusable.focus();
 
   popup2.scrollTop = 0;
@@ -408,8 +355,6 @@ async function fetchProfileData() {
   
   if (buttons.back) {
    buttons.back.onclick = () => {
-  releaseFocus(popup2);
-
   setHidden(popup2, true);
   setHidden(popup1, false);
 
@@ -434,6 +379,7 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
