@@ -371,15 +371,15 @@ app.use(
             imgSrc: ["'self'", "data:", "res.cloudinary.com", "https://res.cloudinary.com"], 
             // CRITICAL: Updated connectSrc to include all necessary domains from .env
             connectSrc: [
-                "'self'", 
-                BACKEND_API_URL, 
-                new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
-                new URL(VCARD_BASE_URL).origin, Â  // Added for public vCard access
-                "res.cloudinary.com", 
-                "https://api.cloudinary.com", 
-                "*.google-analytics.com", 
-                "*.analytics.google.com"
-           ], 
+    "'self'",
+    BACKEND_API_URL,
+    new URL(FRONTEND_BASE_URL).origin,
+    new URL(VCARD_BASE_URL).origin,
+    "https://res.cloudinary.com",
+    "https://api.cloudinary.com",
+    "*.google-analytics.com",
+    "*.analytics.google.com"
+], 
             fontSrc: ["'self'", "res.cloudinary.com", "https://fonts.gstatic.com", "data:", "https://cdnjs.cloudflare.com"],
             frameAncestors: ["'self'"],
         },
@@ -956,6 +956,7 @@ app.listen(PORT, HOST, () => {
     logger.info(`ðŸš€ Server live and listening on ${PUBLIC_URL}`); 
     logger.info(`ðŸŒ Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
 });
+
 
 
 
