@@ -144,7 +144,7 @@ async function fetchProfileData() {
    `);
    
    // CRITICAL FIX: Use the specific API slug endpoint
-   const res = await fetch(`${API_ROOT.replace(/\/$/, "")}/${clientSlug}`); 
+   const res = await fetch(`${API_ROOT.replace(/\/$/, "")}/api/vcard/${clientSlug}`); 
    
    if (!res.ok) {
      throw new Error('Network error or server unavailable.');
@@ -419,4 +419,5 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
