@@ -25,21 +25,26 @@ const logger = pino({ level: process.env.NODE_ENV === "production" ? "info" : "d
 
 
 // ------------------------
-// Environment Variables
+// Environment Variables & Configuration
 // ------------------------
 const PORT = process.env.PORT || 8080;
 const HOST = "0.0.0.0";
 const MONGO_URI = process.env.MONGODB_URI; 
 
+// 1. The URL where THIS API is running (Backend)
+const APP_BASE_URL = process.env.APP_BASE_URL || "https://smartcardlink-api.onrender.com"; 
 
-// Base URLs - Using the newly defined .env variables
-const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; 
-const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000"; 
-const VCARD_BASE_URL = process.env.VCARD_BASE_URL || APP_BASE_URL; 
-const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL;
+// 2. The URL where your Dashboard/Admin UI is hosted (Frontend)
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "https://smartcardlink-dashboard-frontend.onrender.com"; 
 
+// 3. The URL where the Public vCard pages are hosted (Public)
+// CRITICAL: We use the dedicated public domain to ensure QR codes and links are authoritative.
+const VCARD_BASE_URL = process.env.VCARD_BASE_URL || "https://smartcardlink-public.onrender.com";
 
-// Derive the base URL for the backend API for internal use (CORS)
+// 4. Fallback URL for errors or inactive slugs
+const APP_FALLBACK_URL = process.env.APP_FALLBACK_URL || `${VCARD_BASE_URL}/404.html`;
+
+// Derive the origin for CORS logic
 const BACKEND_API_URL = new URL(APP_BASE_URL).origin;
 
 
@@ -819,48 +824,53 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
         if (!client.email1) return respError(res, "Cannot generate vCard: Client has no primary email address (email1).", 400);
 
 
-        // 1. Generate vCard Content
+// 1. Generate vCard Content
         const vcfContent = generateVcardContent(client);
       
         // 2. Upload VCF to Cloudinary
-        const vcardUrl = await uploadVcfToCloudinary(client.slug, vcfContent);
+        const vcfDownloadUrl = await uploadVcfToCloudinary(client.slug, vcfContent);
         
-        // 3. Prepare public page link and Generate QR Code (Data URL encoding the public page)
-        // FIX: Ensure the public page link uses the correct VCARD_BASE_URL formatting
-        const publicVcardPage = `${VCARD_BASE_URL.replace(/\/$/, "")}/${client.slug}`;
+        // 3. Prepare public page link and Generate QR Code
+        // FIX: Changed from path-based (/slug) to query-based (?slug=) to match frontend logic
+        const publicVcardPage = `${VCARD_BASE_URL.replace(/\/$/, "")}/?slug=${client.slug}`;
         const qrCodeDataUrl = await qrcode.toDataURL(publicVcardPage, { errorCorrectionLevel: "H", type: "image/png" }); 
 
-
         // 4. Update DB
-        client.vcardUrl = vcardUrl; 
+        // FIX: Store the public webpage URL in vcardUrl instead of the Cloudinary file link
+        client.vcardUrl = publicVcardPage; 
         client.qrCodeUrl = qrCodeDataUrl; 
         client.status = "Active";
         client.history.push({ 
             action: "VCARD_GENERATED", 
-            notes: `vCard generated, status set to Active. VCF: ${vcardUrl}`,
+            notes: `vCard generated, status set to Active. Webpage: ${publicVcardPage}`,
             actor: "admin"
         });
-        await client.save(); 
+        await client.save();
 
-
-        // 5. Send Client Email (Uses SMTP details)
+// 5. Send Client Email (Uses SMTP details)
         const emailSubject = `Your SmartCardLink is Ready!`;
         const emailHtml = `
             <p>Dear ${client.fullName},</p>
             <p>Your digital smart card is now <strong>Active</strong> and ready to share.</p>
             <p><strong>Public Page Link:</strong> <a href="${publicVcardPage}">${publicVcardPage}</a></p>
-            <p><strong>Direct Download vCard:</strong> <a href="${vcardUrl}">Click to Download Contact (.vcf)</a></p>
-            <p>Please save the downloaded .vcf file to your contacts.</p>
             <p>Thank you.</p>
         `;
         await sendEmail(client.email1, emailSubject, `Your digital smart card link is: ${publicVcardPage}`, emailHtml);
-        return respSuccess(res, { vcardUrl, qrCodeUrl, publicVcardPage }, "vCard created, client active, email sent.", 200);
+
+        // ✅ REQUIRED SERVER RESPONSE CONTRACT (CORRECTED)
+        // Returning email1 and slug allows the Action Bar buttons to work immediately.
+        return respSuccess(res, { 
+            vcardUrl: publicVcardPage, 
+            qrCodeUrl: qrCodeDataUrl, 
+            publicVcardPage,
+            email1: client.email1,
+            slug: client.slug 
+        }, "vCard created, client active, email sent.", 200);
     } catch (err) {
         logger.error({ err }, "❌ POST /api/clients/:id/vcard error");
         return respError(res, err?.message || "vCard generation failed.", 500, null, err);
     }
-});
-
+})
 
 // ------------------------
 // Public View Route (VCard page)

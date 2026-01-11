@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -506,7 +506,7 @@
       const url = vcardUrlDisplay.value;
       if (!url) return;
       navigator.clipboard.writeText(url).then(() => {
-        copyVcardUrlBtn.textContent = 'Copied ✓';
+        copyVcardUrlBtn.textContent = 'Copied ?';
       });
     };
 
@@ -576,6 +576,6 @@
     resetCopyStateBtn.addEventListener('click', handleResetCopyState);
 
   })();
-</script>
+</script src="/js/adminForm.js"></script>
 </body>
 </html>
