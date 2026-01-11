@@ -61,10 +61,17 @@
  // --- UTILITY FUNCTIONS ---
  function setHidden(node, hidden) {
   if (!node) return;
-  // Using 'display: none' for clean UI toggling
-  node.style.display = hidden ? 'none' : 'block';
-  node.setAttribute('aria-hidden', hidden ? 'true' : 'false');
- }
+
+  if (hidden) {
+    node.style.display = "none";
+    node.setAttribute("aria-hidden", "true");
+    node.setAttribute("hidden", "");
+  } else {
+    node.style.display = "block";
+    node.setAttribute("aria-hidden", "false");
+    node.removeAttribute("hidden");
+  }
+}
 
  function alertMsg(msg) {
   if (typeof Swal !== 'undefined') {
@@ -434,6 +441,7 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
