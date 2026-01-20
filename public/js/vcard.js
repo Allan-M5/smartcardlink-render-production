@@ -282,7 +282,30 @@ async function fetchProfileData() {
    window.open(`https://wa.me/${digits}`, '_blank');
   }, phone);
 
-  setAction(actions.save, () => window.location.href = vcfDownloadUrl, vcfDownloadUrl);
+  setAction(actions.save, () => {
+  const vcard = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${client.fullName || ""}`,
+    `N:${client.fullName || ""};;;;`,
+    client.phone1 ? `TEL;TYPE=CELL:${client.phone1}` : "",
+    client.email1 ? `EMAIL:${client.email1}` : "",
+    client.company ? `ORG:${client.company}` : "",
+    client.title ? `TITLE:${client.title}` : "",
+    "END:VCARD"
+  ].filter(Boolean).join("\n");
+
+  const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (client.fullName || "contact").replace(/\s+/g,"_") + ".vcf";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}, true);
 
   // Print button is always active
   if(actions.print) actions.print.onclick = () => window.print();
@@ -397,7 +420,7 @@ async function fetchProfileData() {
   // Popup Navigation & Sizing Logic (Kept intact)
   if (buttons.moreInfo && popup1 && popup2) {
    buttons.moreInfo.onclick = () => {
-  // FORCE popup toggle – override index.html interference
+  // FORCE popup toggle � override index.html interference
   popup1.hidden = true;
   popup2.hidden = false;
 
@@ -436,6 +459,7 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 

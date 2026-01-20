@@ -481,17 +481,9 @@ const handleValidationErrors = (req, res, next) => {
  // ------------------------
  // Public VCard JSON API
  // ------------------------
- app.get("/api/vcard/:slug", publicLimiter, async (req, res) => {
-     try {
-         const slug = req.params.slug;
-
-         const client = await Client.findOne({ slug, status: { $ne: "Deleted" } });
-         if (!client) {
-             await logAction("system", "VCARD_MISSING", null, `Missing or inactive slug: ${slug}`, { ip: req.ip });
+ if (!client) {
              return respError(res, "vCard not found or inactive.", 404);
          }
-
-         await logAction("system", "VCARD_VISIT", client._id, `Public vCard viewed: ${slug}`, { ip: req.ip });
 
          return respSuccess(res, {
              fullName: client.fullName,
@@ -524,12 +516,7 @@ const handleValidationErrors = (req, res, next) => {
  /* ================================
    Public vCard JSON API
 ================================ */
-app.get("/api/vcard/:slug", publicLimiter, async (req, res) => {
-  try {
-    const { slug } = req.params;
-
-    const client = await Client.findOne({ slug, status: { $ne: "Deleted" } });
-    if (!client) {
+if (!client) {
       return respError(res, "vCard not found or inactive.", 404);
     }
 
@@ -1003,5 +990,64 @@ app.listen(PORT, HOST, () => {
 
 
 
+
+
+
+/* ================================
+   FAST CACHED PUBLIC VCARD API
+================================ */
+const vcardCache = new Map();
+const VCARD_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+app.get("/api/vcard/:slug", publicLimiter, async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    // ?? Memory cache (instant response)
+    const cached = vcardCache.get(slug);
+    if (cached && (Date.now() - cached.time) < VCARD_CACHE_TTL) {
+      res.set("Cache-Control", "public, max-age=300");
+      return respSuccess(res, cached.data, "vCard data (cached)");
+    }
+
+    // ? Lean Mongo query (no mongoose hydration)
+    const client = await Client.findOne(
+      { slug, status: { $ne: "Deleted" } },
+      "-history -__v"
+    ).lean();
+
+    if (!client) return respError(res, "vCard not found or inactive.", 404);
+
+    const payload = {
+      fullName: client.fullName,
+      title: client.title,
+      company: client.company,
+      phone1: client.phone1,
+      phone2: client.phone2,
+      phone3: client.phone3,
+      email1: client.email1,
+      email2: client.email2,
+      email3: client.email3,
+      website: client.website || client.businessWebsite,
+      portfolioWebsite: client.portfolioWebsite,
+      locationMap: client.locationMap,
+      address: client.address,
+      bio: client.bio,
+      photoUrl: client.photoUrl,
+      vcardUrl: client.vcardUrl,
+      qrCodeUrl: client.qrCodeUrl,
+      socialLinks: client.socialLinks,
+      workingHours: client.workingHours
+    };
+
+    vcardCache.set(slug, { data: payload, time: Date.now() });
+    res.set("Cache-Control", "public, max-age=300");
+
+    return respSuccess(res, payload, "vCard data retrieved successfully");
+  } catch (err) {
+    logger.error(err, "Public vCard API error");
+    return respError(res, "Failed to load vCard.", 500);
+  }
+});
 
 
