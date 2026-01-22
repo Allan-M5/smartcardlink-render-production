@@ -360,12 +360,18 @@
           <td>${activeMonths}</td>
           <td>${getStatusBadge(currentStatus)}</td>
           <td class="actions-cell">
-            ${currentStatus === 'Active' ? 
-              `<button class="action-btn btn-disable" onclick="window.showNotesModal('Disable', '${client._id}', 'Disabled')"><i class="fas fa-ban"></i> Disable</button>` :
-              `<button class="action-btn btn-enable" onclick="window.showNotesModal('Enable', '${client._id}', 'Active')"><i class="fas fa-check-circle"></i> Enable</button>`
-            }
-            
-          </td>
+  <button class="action-btn"
+    onclick="openVcard(`${client.vcardUrl})">
+    <i class="fas fa-id-card"></i> View vCard
+  </button>
+
+  ${Number(calculateActiveMonths(client.createdAt).replace(/\D/g,'')) >= 12
+    ? `<button class="action-btn btn-disable"
+        onclick="window.showNotesModal('Disable','${client._id}','Disabled')">
+        <i class="fas fa-ban"></i> Disable
+      </button>`
+    : ''}
+</td>
         `;
         clientTableBody.appendChild(tr);
       });
@@ -625,6 +631,7 @@
   </script>
 </body>
 </html>
+
 
 
 
