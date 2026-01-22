@@ -446,3 +446,7 @@ window.processClient = processClient;
 window.fetchAllClients = fetchAllClients;
 window.exportToCsv = exportToCsv;
 window.showNotesModal = showNotesModal;
+
+
+
+

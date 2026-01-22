@@ -369,3 +369,13 @@ html, body {
 .popup-footer .powered { font-size: 11px; opacity: 0.7; color: #9CCBFF; }
 .popup-footer .store { color: var(--gold); font-weight: 700; font-size: 14px; display: block; }
 .location-time { color: #fff; font-style: italic; font-size: 12px; }
+.pending-card {
+  max-width: 100%;
+  min-height: auto;
+  padding: 12px;
+}
+@media (max-width: 768px) {
+  .pending-card {
+    font-size: 14px;
+  }
+}

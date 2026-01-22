@@ -1,4 +1,4 @@
-﻿// public/js/vcard.js - VCard Data Fetch and Logic
+// public/js/vcard.js - VCard Data Fetch and Logic
 (function () {
  'use strict';
 
@@ -420,7 +420,7 @@ async function fetchProfileData() {
   // Popup Navigation & Sizing Logic (Kept intact)
   if (buttons.moreInfo && popup1 && popup2) {
    buttons.moreInfo.onclick = () => {
-  // FORCE popup toggle � override index.html interference
+  // FORCE popup toggle ? override index.html interference
   popup1.hidden = true;
   popup2.hidden = false;
 
@@ -459,6 +459,7 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
