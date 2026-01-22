@@ -136,3 +136,5 @@ test-results/
 *.sublime-workspace
 npm-shrinkwrap.json
 tsconfig.tsbuildinfo
+
+public-deploy/
