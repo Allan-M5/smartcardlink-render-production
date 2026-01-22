@@ -336,8 +336,8 @@
         tr.dataset.clientId = client._id; 
         
         const currentStatus = client.status || 'Pending';
-        const createdDate = client.vcardCreatedDate ? client.vcardCreatedDate.split('T')[0] : 'N/A';
-        const activeMonths = calculateActiveMonths(client.vcardCreatedDate);
+        const createdDate = client.createdAt ? client.createdAt.split('T')[0] : 'N/A';
+        const activeMonths = calculateActiveMonths(client.createdAt);
         const photoUrl = client.photoUrl || 'https://placehold.co/50x50/111/fff?text=No+Photo';
 
         tr.innerHTML = `
@@ -554,8 +554,8 @@
             client.email1 || '',
             client.phone1 || '',
             client.status || 'Pending',
-            client.vcardCreatedDate ? client.vcardCreatedDate.split('T')[0] : '',
-            calculateActiveMonths(client.vcardCreatedDate)
+            client.createdAt ? client.createdAt.split('T')[0] : '',
+            calculateActiveMonths(client.createdAt)
         ]);
 
         let csvContent = headers.join(",") + "\n";
@@ -615,6 +615,7 @@
   </script>
 </body>
 </html>
+
 
 
 
