@@ -617,6 +617,21 @@ app.post("/api/clients", publicLimiter, validateClientCreation, handleValidation
         clientDoc.history.push({ action: "CLIENT_CREATED", notes: "Initial form submission", actor: "client_submission" });
         await clientDoc.save();
 
+// SERVER_CANONICAL_FIX: FAST ACK
+setImmediate(async () => {
+  try {
+    if (ADMIN_EMAIL) {
+      await sendEmail(
+        ADMIN_EMAIL,
+        `New SmartCardLink submission: ${clientDoc.fullName}`,
+        `Client ID: ${clientDoc._id}`
+      );
+    }
+  } catch(e) {
+    logger.warn({ e }, "Deferred email failed");
+  }
+});
+
 // CLIENT_CREATED_FAST_RETURN
 return respSuccess(res, {
   _id: clientDoc._id,
@@ -653,7 +668,11 @@ app.get("/api/clients/all", publicLimiter, async (req, res) => {
             .select("-history -__v"); // Exclude large/internal fields
 
 
-        return respSuccess(res, clients, "All clients retrieved successfully");
+        const normalized = clients.map(c => ({
+    ...c.toObject(),
+    status: c.status === "Suspended" ? "Disabled" : c.status
+  }));
+  return respSuccess(res, normalized, "All clients retrieved successfully");
     } catch (err) {
         logger.error({ err }, "❌ GET /api/clients/all error");
         return respError(res, "Server error fetching all clients", 500, null, err);
