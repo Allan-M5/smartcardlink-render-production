@@ -294,6 +294,16 @@
         if (now.getDate() < createdDate.getDate()) {
             totalMonths--;
         }
+
+    // ? SAFE VCARD URL RESOLVER
+    function openVcard(url) {
+      if (!url || typeof url !== 'string') {
+        showToast('No vCard URL available', 'error');
+        return;
+      }
+      openVcard(client.vcardUrl);
+    }
+
         
         return totalMonths > 0 ? `${totalMonths} months` : '0 months';
     }
@@ -615,6 +625,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
