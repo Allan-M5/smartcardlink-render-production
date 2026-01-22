@@ -79,7 +79,7 @@
     .status-Processed { background-color: #4299e1; } 
     .status-Active { background-color: #38a169; } 
     .status-Disabled { background-color: #e53e3e; } 
-    .status-Deleted { background-color: #4a5568; } 
+     
     .client-photo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #555; }
     .actions-cell button { padding: 0.5rem 0.75rem; font-size: 0.8rem; margin-right: 0.25rem; }
     
@@ -150,7 +150,7 @@
           <option value="Disabled">Disabled</option>
           <option value="Pending">Pending</option>
           <option value="Processed">Processed</option>
-          <option value="Deleted">Deleted</option>
+          
         </select>
         <button id="exportBtn" aria-label="Export to CSV">
              <i class="fas fa-file-export"></i> Export CSV
@@ -354,7 +354,7 @@
               `<button class="action-btn btn-disable" onclick="window.showNotesModal('Disable', '${client._id}', 'Disabled')"><i class="fas fa-ban"></i> Disable</button>` :
               `<button class="action-btn btn-enable" onclick="window.showNotesModal('Enable', '${client._id}', 'Active')"><i class="fas fa-check-circle"></i> Enable</button>`
             }
-            <button class="action-btn btn-delete" onclick="window.showNotesModal('Delete', '${client._id}', 'Deleted')"><i class="fas fa-trash-alt"></i> Delete</button>
+            
           </td>
         `;
         clientTableBody.appendChild(tr);
@@ -394,7 +394,7 @@
     function updateTotals(data) {
         if (!totalsDiv) return;
         
-        const counts = { Active: 0, Pending: 0, Processed: 0, Disabled: 0, Deleted: 0 };
+        const counts = { Active: 0, Pending: 0, Processed: 0, Disabled: 0, };
         data.forEach(client => {
             const status = client.status || 'Pending';
             if (counts.hasOwnProperty(status)) {
@@ -409,7 +409,7 @@
             **Pending:** ${counts.Pending} | 
             **Processed:** ${counts.Processed} |
             **Disabled:** ${counts.Disabled} |
-            **Deleted:** ${counts.Deleted}
+            **
         `;
     }
 
@@ -615,5 +615,9 @@
   </script>
 </body>
 </html>
+
+
+
+
 
 
