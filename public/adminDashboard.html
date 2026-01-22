@@ -219,6 +219,43 @@
         .toast.error { background-color: #ef4444; }
         .toast.success { background-color: #22c55e; }
     </style>
+<style>
+/* SMARTCARDLINK_ADMIN_DASHBOARD_FIX */
+
+/* Constrain table height for proportional layout */
+.table-container {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Prevent dashboard from feeling overly tall */
+.dashboard-card {
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+/* Improve mobile usability */
+@media (max-width: 768px) {
+  table {
+    min-width: 900px;
+  }
+
+  th, td {
+    padding: 0.75rem;
+  }
+
+  .actions-cell button {
+    padding: 0.6rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Make rows more touch-friendly */
+tbody tr {
+  cursor: pointer;
+}
+</style>
+
 </head>
 <body>
     <video autoplay muted loop playsinline id="bg-video">

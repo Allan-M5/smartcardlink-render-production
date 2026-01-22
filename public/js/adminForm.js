@@ -355,3 +355,40 @@ SmartCardLink Admin`
 
 
 
+
+
+/* SMARTCARDLINK_ADMIN_FORM_STRICT_FETCH */
+
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const clientId = params.get("id");
+  if (!clientId) return;
+
+  async function loadClientStrict() {
+    try {
+      const res = await fetch(`${window.SCL_CONFIG.API_ROOT}/clients/${clientId}`);
+      const json = await res.json();
+      if (!json || !json.data) return;
+
+      const client = json.data;
+
+      // Clear any previous state
+      const form = document.querySelector("form");
+      if (form) form.reset();
+
+      // Populate form strictly from backend response
+      Object.entries(client).forEach(([key, value]) => {
+        const el = document.querySelector(`[name="${key}"]`);
+        if (el) el.value = value ?? "";
+      });
+    } catch (err) {
+      console.error("Strict admin form fetch failed:", err);
+    }
+  }
+
+  // Kill any leaked global state
+  window.__ACTIVE_CLIENT__ = null;
+  window.__SELECTED_CLIENT__ = null;
+
+  loadClientStrict();
+})();

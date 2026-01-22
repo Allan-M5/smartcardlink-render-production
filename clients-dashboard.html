@@ -613,6 +613,39 @@
     // Expose required functions to the global scope for HTML inline calls (Action buttons)
     window.showNotesModal = showNotesModal;
   </script>
+<script>
+// SMARTCARDLINK_CLIENTS_DASHBOARD_OVERRIDE
+(function () {
+  const originalFetch = window.fetch;
+  window.fetch = async function (...args) {
+    const res = await originalFetch.apply(this, args);
+    try {
+      if (args[0] && args[0].includes('/api/clients/all')) {
+        const clone = res.clone();
+        const json = await clone.json();
+
+        if (json && json.data) {
+          if (Array.isArray(json.data)) {
+            json.data = json.data;
+          } else if (json.data.clients && Array.isArray(json.data.clients)) {
+            json.data = json.data.clients;
+          }
+        }
+
+        return new Response(JSON.stringify(json), {
+          status: res.status,
+          statusText: res.statusText,
+          headers: res.headers
+        });
+      }
+    } catch (e) {
+      console.error('Dashboard normalization override failed:', e);
+    }
+    return res;
+  };
+})();
+</script>
+
 </body>
 </html>
 

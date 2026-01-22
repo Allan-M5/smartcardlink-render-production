@@ -418,5 +418,58 @@
     }
   });
 </script>
+<script>
+// SMARTCARDLINK_CLIENT_FORM_OVERRIDE
+(function () {
+  const form = document.getElementById("clientForm");
+  if (!form) return;
+
+  // Enable Sunday fields
+  ["sunStart","sunEnd"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+
+  let isSubmitting = false;
+
+  form.addEventListener("submit", function () {
+    if (isSubmitting) return;
+    isSubmitting = true;
+
+    const btn = form.querySelector("button[type=submit]");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Submitting...";
+    }
+  });
+
+  // Hook into global message handler if present
+  if (typeof window.showMessage === "function") {
+    const original = window.showMessage;
+    window.showMessage = function (msg, type) {
+      original(msg, type);
+
+      const btn = form.querySelector("button[type=submit]");
+      if (type === "success") {
+        form.reset();
+        isSubmitting = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Submit";
+        }
+      }
+
+      if (type === "error") {
+        isSubmitting = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Submit";
+        }
+      }
+    };
+  }
+})();
+</script>
+
 </body>
 </html>

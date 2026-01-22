@@ -616,6 +616,15 @@ app.post("/api/clients", publicLimiter, validateClientCreation, handleValidation
 
         clientDoc.history.push({ action: "CLIENT_CREATED", notes: "Initial form submission", actor: "client_submission" });
         await clientDoc.save();
+
+// CLIENT_CREATED_FAST_RETURN
+return respSuccess(res, {
+  _id: clientDoc._id,
+  slug: clientDoc.slug,
+  status: clientDoc.status,
+  createdAt: clientDoc.createdAt
+}, "Saved. Pending admin processing.", 201);
+
         
         // Notify admin by email (Uses ADMIN_EMAIL and SMTP details)
         if (ADMIN_EMAIL) {
