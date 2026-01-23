@@ -20,7 +20,6 @@
             --pending: #d69e2e;
             --processed: #4299e1;
             --deleted: #4a5568;
-            --warning: #ed8936; /* For expiry alerts */
         }
 
         body {
@@ -51,7 +50,7 @@
             border-radius: 1rem;
             padding: 2rem;
             width: 100%;
-            max-width: 1250px;
+            max-width: 1200px;
             border: 1px solid var(--border);
             box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
             animation: fadeIn 0.8s ease-out;
@@ -68,13 +67,6 @@
             text-align: center;
             margin-bottom: 2rem;
         }
-
-        /* Expiry Highlight Classes */
-        .expiry-warning { border-left: 4px solid var(--warning) !important; background-color: rgba(237, 137, 54, 0.05) !important; }
-        .expiry-due { border-left: 4px solid var(--danger) !important; background-color: rgba(229, 62, 62, 0.1) !important; }
-        .badge-expiry-warning { background: var(--warning); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
-        .badge-expiry-due { background: var(--danger); color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
         .controls-container {
             display: flex;
@@ -102,6 +94,12 @@
             transition: border-color 0.3s;
         }
 
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+        }
+
         .button-group { display: flex; gap: 0.5rem; }
 
         button { 
@@ -116,12 +114,47 @@
             white-space: nowrap;
         }
 
-        button:hover { background-color: var(--primary); color: #000; }
+        button:hover {
+            background-color: var(--primary);
+            color: #000;
+        }
 
-        .table-container { overflow-x: auto; border-radius: 0.5rem; margin-top: 1rem; }
-        table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background-color: #222; color: var(--primary); font-size: 0.8rem; text-transform: uppercase; }
+        .table-container {
+            overflow-x: auto;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #222;
+            color: var(--primary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        td {
+            background-color: var(--card-bg);
+            font-size: 0.9rem;
+        }
+
+        tbody tr:hover { background-color: #252525; }
+
+        .row-success {
+            background-color: rgba(56, 161, 105, 0.2) !important;
+            transition: background-color 0.5s;
+        }
 
         .status-badge {
             padding: 0.25rem 0.75rem;
@@ -130,9 +163,12 @@
             font-weight: 600;
             color: white;
         }
+
         .status-Pending { background-color: var(--pending); } 
+        .status-Processed { background-color: var(--processed); } 
         .status-Active { background-color: var(--success); } 
         .status-Disabled { background-color: var(--danger); } 
+        .status-Deleted { background-color: var(--deleted); }
 
         .client-photo {
             width: 45px;
@@ -142,7 +178,16 @@
             border: 2px solid #444;
         }
 
-        .modal { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); }
+        /* Modals & Toasts */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(4px);
+        }
+
         .modal-content {
             background: var(--card-bg);
             margin: 10vh auto;
@@ -151,17 +196,56 @@
             max-width: 450px;
             border-radius: 0.75rem;
             border: 1px solid var(--border);
-            display: flex; flex-direction: column; gap: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
         }
 
-        .toast-container { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.75rem; }
-        .toast { padding: 1rem; border-radius: 0.5rem; color: white; opacity: 0; transform: translateX(50px); transition: 0.3s; }
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .toast {
+            min-width: 280px;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            transform: translateX(50px);
+            transition: 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
         .toast.show { opacity: 1; transform: translateX(0); }
         .toast.success { background: #059669; }
         .toast.error { background: #dc2626; }
 
-        .loading-spinner { border: 3px solid #333; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
+        .loading-spinner {
+            border: 3px solid #333;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 0.8s linear infinite;
+        }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .controls-container { flex-direction: column; }
+            .search-container { max-width: 100%; }
+            .button-group { width: 100%; }
+            .button-group button { flex: 1; }
+        }
     </style>
 </head>
 <body>
@@ -184,13 +268,15 @@
                     <option value="Active">Active</option>
                     <option value="Disabled">Disabled</option>
                     <option value="Pending">Pending</option>
+                    <option value="Processed">Processed</option>
+                    <option value="Deleted">Deleted</option>
                 </select>
                 <button id="exportBtn" title="Export CSV"><i class="fas fa-file-export"></i></button>
                 <button id="resetBtn" title="Reset Filters"><i class="fas fa-undo"></i></button>
             </div>
         </div>
         
-        <div id="totals" style="text-align: center; color: var(--primary); font-size: 0.9rem; margin-bottom: 1.5rem;"></div>
+        <div id="totals" style="text-align: center; color: var(--primary); font-size: 0.9rem; margin-bottom: 1rem; display: none;"></div>
         
         <div class="table-container">
             <table>
@@ -251,17 +337,26 @@
         function showToast(msg, type = 'success') {
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            toast.innerText = msg;
+            toast.innerHTML = `<span>${msg}</span>`;
             elements.toastBox.prepend(toast);
             setTimeout(() => toast.classList.add('show'), 10);
-            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 5000);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
         }
 
+        const getStatusBadge = (s) => {
+            const label = s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : 'Pending';
+            return `<span class="status-badge status-${label}">${label}</span>`;
+        };
+
         const calculateMonths = (date) => {
-            if (!date) return null;
+            if (!date) return 'N/A';
             const d = new Date(date), n = new Date();
             let m = (n.getFullYear() - d.getFullYear()) * 12 + (n.getMonth() - d.getMonth());
-            return Math.max(0, m);
+            if (n.getDate() < d.getDate()) m--;
+            return `${Math.max(0, m)} months`;
         };
 
         async function fetchClients() {
@@ -269,11 +364,12 @@
             elements.table.innerHTML = '';
             try {
                 const res = await fetch(`${API_BASE_URL}/api/clients/all`);
+                if (!res.ok) throw new Error('Fetch failed');
                 const result = await res.json();
-                allClientData = result.data || [];
+                allClientData = Array.isArray(result.data) ? result.data : [];
                 render();
             } catch (err) {
-                showToast("Database Connection Failed", 'error');
+                showToast(err.message, 'error');
             } finally {
                 elements.loader.style.display = 'none';
             }
@@ -289,77 +385,90 @@
             });
 
             elements.empty.style.display = filtered.length ? 'none' : 'block';
-            
-            elements.table.innerHTML = filtered.map(c => {
-                const dateSource = c.vcardCreatedDate || c.createdAt;
-                const months = calculateMonths(dateSource);
-                
-                let rowClass = "";
-                let alertBadge = "";
-
-                if (months !== null) {
-                    if (months >= 12) {
-                        rowClass = "expiry-due";
-                        alertBadge = `<br><span class="badge-expiry-due">RENEWAL DUE</span>`;
-                    } else if (months >= 11) {
-                        rowClass = "expiry-warning";
-                        alertBadge = `<br><span class="badge-expiry-warning">EXPIRING SOON</span>`;
-                    }
-                }
-
-                return `
-                <tr class="${rowClass}">
+            elements.totals.style.display = filtered.length ? 'block' : 'none';
+            elements.table.innerHTML = filtered.map(c => `
+                <tr data-id="${c._id}">
                     <td><img src="${c.photoUrl || 'https://placehold.co/50x50/222/fff?text=?'}" class="client-photo" onerror="this.src='https://placehold.co/50x50/222/fff?text=?'"></td>
-                    <td style="font-weight:700">${c.fullName || '-'}</td>
+                    <td>${c.fullName || '-'}</td>
                     <td>${c.company || '-'}</td>
                     <td>${c.email1 || '-'}</td>
                     <td>${c.phone1 || '-'}</td>
-                    <td>${dateSource ? dateSource.split('T')[0] : '-'}</td>
-                    <td><strong>${months !== null ? months + ' months' : 'N/A'}</strong>${alertBadge}</td>
-                    <td><span class="status-badge status-${c.status || 'Pending'}">${c.status || 'Pending'}</span></td>
+                    <td>${c.vcardCreatedDate ? c.vcardCreatedDate.split('T')[0] : '-'}</td>
+                    <td>${calculateMonths(c.vcardCreatedDate)}</td>
+                    <td>${getStatusBadge(c.status)}</td>
                     <td>
-                        <button onclick="openActionModal('${c._id}', '${c.status === 'Active' ? 'Disabled' : 'Active'}')" title="Toggle Status">
+                        <button onclick="openActionModal('${c._id}', '${c.status === 'Active' ? 'Disabled' : 'Active'}')">
                             <i class="fas ${c.status === 'Active' ? 'fa-ban' : 'fa-check'}"></i>
                         </button>
+                        <button onclick="openActionModal('${c._id}', 'Deleted')">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
-                </tr>`;
-            }).join('');
+                </tr>
+            `).join('');
 
-            elements.totals.innerHTML = `Total Clients: ${filtered.length} | Active Subscriptions: ${filtered.filter(x=>x.status==='Active').length}`;
+            updateStats(filtered);
+        }
+
+        function updateStats(data) {
+            const counts = data.reduce((acc, curr) => {
+                const s = curr.status || 'Pending';
+                acc[s] = (acc[s] || 0) + 1;
+                return acc;
+            }, {});
+            elements.totals.innerHTML = `Total: ${data.length} | Active: ${counts.Active || 0} | Pending: ${counts.Pending || 0} | Disabled: ${counts.Disabled || 0}`;
         }
 
         window.openActionModal = (id, nextStatus) => {
             elements.modal.style.display = 'block';
+            elements.modalText.value = '';
             elements.modalConfirm.onclick = async () => {
                 const note = elements.modalText.value.trim();
                 if (!note) return showToast('Reason required', 'error');
                 
+                elements.modal.style.display = 'none';
                 try {
                     const res = await fetch(`${API_BASE_URL}/api/clients/${id}/status/${nextStatus}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ notes: note })
                     });
-                    if (res.ok) {
-                        showToast("Client Status Updated");
-                        elements.modal.style.display = 'none';
-                        fetchClients();
+                    if (!res.ok) throw new Error('Update failed');
+                    
+                    const idx = allClientData.findIndex(c => c._id === id);
+                    if (idx > -1) {
+                        allClientData[idx].status = nextStatus;
+                        render();
+                        const row = document.querySelector(`tr[data-id="${id}"]`);
+                        row?.classList.add('row-success');
+                        setTimeout(() => row?.classList.remove('row-success'), 2000);
                     }
-                } catch (err) { showToast("Update Failed", 'error'); }
+                    showToast(`Updated to ${nextStatus}`);
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
             };
         };
 
         document.getElementById('exportBtn').onclick = () => {
-            const csv = allClientData.map(c => `"${c.fullName}","${c.email1}","${c.status}"`).join("\n");
-            const blob = new Blob(["Name,Email,Status\n" + csv], { type: 'text/csv' });
+            const headers = "ID,Name,Company,Email,Phone,Status,Created\n";
+            const csv = allClientData.map(c => 
+                `"${c._id}","${c.fullName}","${c.company}","${c.email1}","${c.phone1}","${c.status}","${c.vcardCreatedDate}"`
+            ).join("\n");
+            const blob = new Blob([headers + csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = "clients_report.csv";
+            a.download = `clients_${new Date().toISOString().slice(0,10)}.csv`;
             a.click();
         };
 
-        document.getElementById('resetBtn').onclick = () => { elements.search.value = ''; elements.filter.value = ''; render(); };
+        document.getElementById('resetBtn').onclick = () => {
+            elements.search.value = '';
+            elements.filter.value = '';
+            render();
+        };
+
         document.getElementById('modalCloseBtn').onclick = () => elements.modal.style.display = 'none';
         elements.search.oninput = render;
         elements.filter.onchange = render;
