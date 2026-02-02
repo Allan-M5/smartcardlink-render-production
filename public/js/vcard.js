@@ -40,7 +40,7 @@
  const buttons = {
   moreInfo: el('moreInfoBtn'),
   back: el('backBtn'),
-  book: el('bookAppointmentBtn'),
+  
   business: el('businessWebsite'),
   portfolio: el('portfolioWebsite'),
   location: el('locationMap'),
@@ -294,7 +294,7 @@ async function fetchProfileData() {
     btn.classList.remove('disabled');
    } else {
     btn.onclick = () => alertMsg(btn.textContent + " is not provided");
-    btn.classList.add('disabled');
+    
    }
   };
 
@@ -357,7 +357,7 @@ async function fetchProfileData() {
     btn.classList.remove('disabled');
    } else {
     btn.onclick = () => alertMsg(fallback);
-    btn.classList.add('disabled');
+    
    }
   };
   
@@ -370,7 +370,7 @@ async function fetchProfileData() {
     btn.classList.remove('disabled');
    } else {
     btn.onclick = () => alertMsg(`${platformName} Not Provided`);
-    btn.classList.add('disabled');
+    
    }
   };
 
@@ -440,10 +440,7 @@ window.__initBookAppointment && window.__initBookAppointment(client);
 ;
 
   // remove ALL state control
-  buttons.book.disabled = false;
-  buttons.book.removeAttribute('disabled');
-  buttons.book.classList.remove('disabled');
-}
+  }
 
 // FORCE enable Book Appointment (no data dependency)
 
@@ -567,3 +564,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
   observer.observe(document.body, { childList: true, subtree: true });
 });
+
+  
+// =====================================================
+// BOOK APPOINTMENT  FINAL, DATA-INDEPENDENT
+// =====================================================
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('#bookAppointmentBtn');
+  if (!btn) return;
+
+  e.preventDefault();
+
+  const title = encodeURIComponent('Meeting via SmartCardLink');
+  const details = encodeURIComponent(
+    'SmartCardLink vCard\n' + window.location.href
+  );
+
+  window.open(
+    'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + title +
+    '&details=' + details,
+    '_blank',
+    'noopener,noreferrer'
+  );
+});
+
+
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('#bookAppointmentBtn');
+  if (!btn) return;
+
+  e.preventDefault();
+
+  btn.disabled = false;
+  btn.classList.remove('disabled');
+
+  const title = encodeURIComponent('Meeting via SmartCardLink');
+  const details = encodeURIComponent(
+    'SmartCardLink vCard\n' + window.location.href
+  );
+
+  window.open(
+    'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + title +
+    '&details=' + details,
+    '_blank',
+    'noopener,noreferrer'
+  );
+});
+
+
+
