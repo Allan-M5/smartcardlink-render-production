@@ -536,3 +536,31 @@ if (buttons.book) {
 
 
 
+
+// === HARD OVERRIDE: Kill aria-hidden & disabled forever (last resort) ===
+document.addEventListener('DOMContentLoaded', () => {
+  const popup = document.getElementById('popup2');
+  const book = document.getElementById('bookAppointmentBtn');
+
+  const clean = () => {
+    if (popup) {
+      popup.removeAttribute('aria-hidden');
+      popup.removeAttribute('hidden');
+    }
+    if (book) {
+      book.disabled = false;
+      book.removeAttribute('disabled');
+      book.classList.remove('disabled');
+    }
+  };
+
+  clean();
+
+  const obs = new MutationObserver(clean);
+  obs.observe(document.body, {
+    attributes: true,
+    subtree: true,
+    attributeFilter: ['aria-hidden', 'disabled', 'hidden']
+  });
+});
+
