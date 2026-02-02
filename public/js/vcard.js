@@ -62,11 +62,32 @@
  function setHidden(node, hidden) {
   if (!node) return;
 
+  // FIX: release focus before hiding (accessibility-safe)
+  if (hidden && node.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+
   if (hidden) {
-    node.style.display = "none";
-    node.setAttribute("aria-hidden", "true");
-    node.setAttribute("hidden", "");
+    node.style.display = 'none';
+    node.setAttribute('aria-hidden', 'true');
+    node.setAttribute('hidden', '');
   } else {
+    node.style.display = 'block';
+    node.setAttribute('aria-hidden', 'false');
+    node.removeAttribute('hidden');
+  }
+}
+
+  if (hidden) {
+    node.style.display = 'none';
+    node.setAttribute('aria-hidden', 'true');
+    node.setAttribute('hidden', '');
+  } else {
+    node.style.display = 'block';
+    node.setAttribute('aria-hidden', 'false');
+    node.removeAttribute('hidden');
+  }
+} else {
     node.style.display = "block";
     node.setAttribute("aria-hidden", "false");
     node.removeAttribute("hidden");
@@ -470,6 +491,8 @@ if (buttons.book) {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
+
 
 
 
