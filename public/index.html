@@ -126,40 +126,7 @@
     </main>
   </div>
 
-  <script src="./js/vcard.js" defer></script>
-
-  <!-- Small fix: Ensure popups load after DOM -->
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const popup1 = document.getElementById('popup1');
-      const popup2 = document.getElementById('popup2');
-      const moreInfoBtn = document.getElementById('moreInfoBtn');
-      const backBtn = document.getElementById('backBtn');
-
-      if (moreInfoBtn && backBtn && popup1 && popup2) {
-        moreInfoBtn.addEventListener('click', () => {
-          document.activeElement && document.activeElement.blur();
-popup1.hidden = true;
-popup2.hidden = false;
-        });
-
-        backBtn.addEventListener('click', () => {
-          document.activeElement && document.activeElement.blur();
-popup1.hidden = false;
-popup2.hidden = true;
-        });
-      }
-    });
-  </script>
-<button id='globalBookAppointmentBtn' class='book-btn' style='position:fixed;bottom:20px;right:20px;z-index:9999;'>
-  Book Appointment
-</button>
-<script src="/js/book-appointment.js"></script><script src="/js/book-appointment.js" defer></script>`n</body>
+  <script src="/js/vcard.js" defer></script>
+<script src="/js/book-appointment.js" defer></script>
+</body>
 </html>
-
-
-
-
-
-
-
