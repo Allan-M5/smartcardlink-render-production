@@ -138,17 +138,20 @@
 
       if (moreInfoBtn && backBtn && popup1 && popup2) {
         moreInfoBtn.addEventListener('click', () => {
-          popup1.hidden = true;
-          popup2.hidden = false;
+          document.activeElement && document.activeElement.blur();
+popup1.hidden = true;
+popup2.hidden = false;
         });
 
         backBtn.addEventListener('click', () => {
-          popup1.hidden = false;
-          popup2.hidden = true;
+          document.activeElement && document.activeElement.blur();
+popup1.hidden = false;
+popup2.hidden = true;
         });
       }
     });
   </script>
 </body>
 </html>
+
 
