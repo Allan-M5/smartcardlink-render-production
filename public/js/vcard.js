@@ -565,3 +565,43 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+
+
+// =====================================================
+// BOOK APPOINTMENT  FINAL OVERRIDE (POPUP-INDEPENDENT)
+// =====================================================
+document.addEventListener('DOMContentLoaded', function () {
+  var book = document.getElementById('bookAppointmentBtn');
+  if (!book) return;
+
+  book.disabled = false;
+  book.removeAttribute('disabled');
+  book.classList.remove('disabled');
+
+  book.onclick = function () {
+    try {
+      var name = window.client?.fullName || 'Contact';
+      var phone = window.client?.phone1 || 'N/A';
+      var email = window.client?.email1 || 'N/A';
+
+      var title = encodeURIComponent('Meeting with ' + name);
+      var details = encodeURIComponent(
+        'SmartCardLink vCard:\\n' +
+        window.location.href +
+        '\\n\\nPhone: ' + phone +
+        '\\nEmail: ' + email
+      );
+
+      var url =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + title +
+        '&details=' + details;
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      console.error('Book Appointment failed:', e);
+    }
+  };
+});
+
