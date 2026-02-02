@@ -485,6 +485,7 @@ async function fetchProfileData() {
    // Setup all buttons
    setupPopup1Actions(client);
    setupPopup2Buttons(client);
+window.__initBookAppointment && window.__initBookAppointment(client);
 
 // === BOOK APPOINTMENT: ISOLATED & ALWAYS ACTIVE ===
 if (buttons.book) {
@@ -797,4 +798,54 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+
+
+
+
+// =====================================================
+// BOOK APPOINTMENT  SINGLE SOURCE OF TRUTH (FINAL FIX)
+// =====================================================
+(function () {
+  'use strict';
+
+  function openGoogleCalendar(client) {
+    const name = client.fullName || 'Contact';
+    const phone = client.phone1 || 'N/A';
+    const email = client.email1 || 'N/A';
+
+    const title = encodeURIComponent('Meeting with ' + name);
+    const details = encodeURIComponent(
+      'SmartCardLink vCard\n' +
+      window.location.href +
+      '\n\nPhone: ' + phone +
+      '\nEmail: ' + email
+    );
+
+    const url =
+      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + title +
+      '&details=' + details;
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  window.__initBookAppointment = function (client) {
+    const btn = document.getElementById('bookAppointmentBtn');
+    if (!btn) return;
+
+    // Force enable  no conditions
+    btn.disabled = false;
+    btn.removeAttribute('disabled');
+    btn.classList.remove('disabled');
+
+    // Clear previous handlers
+    btn.onclick = null;
+
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      openGoogleCalendar(client);
+    });
+  };
+
+})();
 
