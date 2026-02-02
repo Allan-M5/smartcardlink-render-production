@@ -364,9 +364,14 @@ async function fetchProfileData() {
   setSocialAction(buttons.tiktok, 'tiktok', 'TikTok');
   setSocialAction(buttons.youtube, 'youtube', 'YouTube');
 
-  // Book Appointment Logic (Assumes presence of an appointment link)
+  // Book Appointment  Google Calendar with vCard link
   if (buttons.book) {
-   openOrAlert(buttons.book, client.appointmentLink, 'Appointment Link Not Provided');
+    buttons.book.onclick = () => {
+      const title = encodeURIComponent(Meeting with );
+      const details = encodeURIComponent(SmartCardLink vCard:\n\n\nPhone: \nEmail: );
+      const calendarUrl = https://calendar.google.com/calendar/render?action=TEMPLATE&text=&details=;
+      window.open(calendarUrl, '_blank');
+    };
   }
  }
 
@@ -459,6 +464,8 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
+
 
 
 
