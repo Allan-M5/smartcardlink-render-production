@@ -426,12 +426,27 @@ async function fetchProfileData() {
    setupPopup1Actions(client);
    setupPopup2Buttons(client);
 
-// === FINAL FIX: Book Appointment must NEVER be disabled ===
+// === BOOK APPOINTMENT: ISOLATED & ALWAYS ACTIVE ===
 if (buttons.book) {
+  buttons.book.onclick = function () {
+    var title = encodeURIComponent('Meeting with ' + (client.fullName || 'Contact'));
+    var details = encodeURIComponent(
+      'SmartCardLink vCard:\n' +
+      window.location.href +
+      '\n\nPhone: ' + (client.phone1 || 'N/A') +
+      '\nEmail: ' + (client.email1 || 'N/A')
+    );
+    var calendarUrl =
+      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + title +
+      '&details=' + details;
+    window.open(calendarUrl, '_blank');
+  };
+
+  // remove ALL state control
   buttons.book.disabled = false;
   buttons.book.removeAttribute('disabled');
   buttons.book.classList.remove('disabled');
-  buttons.book.setAttribute('aria-hidden', 'false');
 }
 
 // FORCE enable Book Appointment (no data dependency)
@@ -499,6 +514,7 @@ if (buttons.book) {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
