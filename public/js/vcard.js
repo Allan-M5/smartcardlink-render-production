@@ -402,7 +402,7 @@ async function fetchProfileData() {
 
  // --- INITIALIZATION ---
  async function init() {
-  const client = await fetchProfileData();
+  const client = await fetchProfileData();\n\n// Expose client globally for isolated modules\nwindow.__SMARTCARD_CLIENT__ = client;
 
   if (client) {
    // Populate Popup 1 Data
@@ -635,4 +635,5 @@ document.addEventListener('DOMContentLoaded', function () {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 });
+
 
