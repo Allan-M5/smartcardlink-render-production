@@ -339,58 +339,12 @@ async function fetchProfileData() {
  function setupPopup2Buttons(client) {
 
   // === HARD OVERRIDE: Book Appointment is NOT managed by openOrAlert ===
-  if (buttons.book) {
-    buttons.book.classList.remove('disabled');
-    buttons.book.disabled = false;
-
-    buttons.book.onclick = () => {
-      const name = client.fullName || 'Contact';
-      const phone = client.phone1 || 'N/A';
-      const email = client.email1 || 'N/A';
-
-      const title = encodeURIComponent('Meeting with ' + name);
-      const details = encodeURIComponent(
-        'SmartCardLink vCard\n' +
-        window.location.href +
-        '\n\nPhone: ' + phone +
-        '\nEmail: ' + email
-      );
-
-      const calendarUrl =
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + title +
-        '&details=' + details;
-
-      window.open(calendarUrl, '_blank', 'noopener,noreferrer');
-    };
+  ;
   }
 
 
   // === HARD OVERRIDE: Book Appointment is NOT managed by openOrAlert ===
-  if (buttons.book) {
-    buttons.book.classList.remove('disabled');
-    buttons.book.disabled = false;
-
-    buttons.book.onclick = () => {
-      const name = client.fullName || 'Contact';
-      const phone = client.phone1 || 'N/A';
-      const email = client.email1 || 'N/A';
-
-      const title = encodeURIComponent('Meeting with ' + name);
-      const details = encodeURIComponent(
-        'SmartCardLink vCard\n' +
-        window.location.href +
-        '\n\nPhone: ' + phone +
-        '\nEmail: ' + email
-      );
-
-      const calendarUrl =
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + title +
-        '&details=' + details;
-
-      window.open(calendarUrl, '_blank', 'noopener,noreferrer');
-    };
+  ;
   }
 
   const socialLinks = client.socialLinks || {};
@@ -446,13 +400,7 @@ async function fetchProfileData() {
   setSocialAction(buttons.youtube, 'youtube', 'YouTube');
 
   // Book Appointment  Google Calendar with vCard link
-  if (buttons.book) {
-    buttons.book.onclick = () => {
-      const title = encodeURIComponent(Meeting with );
-      const details = encodeURIComponent(SmartCardLink vCard:\n\n\nPhone: \nEmail: );
-      const calendarUrl = https://calendar.google.com/calendar/render?action=TEMPLATE&text=&details=;
-      window.open(calendarUrl, '_blank');
-    };
+  ;
   }
  }
 
@@ -489,21 +437,7 @@ activateBookingSystem(client);
 window.__initBookAppointment && window.__initBookAppointment(client);
 
 // === BOOK APPOINTMENT: ISOLATED & ALWAYS ACTIVE ===
-if (buttons.book) {
-  buttons.book.onclick = function () {
-    var title = encodeURIComponent('Meeting with ' + (client.fullName || 'Contact'));
-    var details = encodeURIComponent(
-      'SmartCardLink vCard:\n' +
-      window.location.href +
-      '\n\nPhone: ' + (client.phone1 || 'N/A') +
-      '\nEmail: ' + (client.email1 || 'N/A')
-    );
-    var calendarUrl =
-      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-      '&text=' + title +
-      '&details=' + details;
-    window.open(calendarUrl, '_blank');
-  };
+;
 
   // remove ALL state control
   buttons.book.disabled = false;
@@ -512,10 +446,7 @@ if (buttons.book) {
 }
 
 // FORCE enable Book Appointment (no data dependency)
-if (buttons.book) {
-    buttons.book.disabled = false;
-    buttons.book.classList.remove('disabled');
-}
+
 
    // Show the main VCard popup
    setHidden(popup1, false);
@@ -535,17 +466,7 @@ if (buttons.book) {
   });
 
   // Popup Navigation & Sizing Logic (Kept intact)
-  if (buttons.moreInfo && popup1 && popup2) {
-   buttons.moreInfo.onclick = () => {
-  // FORCE popup toggle ? override index.html interference
-  popup1.hidden = true;
-  popup2.hidden = false;
-
-  popup1.style.display = "none";
-  popup2.style.display = "block";
-
-  popup2.scrollTop = 0;
-};
+  ;
   }
   
   if (buttons.back) {
@@ -575,323 +496,74 @@ if (buttons.book) {
 
  document.addEventListener('DOMContentLoaded', init);
 
-})();
+}})();
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// === HARD OVERRIDE: Kill aria-hidden & disabled forever (last resort) ===
-document.addEventListener('DOMContentLoaded', () => {
-  const popup = document.getElementById('popup2');
-  const book = document.getElementById('bookAppointmentBtn');
-
-  const clean = () => {
-    if (popup) {
-      popup.removeAttribute('aria-hidden');
-      popup.removeAttribute('hidden');
-    }
-    if (book) {
-      book.disabled = false;
-      book.removeAttribute('disabled');
-      book.classList.remove('disabled');
-    }
-  };
-
-  clean();
-
-  const obs = new MutationObserver(clean);
-  obs.observe(document.body, {
-    attributes: true,
-    subtree: true,
-    attributeFilter: ['aria-hidden', 'disabled', 'hidden']
-  });
-});
-
-
-
-
-
-// =====================================================
-// BOOK APPOINTMENT  FINAL OVERRIDE (POPUP-INDEPENDENT)
-// =====================================================
-document.addEventListener('DOMContentLoaded', function () {
-  var book = document.getElementById('bookAppointmentBtn');
-  if (!book) return;
-
-  book.disabled = false;
-  book.removeAttribute('disabled');
-  book.classList.remove('disabled');
-
-  book.onclick = function () {
-    try {
-      var name = window.client?.fullName || 'Contact';
-      var phone = window.client?.phone1 || 'N/A';
-      var email = window.client?.email1 || 'N/A';
-
-      var title = encodeURIComponent('Meeting with ' + name);
-      var details = encodeURIComponent(
-        'SmartCardLink vCard:\\n' +
-        window.location.href +
-        '\\n\\nPhone: ' + phone +
-        '\\nEmail: ' + email
-      );
-
-      var url =
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + title +
-        '&details=' + details;
-
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (e) {
-      console.error('Book Appointment failed:', e);
-    }
-  };
-});
-
-
-
-// =====================================================
-// GLOBAL BOOK APPOINTMENT (GUARANTEED WORKING)
-// =====================================================
-document.addEventListener('DOMContentLoaded', function () {
-  var btn = document.getElementById('globalBookAppointmentBtn');
-  if (!btn) return;
-
-  btn.onclick = function () {
-    var name = window.client?.fullName || 'Contact';
-    var phone = window.client?.phone1 || 'N/A';
-    var email = window.client?.email1 || 'N/A';
-
-    var title = encodeURIComponent('Meeting with ' + name);
-    var details = encodeURIComponent(
-      'SmartCardLink vCard:\\n' +
-      window.location.href +
-      '\\n\\nPhone: ' + phone +
-      '\\nEmail: ' + email
-    );
-
-    var url =
-      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-      '&text=' + title +
-      '&details=' + details;
-
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-});
-
-
-
-
-/* =========================================================
-   BOOK APPOINTMENT  FINAL, CACHE-PROOF, VCARD-SAFE FIX
-   ========================================================= */
-(function () {
-  function attachBooking() {
+  // =====================================================
+  // BOOK APPOINTMENT  SINGLE OWNER (ARCHITECTURAL)
+  // =====================================================
+  function activateBooking(client) {
     const btn = document.getElementById('bookAppointmentBtn');
-    if (!btn) return;
+    const popup2 = document.getElementById('popup2');
+    if (!btn || !client) return;
 
+    // Accessibility correctness
+    popup2.removeAttribute('aria-hidden');
+    popup2.removeAttribute('hidden');
+
+    // Guaranteed enabled state
     btn.disabled = false;
     btn.removeAttribute('disabled');
     btn.classList.remove('disabled');
 
-    btn.onclick = function () {
-      const c = window.__SMARTCARD_CLIENT__ || {};
-      const name = c.fullName || 'Contact';
-      const phone = c.phone1 || 'N/A';
-      const email = c.email1 || 'N/A';
+    btn.onclick = function (e) {
+      e.preventDefault();
 
-      const title = encodeURIComponent('Meeting with ' + name);
+      const title = encodeURIComponent('Meeting with ' + (client.fullName || 'Contact'));
       const details = encodeURIComponent(
-        'SmartCardLink vCard\\n' +
+        'SmartCardLink vCard\n' +
         window.location.href +
-        '\\n\\nPhone: ' + phone +
-        '\\nEmail: ' + email
+        '\n\nPhone: ' + (client.phone1 || 'N/A') +
+        '\nEmail: ' + (client.email1 || 'N/A')
       );
 
-      const url =
+      window.open(
         'https://calendar.google.com/calendar/render?action=TEMPLATE' +
         '&text=' + title +
-        '&details=' + details;
-
-      window.open(url, '_blank', 'noopener,noreferrer');
+        '&details=' + details,
+        '_blank',
+        'noopener,noreferrer'
+      );
     };
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', attachBooking);
-  } else {
-    attachBooking();
-  }
-})();
 
 
 
-/* =========================================================
-   BOOK APPOINTMENT  FINAL CSS + JS OVERRIDE (GUARANTEED)
-   ========================================================= */
-(function () {
-  function forceEnableBooking() {
+
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const observer = new MutationObserver(() => {
     const btn = document.getElementById('bookAppointmentBtn');
-    if (!btn) return;
+    if (!btn || btn.classList.contains('bound')) return;
 
-    // Kill all disabling mechanisms
     btn.disabled = false;
-    btn.removeAttribute('disabled');
     btn.classList.remove('disabled');
-    btn.style.pointerEvents = 'auto';
-    btn.style.opacity = '1';
+    btn.classList.add('bound');
 
-    // HARD click handler (capture beats everything)
-    btn.addEventListener('click', function (e) {
+    btn.onclick = (e) => {
       e.preventDefault();
-      e.stopPropagation();
-
-      const c = window.__SMARTCARD_CLIENT__ || {};
-      const name = c.fullName || 'Contact';
-      const phone = c.phone1 || 'N/A';
-      const email = c.email1 || 'N/A';
-
-      const title = encodeURIComponent('Meeting with ' + name);
-      const details = encodeURIComponent(
-        'SmartCardLink vCard\\n' +
-        window.location.href +
-        '\\n\\nPhone: ' + phone +
-        '\\nEmail: ' + email
+      const title = encodeURIComponent('Meeting via SmartCardLink');
+      const details = encodeURIComponent(window.location.href);
+      window.open(
+        'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' +
+        title + '&details=' + details,
+        '_blank',
+        'noopener,noreferrer'
       );
+    };
+  });
 
-      const url =
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + title +
-        '&details=' + details;
-
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }, true); // <-- CAPTURE MODE
-  }
-
-  // Run now + keep enforcing (DOM mutations)
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', forceEnableBooking);
-  } else {
-    forceEnableBooking();
-  }
-
-  // Safety net: re-apply if something re-disables it
-  const obs = new MutationObserver(forceEnableBooking);
-  obs.observe(document.body, { attributes: true, subtree: true });
-})();
-
-
-
-
-
-
-
-
-
-// =====================================================
-// BOOK APPOINTMENT  SINGLE SOURCE OF TRUTH (FINAL FIX)
-// =====================================================
-(function () {
-  'use strict';
-
-  function openGoogleCalendar(client) {
-    const name = client.fullName || 'Contact';
-    const phone = client.phone1 || 'N/A';
-    const email = client.email1 || 'N/A';
-
-    const title = encodeURIComponent('Meeting with ' + name);
-    const details = encodeURIComponent(
-      'SmartCardLink vCard\n' +
-      window.location.href +
-      '\n\nPhone: ' + phone +
-      '\nEmail: ' + email
-    );
-
-    const url =
-      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-      '&text=' + title +
-      '&details=' + details;
-
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
-  window.__initBookAppointment = function (client) {
-    const btn = document.getElementById('bookAppointmentBtn');
-    if (!btn) return;
-
-    // Force enable  no conditions
-    btn.disabled = false;
-    btn.removeAttribute('disabled');
-    btn.classList.remove('disabled');
-
-    // Clear previous handlers
-    btn.onclick = null;
-
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      openGoogleCalendar(client);
-    });
-  };
-
-})();
-
-
- 
-// =====================================================
-// BOOK APPOINTMENT  FINAL ARCHITECTURAL FIX
-// =====================================================
-function activateBookingSystem(client) {
-  const btn = document.getElementById('bookAppointmentBtn');
-  const popup2 = document.getElementById('popup2');
-  if (!btn || !client) return;
-
-  // Ensure popup is accessible when visible
-  if (popup2 && !popup2.hasAttribute('hidden')) {
-    popup2.removeAttribute('aria-hidden');
-  }
-
-  // Hard reset state
-  btn.disabled = false;
-  btn.removeAttribute('disabled');
-  btn.classList.remove('disabled');
-
-  // Single owner of click logic
-  btn.onclick = function (e) {
-    e.preventDefault();
-
-    const name = client.fullName || 'Contact';
-    const phone = client.phone1 || 'N/A';
-    const email = client.email1 || 'N/A';
-
-    const title = encodeURIComponent('Meeting with ' + name);
-    const details = encodeURIComponent(
-      'SmartCardLink vCard\n' +
-      window.location.href +
-      '\n\nPhone: ' + phone +
-      '\nEmail: ' + email
-    );
-
-    const url =
-      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-      '&text=' + title +
-      '&details=' + details;
-
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-}
-
+  observer.observe(document.body, { childList: true, subtree: true });
+});
