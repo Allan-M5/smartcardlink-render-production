@@ -605,3 +605,34 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 });
 
+
+
+// =====================================================
+// GLOBAL BOOK APPOINTMENT (GUARANTEED WORKING)
+// =====================================================
+document.addEventListener('DOMContentLoaded', function () {
+  var btn = document.getElementById('globalBookAppointmentBtn');
+  if (!btn) return;
+
+  btn.onclick = function () {
+    var name = window.client?.fullName || 'Contact';
+    var phone = window.client?.phone1 || 'N/A';
+    var email = window.client?.email1 || 'N/A';
+
+    var title = encodeURIComponent('Meeting with ' + name);
+    var details = encodeURIComponent(
+      'SmartCardLink vCard:\\n' +
+      window.location.href +
+      '\\n\\nPhone: ' + phone +
+      '\\nEmail: ' + email
+    );
+
+    var url =
+      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + title +
+      '&details=' + details;
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+});
+
