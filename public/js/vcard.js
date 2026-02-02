@@ -337,6 +337,34 @@ async function fetchProfileData() {
  }
 
  function setupPopup2Buttons(client) {
+
+  // === HARD OVERRIDE: Book Appointment is NOT managed by openOrAlert ===
+  if (buttons.book) {
+    buttons.book.classList.remove('disabled');
+    buttons.book.disabled = false;
+
+    buttons.book.onclick = () => {
+      const name = client.fullName || 'Contact';
+      const phone = client.phone1 || 'N/A';
+      const email = client.email1 || 'N/A';
+
+      const title = encodeURIComponent('Meeting with ' + name);
+      const details = encodeURIComponent(
+        'SmartCardLink vCard\n' +
+        window.location.href +
+        '\n\nPhone: ' + phone +
+        '\nEmail: ' + email
+      );
+
+      const calendarUrl =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + title +
+        '&details=' + details;
+
+      window.open(calendarUrl, '_blank', 'noopener,noreferrer');
+    };
+  }
+
   const socialLinks = client.socialLinks || {};
 
   // Helper for non-social URLs
@@ -736,5 +764,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const obs = new MutationObserver(forceEnableBooking);
   obs.observe(document.body, { attributes: true, subtree: true });
 })();
+
 
 
