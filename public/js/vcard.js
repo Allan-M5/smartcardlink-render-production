@@ -405,6 +405,12 @@ async function fetchProfileData() {
    setupPopup1Actions(client);
    setupPopup2Buttons(client);
 
+// FORCE enable Book Appointment (no data dependency)
+if (buttons.book) {
+    buttons.book.disabled = false;
+    buttons.book.classList.remove('disabled');
+}
+
    // Show the main VCard popup
    setHidden(popup1, false);
    setHidden(popup2, true);
@@ -464,6 +470,7 @@ async function fetchProfileData() {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
