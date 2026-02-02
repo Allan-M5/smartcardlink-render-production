@@ -485,6 +485,7 @@ async function fetchProfileData() {
    // Setup all buttons
    setupPopup1Actions(client);
    setupPopup2Buttons(client);
+activateBookingSystem(client);
 window.__initBookAppointment && window.__initBookAppointment(client);
 
 // === BOOK APPOINTMENT: ISOLATED & ALWAYS ACTIVE ===
@@ -848,4 +849,49 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 
 })();
+
+
+ 
+// =====================================================
+// BOOK APPOINTMENT  FINAL ARCHITECTURAL FIX
+// =====================================================
+function activateBookingSystem(client) {
+  const btn = document.getElementById('bookAppointmentBtn');
+  const popup2 = document.getElementById('popup2');
+  if (!btn || !client) return;
+
+  // Ensure popup is accessible when visible
+  if (popup2 && !popup2.hasAttribute('hidden')) {
+    popup2.removeAttribute('aria-hidden');
+  }
+
+  // Hard reset state
+  btn.disabled = false;
+  btn.removeAttribute('disabled');
+  btn.classList.remove('disabled');
+
+  // Single owner of click logic
+  btn.onclick = function (e) {
+    e.preventDefault();
+
+    const name = client.fullName || 'Contact';
+    const phone = client.phone1 || 'N/A';
+    const email = client.email1 || 'N/A';
+
+    const title = encodeURIComponent('Meeting with ' + name);
+    const details = encodeURIComponent(
+      'SmartCardLink vCard\n' +
+      window.location.href +
+      '\n\nPhone: ' + phone +
+      '\nEmail: ' + email
+    );
+
+    const url =
+      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + title +
+      '&details=' + details;
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+}
 
