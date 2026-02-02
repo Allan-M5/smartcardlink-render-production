@@ -114,7 +114,7 @@
 
   // Hide main content popups
   setHidden(popup1, true);
-  setHidden(popup2, true);
+  popup2.style.display = 'none';
 
   let msgEl = el('messageArea'); 
   if (!msgEl) {
@@ -461,7 +461,7 @@ if (buttons.book) {
 
    // Show the main VCard popup
    setHidden(popup1, false);
-   setHidden(popup2, true);
+   popup2.style.display = 'none';
   }
 
   // Dropdown Toggles (Kept intact)
@@ -494,7 +494,7 @@ if (buttons.book) {
    buttons.back.onclick = () => {
   releaseFocus(popup2);
 
-  setHidden(popup2, true);
+  popup2.style.display = 'none';
   setHidden(popup1, false);
 
   if (buttons.moreInfo) buttons.moreInfo.focus();
@@ -563,4 +563,5 @@ document.addEventListener('DOMContentLoaded', () => {
     attributeFilter: ['aria-hidden', 'disabled', 'hidden']
   });
 });
+
 
