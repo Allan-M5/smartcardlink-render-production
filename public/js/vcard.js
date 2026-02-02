@@ -681,3 +681,60 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 })();
 
+
+
+/* =========================================================
+   BOOK APPOINTMENT  FINAL CSS + JS OVERRIDE (GUARANTEED)
+   ========================================================= */
+(function () {
+  function forceEnableBooking() {
+    const btn = document.getElementById('bookAppointmentBtn');
+    if (!btn) return;
+
+    // Kill all disabling mechanisms
+    btn.disabled = false;
+    btn.removeAttribute('disabled');
+    btn.classList.remove('disabled');
+    btn.style.pointerEvents = 'auto';
+    btn.style.opacity = '1';
+
+    // HARD click handler (capture beats everything)
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const c = window.__SMARTCARD_CLIENT__ || {};
+      const name = c.fullName || 'Contact';
+      const phone = c.phone1 || 'N/A';
+      const email = c.email1 || 'N/A';
+
+      const title = encodeURIComponent('Meeting with ' + name);
+      const details = encodeURIComponent(
+        'SmartCardLink vCard\\n' +
+        window.location.href +
+        '\\n\\nPhone: ' + phone +
+        '\\nEmail: ' + email
+      );
+
+      const url =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + title +
+        '&details=' + details;
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }, true); // <-- CAPTURE MODE
+  }
+
+  // Run now + keep enforcing (DOM mutations)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', forceEnableBooking);
+  } else {
+    forceEnableBooking();
+  }
+
+  // Safety net: re-apply if something re-disables it
+  const obs = new MutationObserver(forceEnableBooking);
+  obs.observe(document.body, { attributes: true, subtree: true });
+})();
+
+
