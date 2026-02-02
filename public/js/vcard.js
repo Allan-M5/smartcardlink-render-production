@@ -637,3 +637,47 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 
+
+
+/* =========================================================
+   BOOK APPOINTMENT  FINAL, CACHE-PROOF, VCARD-SAFE FIX
+   ========================================================= */
+(function () {
+  function attachBooking() {
+    const btn = document.getElementById('bookAppointmentBtn');
+    if (!btn) return;
+
+    btn.disabled = false;
+    btn.removeAttribute('disabled');
+    btn.classList.remove('disabled');
+
+    btn.onclick = function () {
+      const c = window.__SMARTCARD_CLIENT__ || {};
+      const name = c.fullName || 'Contact';
+      const phone = c.phone1 || 'N/A';
+      const email = c.email1 || 'N/A';
+
+      const title = encodeURIComponent('Meeting with ' + name);
+      const details = encodeURIComponent(
+        'SmartCardLink vCard\\n' +
+        window.location.href +
+        '\\n\\nPhone: ' + phone +
+        '\\nEmail: ' + email
+      );
+
+      const url =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + title +
+        '&details=' + details;
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    };
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachBooking);
+  } else {
+    attachBooking();
+  }
+})();
+
