@@ -426,6 +426,14 @@ async function fetchProfileData() {
    setupPopup1Actions(client);
    setupPopup2Buttons(client);
 
+// === FINAL FIX: Book Appointment must NEVER be disabled ===
+if (buttons.book) {
+  buttons.book.disabled = false;
+  buttons.book.removeAttribute('disabled');
+  buttons.book.classList.remove('disabled');
+  buttons.book.setAttribute('aria-hidden', 'false');
+}
+
 // FORCE enable Book Appointment (no data dependency)
 if (buttons.book) {
     buttons.book.disabled = false;
@@ -491,6 +499,7 @@ if (buttons.book) {
  document.addEventListener('DOMContentLoaded', init);
 
 })();
+
 
 
 
