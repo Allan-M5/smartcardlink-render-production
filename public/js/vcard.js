@@ -615,3 +615,27 @@ document.addEventListener('click', function (e) {
 
 
 
+
+
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('#bookAppointmentBtn');
+  if (!btn) return;
+
+  e.preventDefault();
+
+  btn.disabled = false;
+  btn.classList.remove('disabled');
+
+  const title = encodeURIComponent('Meeting via SmartCardLink');
+  const details = encodeURIComponent(
+    'SmartCardLink vCard\n' + window.location.href
+  );
+
+  window.open(
+    'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + title +
+    '&details=' + details,
+    '_blank',
+    'noopener,noreferrer'
+  );
+});
