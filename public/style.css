@@ -1,4 +1,4 @@
-﻿/* style.css - FULL PRODUCTION VERSION */
+/* style.css - FULL PRODUCTION VERSION */
 
 /* 1. Variables & Resets */
 :root {
@@ -389,7 +389,7 @@ html, body {
   opacity: 1 !important;
 }
 
-/* === SmartCardLink Photo ↔ QR Swipe === */
+/* === SmartCardLink Photo ? QR Swipe === */
 .photo-swipe-container {
   position: relative;
   width: 100%;
@@ -438,10 +438,68 @@ html, body {
   100% { opacity: 0; }
 }
 
-.photo-fullscreen {
   position: fixed !important;
   inset: 0;
   background: #000;
   z-index: 9999;
+}
+
+/* =========================
+   PHOTO ? QR SWIPE STYLES
+   ========================= */
+
+.photo-swipe-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.photo-swipe-track {
+  display: flex;
+  width: 200%;
+  transition: transform 0.35s ease;
+}
+
+.photo-panel,
+.qr-panel {
+  width: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.photo-panel img,
+.qr-panel img {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.swipe-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 12px;
+  opacity: 0.75;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.photo-fullscreen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-fullscreen img {
+  max-width: 95vw;
+  max-height: 95vh;
 }
 
