@@ -491,67 +491,7 @@ window.__initBookAppointment && window.__initBookAppointment(client);
   }
  }
 
- document.addEventListener('DOMContentLoaded', init);
-
-}})();
-
-
-  // =====================================================
-  // BOOK APPOINTMENT  SINGLE OWNER (ARCHITECTURAL)
-  // =====================================================
-  function activateBooking(client) {
-    const btn = document.getElementById('bookAppointmentBtn');
-    const popup2 = document.getElementById('popup2');
-    if (!btn || !client) return;
-
-    // Accessibility correctness
-    popup2.removeAttribute('aria-hidden');
-    popup2.removeAttribute('hidden');
-
-    // Guaranteed enabled state
-    btn.disabled = false;
-    btn.removeAttribute('disabled');
-    btn.classList.remove('disabled');
-
-    btn.onclick = function (e) {
-      e.preventDefault();
-
-      const title = encodeURIComponent('Meeting with ' + (client.fullName || 'Contact'));
-      const details = encodeURIComponent(
-        'SmartCardLink vCard\n' +
-        window.location.href +
-        '\n\nPhone: ' + (client.phone1 || 'N/A') +
-        '\nEmail: ' + (client.email1 || 'N/A')
-      );
-
-      window.open(
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + title +
-        '&details=' + details,
-        '_blank',
-        'noopener,noreferrer'
-      );
-    };
-  }
-
-
-
-
-
-
-
-document.addEventListener('DOMContentLoaded', () => {
-  const observer = new MutationObserver(() => {
-    const btn = document.getElementById('bookAppointmentBtn');
-    if (!btn || btn.classList.contains('bound')) return;
-
-    btn.disabled = false;
-    btn.classList.remove('disabled');
-    btn.classList.add('bound');
-
-    btn.onclick = (e) => {
-      e.preventDefault();
-      const title = encodeURIComponent('Meeting via SmartCardLink');
+ 
       const details = encodeURIComponent(window.location.href);
       window.open(
         'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' +
@@ -569,13 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =====================================================
 // BOOK APPOINTMENT  FINAL, DATA-INDEPENDENT
 // =====================================================
-document.addEventListener('click', function (e) {
-  const btn = e.target.closest('#bookAppointmentBtn');
-  if (!btn) return;
 
-  e.preventDefault();
-
-  const title = encodeURIComponent('Meeting via SmartCardLink');
   const details = encodeURIComponent(
     'SmartCardLink vCard\n' + window.location.href
   );
@@ -590,16 +524,7 @@ document.addEventListener('click', function (e) {
 });
 
 
-document.addEventListener('click', function (e) {
-  const btn = e.target.closest('#bookAppointmentBtn');
-  if (!btn) return;
 
-  e.preventDefault();
-
-  btn.disabled = false;
-  btn.classList.remove('disabled');
-
-  const title = encodeURIComponent('Meeting via SmartCardLink');
   const details = encodeURIComponent(
     'SmartCardLink vCard\n' + window.location.href
   );
@@ -617,16 +542,7 @@ document.addEventListener('click', function (e) {
 
 
 
-document.addEventListener('click', function (e) {
-  const btn = e.target.closest('#bookAppointmentBtn');
-  if (!btn) return;
 
-  e.preventDefault();
-
-  btn.disabled = false;
-  btn.classList.remove('disabled');
-
-  const title = encodeURIComponent('Meeting via SmartCardLink');
   const details = encodeURIComponent(
     'SmartCardLink vCard\n' + window.location.href
   );
@@ -639,3 +555,212 @@ document.addEventListener('click', function (e) {
     'noopener,noreferrer'
   );
 });
+
+      var details = encodeURIComponent(
+        'SmartCardLink vCard\n' + window.location.href
+      );
+
+      window.open(
+        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + title +
+        '&details=' + details,
+        '_blank',
+        'noopener,noreferrer'
+      );
+    };
+  });
+});
+
+        var details = encodeURIComponent(
+          'SmartCardLink vCard\n' + window.location.href
+        );
+
+        window.open(
+          'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+          '&text=' + title +
+          '&details=' + details,
+          '_blank',
+          'noopener,noreferrer'
+        );
+      };
+    }, 50);
+  });
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  var moreInfoBtn = document.getElementById('moreInfoBtn');
+  var popup2 = document.getElementById('popup2');
+
+  if (!moreInfoBtn || !popup2) return;
+
+  moreInfoBtn.addEventListener('click', function () {
+    popup2.removeAttribute('hidden');
+    popup2.style.display = 'block';
+
+    setTimeout(function () {
+      var btn = document.getElementById('bookAppointmentBtn');
+      if (!btn) return;
+
+      btn.disabled = false;
+      btn.removeAttribute('disabled');
+      btn.className = 'book-btn';
+
+      btn.onclick = function (e) {
+        e.preventDefault();
+
+        var title = encodeURIComponent('Meeting via SmartCardLink');
+        var details = encodeURIComponent(
+          'SmartCardLink vCard\n' + window.location.href
+        );
+
+        window.open(
+          'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+          '&text=' + title +
+          '&details=' + details,
+          '_blank',
+          'noopener,noreferrer'
+        );
+      };
+    }, 50);
+  });
+});
+
+/* === Photo ? QR Swipe + Zoom (Isolated Patch) === */
+(function () {
+  const area = document.getElementById("photoArea");
+  if (!area) return;
+
+  let startX = 0;
+  let index = 0;
+  let lastTap = 0;
+
+  const originalRenderPhoto = window.renderPhoto;
+  window.renderPhoto = function (url) {
+    area.innerHTML = "";
+
+    const container = document.createElement("div");
+    container.className = "photo-swipe-container";
+
+    const track = document.createElement("div");
+    track.className = "photo-swipe-track";
+
+    const photoPanel = document.createElement("div");
+    photoPanel.className = "photo-panel";
+
+    const img = document.createElement("img");
+    img.src = url || "/public/images/default-photo.png";
+    img.alt = "Profile Photo";
+
+    const hint = document.createElement("div");
+    hint.className = "swipe-hint";
+    hint.textContent = "Swipe for QR";
+
+    photoPanel.appendChild(img);
+    photoPanel.appendChild(hint);
+
+    const qrPanel = document.createElement("div");
+    qrPanel.className = "qr-panel";
+
+    const qr = document.getElementById("qrCode");
+    if (qr) qrPanel.appendChild(qr.cloneNode(true));
+
+    track.appendChild(photoPanel);
+    track.appendChild(qrPanel);
+    container.appendChild(track);
+    area.appendChild(container);
+
+    container.addEventListener("touchstart", e => {
+      startX = e.touches[0].clientX;
+    });
+
+    container.addEventListener("touchend", e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 50) {
+        index = index === 0 ? 1 : 0;
+        track.style.transform = 	ranslateX(-%);
+        if (navigator.vibrate) navigator.vibrate(20);
+      }
+    });
+
+    img.addEventListener("touchend", () => {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        container.classList.toggle("photo-fullscreen");
+      }
+      lastTap = now;
+    });
+  };
+})();
+
+
+/* === LIVE SAFE Photo ? QR Swipe Enhancer === */
+(function () {
+  function enhancePhotoArea() {
+    const area = document.getElementById("photoArea");
+    if (!area) return;
+
+    const img = area.querySelector("img");
+    if (!img || area.classList.contains("photo-swipe-ready")) return;
+
+    area.classList.add("photo-swipe-ready");
+    area.innerHTML = "";
+
+    let startX = 0;
+    let index = 0;
+    let lastTap = 0;
+
+    const container = document.createElement("div");
+    container.className = "photo-swipe-container";
+
+    const track = document.createElement("div");
+    track.className = "photo-swipe-track";
+
+    const photoPanel = document.createElement("div");
+    photoPanel.className = "photo-panel";
+
+    const hint = document.createElement("div");
+    hint.className = "swipe-hint";
+    hint.textContent = "Swipe for QR";
+
+    photoPanel.appendChild(img);
+    photoPanel.appendChild(hint);
+
+    const qrPanel = document.createElement("div");
+    qrPanel.className = "qr-panel";
+
+    const qr = document.getElementById("qrCode");
+    if (qr) qrPanel.appendChild(qr.cloneNode(true));
+
+    track.appendChild(photoPanel);
+    track.appendChild(qrPanel);
+    container.appendChild(track);
+    area.appendChild(container);
+
+    container.addEventListener("touchstart", e => {
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+
+    container.addEventListener("touchend", e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 50) {
+        index = index === 0 ? 1 : 0;
+        track.style.transform = 	ranslateX(-%);
+        if (navigator.vibrate) navigator.vibrate(20);
+      }
+    });
+
+    img.addEventListener("touchend", () => {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        container.classList.toggle("photo-fullscreen");
+      }
+      lastTap = now;
+    });
+  }
+
+  const observer = new MutationObserver(enhancePhotoArea);
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  document.addEventListener("DOMContentLoaded", enhancePhotoArea);
+})();
+
