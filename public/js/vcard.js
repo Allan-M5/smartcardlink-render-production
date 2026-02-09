@@ -24,6 +24,9 @@
     return json.data;
   }
 
+  /* =========================
+     PHOTO  QR SWIPE (STABLE)
+  ========================= */
   function enhancePhotoSwipe() {
     if (!photoArea || photoArea.classList.contains('photo-swipe-ready')) return;
 
@@ -76,6 +79,7 @@
   }
 
   function renderPhoto(photoUrl, qrUrl) {
+    if (!photoArea) return;
     photoArea.innerHTML = '';
 
     const img = document.createElement('img');
@@ -99,6 +103,7 @@
     if (!client) return;
 
     renderPhoto(client.photoUrl, client.qrCodeUrl);
+
     setHidden(popup1, false);
     setHidden(popup2, true);
   }
