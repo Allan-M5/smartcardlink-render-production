@@ -1,766 +1,178 @@
-// public/js/vcard.js - VCard Data Fetch and Logic
 (function () {
- 'use strict';
+'use strict';
 
- // CRITICAL FIX: Use the explicit API root or window.location.origin for consistency
- // Using window.location.origin is generally best practice for connected frontends/backends
- const API_ROOT = "https://smartcardlink-api.onrender.com"; 
- const el = id => document.getElementById(id);
+/* =========================
+   CONFIG & HELPERS
+========================= */
+const API_ROOT = 'https://smartcardlink-api.onrender.com';
+const el = id => document.getElementById(id);
 
- // DOM References
- const vcardContainer = el('vcard'); // Assuming the main wrapper has this ID for full control
- const popup1 = el('popup1');
- const popup2 = el('popup2');
- const photoArea = el('photoArea');
+function setHidden(node, hidden) {
+  if (!node) return;
+  if (hidden) {
+    node.style.display = 'none';
+    node.setAttribute('aria-hidden', 'true');
+    node.setAttribute('hidden', '');
+  } else {
+    node.style.display = 'block';
+    node.setAttribute('aria-hidden', 'false');
+    node.removeAttribute('hidden');
+  }
+}
 
- // Text Fields
- const fullName = el('fullName');
- const jobName = el('jobName');
- const titlePosition = el('titlePosition');
- const phoneMain = el('phoneMain');
- const emailMain = el('emailMain');
+function alertMsg(msg) {
+  alert(msg);
+}
 
- // Lists
- const phoneList = el('phoneList');
- const emailList = el('emailList');
- const phoneDropdownBtn = el('phoneDropdownBtn');
- const emailDropdownBtn = el('emailDropdownBtn');
+/* =========================
+   DOM REFERENCES
+========================= */
+const popup1 = el('popup1');
+const popup2 = el('popup2');
+const photoArea = el('photoArea');
+const liveTime = el('liveTime');
 
- // Action Buttons (Popup1)
- const actions = {
-  call: el('callBtn'),
-  sms: el('smsBtn'),
-  wa: el('waBtn'),
-  mail: el('mailBtn'),
-  print: el('printBtn'),
-  save: el('saveBtn')
- };
-
- // Popup2 Action Buttons
- const buttons = {
+const buttons = {
   moreInfo: el('moreInfoBtn'),
   back: el('backBtn'),
-  
-  business: el('businessWebsite'),
-  portfolio: el('portfolioWebsite'),
-  location: el('locationMap'),
-  physical: el('physicalAddress'),
   facebook: el('facebookBtn'),
   instagram: el('instagramBtn'),
   x: el('xBtn'),
   linkedin: el('linkedinBtn'),
   tiktok: el('tiktokBtn'),
   youtube: el('youtubeBtn')
- };
-
- // Popup2 Fields
- const bioText = el('bioText');
- const liveTime = el('liveTime');
- const hoursTable = document.querySelector('#hoursTable tbody');
-
- // --- UTILITY FUNCTIONS ---
- function setHidden(node, hidden) {
-  if (!node) return;
-
-  if (hidden) {
-    node.style.display = 'none';
-    node.setAttribute('hidden', '');
-  } else {
-    node.style.display = 'block';
-    node.removeAttribute('hidden');
-  }
-}
-
-  if (hidden) {
-    node.style.display = 'none';
-    node.setAttribute('aria-hidden', 'true');
-    node.setAttribute('hidden', '');
-  } else {
-    node.style.display = 'block';
-    node.setAttribute('aria-hidden', 'false');
-    node.removeAttribute('hidden');
-  }
-}
-
-  if (hidden) {
-    node.style.display = 'none';
-    node.setAttribute('aria-hidden', 'true');
-    node.setAttribute('hidden', '');
-  } else {
-    node.style.display = 'block';
-    node.setAttribute('aria-hidden', 'false');
-    node.removeAttribute('hidden');
-  }
-} else {
-    node.style.display = "block";
-    node.setAttribute("aria-hidden", "false");
-    node.removeAttribute("hidden");
-  }
-}
-
- function alertMsg(msg) {
-  if (typeof Swal !== 'undefined') {
-   Swal.fire({ title: msg, icon: 'info', confirmButtonColor: '#FFD700' });
-  } else {
-   alert(msg);
-  }
- }
- 
- /**
-  * Manages global messages (loading, success, error) at the top of the VCard.
-  */
- function showMessage(msg, isError = false) {
-  if (!vcardContainer) return;
-
-  // Hide main content popups
-  setHidden(popup1, true);
-  popup2.style.display = 'none';
-
-  let msgEl = el('messageArea'); 
-  if (!msgEl) {
-    msgEl = document.createElement('div');
-    msgEl.id = 'messageArea';
-    msgEl.style.cssText = 'text-align: center; padding: 20px;';
-    vcardContainer.prepend(msgEl);
-  }
-  msgEl.style.color = isError ? '#ef4444' : '#FFD700';
-  msgEl.innerHTML = `<h3 style="margin: 0; padding: 0;">${msg}</h3>`;
-  setHidden(msgEl, false);
- }
-
- /**
- * Checks if a URL is non-empty and starts with http(s).
- * @param {string} url 
- * @returns {boolean}
- */
- function isValidUrl(url) {
-  if (!url || typeof url !== 'string' || url.trim() === '') {
-    return false;
-  }
-  const lowerUrl = url.toLowerCase();
-  return lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
- }
- 
- /**
- * Handles opening a social media link with validation and logging.
- * @param {string} url 
- * @param {string} platform 
- */
- function openSocialLink(url, platform) {
-   if (isValidUrl(url)) {
-     window.open(url, '_blank');
-   } else {
-     alertMsg(`${platform} URL Not Provided or Invalid`);
-   }
- }
-
-function releaseFocus(container) {
-  if (!container) return;
-  const active = document.activeElement;
-  if (container.contains(active)) active.blur();
-}
-
-// --- DATA FETCHING ---
-async function fetchProfileData() {
-  try {
-    // FINAL FIX: Extract slug from Query Parameters (?slug=name) instead of Pathname
-    const urlParams = new URLSearchParams(window.location.search);
-    const clientSlug = urlParams.get('slug');
-    
-    if (!clientSlug) {
-        console.error("Missing vCard slug in URL parameters.");
-        throw new Error('VCard not found. Missing slug identifier.');
-    }
-   // Display loading state
-   showMessage(`
-    <span class="loading-spinner" style="
-      border: 3px solid #f3f3f3; border-top: 3px solid #FFD700; 
-      border-radius: 50%; width: 16px; height: 16px; 
-      animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; 
-      margin-right: 5px;"></span>
-    Loading VCard...
-   `);
-   
-   // CRITICAL FIX: Use the specific API slug endpoint
-   const res = await fetch(`${API_ROOT.replace(/\/$/, "")}/api/vcard/${clientSlug}`); 
-   
-   if (!res.ok) {
-     throw new Error('Network error or server unavailable.');
-   }
-   
-   const json = await res.json();
-   
-   if (json.status !== 'success' || !json.data) {
-     // Use the message from the API if provided
-     const msg = json.message || 'Card not found or currently inactive.';
-     throw new Error(msg); 
-   }
-   
-   // Hide message area on success
-   setHidden(el('messageArea'), true); 
-
-   return json.data || null; 
-   
-  } catch (err) {
-   console.error("Error fetching profile data:", err);
-   showMessage(err.message || 'Failed to load profile data.', true);
-   return null;
-  }
- }
-
- // --- RENDERING FUNCTIONS ---
-
- function renderPhoto(url) {
-  if (!photoArea) return;
-  photoArea.innerHTML = '';
-  const defaultPhoto = '/public/images/default-photo.png';
-  
-  if (url) {
-   const img = document.createElement('img');
-   img.src = url; 
-   img.alt = "Profile Photo";
-   // Fallback to a default image on error
-   img.onerror = () => { img.src = defaultPhoto; }; 
-   photoArea.appendChild(img);
-  } else {
-   photoArea.innerHTML = `<img src="${defaultPhoto}" alt="Default Profile Photo">`;
-  }
- }
-
- function buildList(container, items, type) {
-  if (!container) return;
-  container.innerHTML = '';
-  
-  const validItems = (items || []).filter(i => i && i.trim()); 
-  if (validItems.length === 0) {
-   const div = document.createElement('div');
-   div.className = 'list-item disabled';
-   div.textContent = 'No additional contacts';
-   container.appendChild(div);
-   return;
-  }
-
-  validItems.forEach(val => {
-   const div = document.createElement('div');
-   div.className = 'list-item';
-   div.textContent = val;
-   div.onclick = () => {
-    if (type === 'phone') window.location.href = `tel:${val.replace(/\s+/g,'')}`;
-    if (type === 'email') window.location.href = `mailto:${val}`;
-   };
-   container.appendChild(div);
-  });
- }
-
- function renderHours(hours) {
-  if (!hoursTable) return;
-  hoursTable.innerHTML = '';
-  
-  // Determine if the whole table should be hidden
-  const hasHours = hours && Object.values(hours).some(h => h && h.trim());
-  const hoursSection = el('hoursSection'); // Assuming there is a wrapper for the table
-  if (!hasHours) {
-   if (hoursSection) setHidden(hoursSection, true);
-   return;
-  }
-  if (hoursSection) setHidden(hoursSection, false);
-
-  const days = [
-   { label: 'MonFri', start: hours.monFriStart, end: hours.monFriEnd },
-   { label: 'Sat', start: hours.satStart, end: hours.satEnd },
-   { label: 'Sun', start: hours.sunStart, end: hours.sunEnd }
-  ];
-
-  days.forEach(d => {
-   const tr = document.createElement('tr');
-   // Display '-' if data is missing for start or end time
-   tr.innerHTML = `<td>${d.label}</td><td>${d.start || '-'}</td><td>${d.end || '-'}</td>`;
-   hoursTable.appendChild(tr);
-  });
- }
-
- // --- ACTION SETUP ---
-
- function setupPopup1Actions(client) {
-  const phone = client.phone1;
-  const email = client.email1;
-  const vcfDownloadUrl = client.vcardUrl; 
-
-  // Helper to disable/enable buttons based on data availability
-  const setAction = (btn, callback, condition) => {
-   if (!btn) return;
-   if (condition) {
-    btn.onclick = callback;
-    btn.classList.remove('disabled');
-   } else {
-    btn.onclick = () => alertMsg(btn.textContent + " is not provided");
-    
-   }
-  };
-
-  setAction(actions.call, () => window.location.href = `tel:${phone}`, phone);
-  setAction(actions.sms, () => window.location.href = `sms:${phone}`, phone);
-  setAction(actions.mail, () => window.location.href = `mailto:${email}`, email);
-
-  setAction(actions.wa, () => {
-   const digits = phone.replace(/\D/g, '');
-   window.open(`https://wa.me/${digits}`, '_blank');
-  }, phone);
-
-  setAction(actions.save, () => {
-  const vcard = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${client.fullName || ""}`,
-    `N:${client.fullName || ""};;;;`,
-    client.phone1 ? `TEL;TYPE=CELL:${client.phone1}` : "",
-    client.email1 ? `EMAIL:${client.email1}` : "",
-    client.company ? `ORG:${client.company}` : "",
-    client.title ? `TITLE:${client.title}` : "",
-    "END:VCARD"
-  ].filter(Boolean).join("\n");
-
-  const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = (client.fullName || "contact").replace(/\s+/g,"_") + ".vcf";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}, true);
-
-  // Print button is always active
-  if(actions.print) actions.print.onclick = () => window.print();
- }
-
- function setupPopup2Buttons(client) {
-
-  // === HARD OVERRIDE: Book Appointment is NOT managed by openOrAlert ===
-  ;
-  }
-
-
-  // === HARD OVERRIDE: Book Appointment is NOT managed by openOrAlert ===
-  ;
-  }
-
-  const socialLinks = client.socialLinks || {};
-
-  // Helper for non-social URLs
-  const openOrAlert = (btn, url, fallback='URL Not Provided') => {
-   if (!btn) return;
-   if (url && url.trim()) {
-    btn.onclick = () => window.open(url, '_blank');
-    btn.classList.remove('disabled');
-   } else {
-    btn.onclick = () => alertMsg(fallback);
-    
-   }
-  };
-  
-  // Helper for social links
-  const setSocialAction = (btn, platformKey, platformName) => {
-   if (!btn) return;
-   const url = socialLinks[platformKey];
-   if (url && url.trim()) {
-    btn.onclick = () => openSocialLink(url, platformName);
-    btn.classList.remove('disabled');
-   } else {
-    btn.onclick = () => alertMsg(`${platformName} Not Provided`);
-    
-   }
-  };
-
-  // Website Links
-  openOrAlert(buttons.business, client.businessWebsite || client.website, 'Business Website Not Provided'); 
-  openOrAlert(buttons.portfolio, client.portfolioWebsite, 'Portfolio Website Not Provided');
-  openOrAlert(buttons.location, client.locationMap, 'Location Map Not Provided');
-  
-  // Physical Address (is just information, so alert text content)
-  if(buttons.physical) {
-   const address = client.address;
-   if(address) {
-    buttons.physical.onclick = () => alertMsg(address);
-    buttons.physical.classList.remove('disabled');
-   } else {
-    buttons.physical.onclick = () => alertMsg('Physical Address Not Provided');
-    buttons.physical.classList.add('disabled');
-   }
-  }
-
-  // Social Media Buttons
-  setSocialAction(buttons.facebook, 'facebook', 'Facebook');
-  setSocialAction(buttons.instagram, 'instagram', 'Instagram');
-  setSocialAction(buttons.x, 'twitter', 'X (Twitter)'); // Maps 'xBtn' to 'twitter' schema field
-  setSocialAction(buttons.linkedin, 'linkedin', 'LinkedIn');
-  setSocialAction(buttons.tiktok, 'tiktok', 'TikTok');
-  setSocialAction(buttons.youtube, 'youtube', 'YouTube');
-
-  // Book Appointment  Google Calendar with vCard link
-  ;
-  }
- }
-
- // --- INITIALIZATION ---
- async function init() {
-  const client = await fetchProfileData();\n\n// Expose client globally for isolated modules\nwindow.__SMARTCARD_CLIENT__ = client;
-
-  if (client) {
-   // Populate Popup 1 Data
-   renderPhoto(client.photoUrl);
-   fullName.textContent = client.fullName || '';
-   jobName.textContent = client.company || '';
-   titlePosition.textContent = client.title || '';
-   
-   phoneMain.textContent = client.phone1 || 'Not Provided';
-   phoneMain.href = client.phone1 ? `tel:${client.phone1}` : '#';
-   
-   emailMain.textContent = client.email1 || 'Not Provided';
-   emailMain.href = client.email1 ? `mailto:${client.email1}` : '#';
-
-   // Additional Contacts
-   // Filter out falsy values like null/undefined/empty string from phone2/3, email2/3
-   buildList(phoneList, [client.phone2, client.phone3].filter(Boolean), 'phone');
-   buildList(emailList, [client.email2, client.email3].filter(Boolean), 'email');
-
-   // Populate Popup 2 Data
-   bioText.textContent = client.bio || 'No bio provided.';
-   renderHours(client.workingHours);
-   
-   // Setup all buttons
-   setupPopup1Actions(client);
-   setupPopup2Buttons(client);
-activateBookingSystem(client);
-window.__initBookAppointment && window.__initBookAppointment(client);
-
-// === BOOK APPOINTMENT: ISOLATED & ALWAYS ACTIVE ===
-;
-
-  // remove ALL state control
-  }
-
-// FORCE enable Book Appointment (no data dependency)
-
-
-   // Show the main VCard popup
-   setHidden(popup1, false);
-   popup2.style.display = 'none';
-  }
-
-  // Dropdown Toggles (Kept intact)
-  [ [phoneDropdownBtn, phoneList], [emailDropdownBtn, emailList] ].forEach(([btn, list]) => {
-   if(!btn || !list) return;
-   setHidden(list, true);
-   btn.onclick = () => {
-    const isHidden = list.style.display === 'none';
-    setHidden(list, !isHidden);
-    const icon = btn.querySelector('i');
-    if (icon) icon.className = isHidden ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
-   };
-  });
-
-  // Popup Navigation & Sizing Logic (Kept intact)
-  ;
-  }
-  
-  if (buttons.back) {
-   buttons.back.onclick = () => {
-  releaseFocus(popup2);
-
-  popup2.style.display = 'none';
-  setHidden(popup1, false);
-
-  if (buttons.moreInfo) buttons.moreInfo.focus();
 };
-  }
 
-  // Live Time Update (Kept intact)
-  if (liveTime) {
-   setInterval(() => {
-    const options = { 
-     day: 'numeric', month: 'short', year: 'numeric', 
-     hour: '2-digit', minute: '2-digit', second: '2-digit', 
-     hour12: false, timeZone: 'Africa/Nairobi' 
-    };
-    const dateStr = new Date().toLocaleString('en-GB', options);
-    liveTime.textContent = dateStr.replace(',', ' ');
-   }, 1000);
-  }
- }
+/* =========================
+   PHOTO ? QR SWIPE (LIVE SAFE)
+========================= */
+function enhancePhotoSwipe() {
+  const img = photoArea?.querySelector('img');
+  if (!photoArea || !img || photoArea.classList.contains('photo-swipe-ready')) return;
 
- 
-      const details = encodeURIComponent(window.location.href);
-      window.open(
-        'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' +
-        title + '&details=' + details,
-        '_blank',
-        'noopener,noreferrer'
-      );
-    };
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
-});
-
-  
-// =====================================================
-// BOOK APPOINTMENT  FINAL, DATA-INDEPENDENT
-// =====================================================
-
-  const details = encodeURIComponent(
-    'SmartCardLink vCard\n' + window.location.href
-  );
-
-  window.open(
-    'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-    '&text=' + title +
-    '&details=' + details,
-    '_blank',
-    'noopener,noreferrer'
-  );
-});
-
-
-
-  const details = encodeURIComponent(
-    'SmartCardLink vCard\n' + window.location.href
-  );
-
-  window.open(
-    'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-    '&text=' + title +
-    '&details=' + details,
-    '_blank',
-    'noopener,noreferrer'
-  );
-});
-
-
-
-
-
-
-  const details = encodeURIComponent(
-    'SmartCardLink vCard\n' + window.location.href
-  );
-
-  window.open(
-    'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-    '&text=' + title +
-    '&details=' + details,
-    '_blank',
-    'noopener,noreferrer'
-  );
-});
-
-      var details = encodeURIComponent(
-        'SmartCardLink vCard\n' + window.location.href
-      );
-
-      window.open(
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + title +
-        '&details=' + details,
-        '_blank',
-        'noopener,noreferrer'
-      );
-    };
-  });
-});
-
-        var details = encodeURIComponent(
-          'SmartCardLink vCard\n' + window.location.href
-        );
-
-        window.open(
-          'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-          '&text=' + title +
-          '&details=' + details,
-          '_blank',
-          'noopener,noreferrer'
-        );
-      };
-    }, 50);
-  });
-});
-
-document.addEventListener('DOMContentLoaded', function () {
-  var moreInfoBtn = document.getElementById('moreInfoBtn');
-  var popup2 = document.getElementById('popup2');
-
-  if (!moreInfoBtn || !popup2) return;
-
-  moreInfoBtn.addEventListener('click', function () {
-    popup2.removeAttribute('hidden');
-    popup2.style.display = 'block';
-
-    setTimeout(function () {
-      var btn = document.getElementById('bookAppointmentBtn');
-      if (!btn) return;
-
-      btn.disabled = false;
-      btn.removeAttribute('disabled');
-      btn.className = 'book-btn';
-
-      btn.onclick = function (e) {
-        e.preventDefault();
-
-        var title = encodeURIComponent('Meeting via SmartCardLink');
-        var details = encodeURIComponent(
-          'SmartCardLink vCard\n' + window.location.href
-        );
-
-        window.open(
-          'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-          '&text=' + title +
-          '&details=' + details,
-          '_blank',
-          'noopener,noreferrer'
-        );
-      };
-    }, 50);
-  });
-});
-
-/* === Photo ? QR Swipe + Zoom (Isolated Patch) === */
-(function () {
-  const area = document.getElementById("photoArea");
-  if (!area) return;
+  photoArea.classList.add('photo-swipe-ready');
+  photoArea.innerHTML = '';
 
   let startX = 0;
   let index = 0;
   let lastTap = 0;
 
-  const originalRenderPhoto = window.renderPhoto;
-  window.renderPhoto = function (url) {
-    area.innerHTML = "";
+  const container = document.createElement('div');
+  container.className = 'photo-swipe-container';
 
-    const container = document.createElement("div");
-    container.className = "photo-swipe-container";
+  const track = document.createElement('div');
+  track.className = 'photo-swipe-track';
 
-    const track = document.createElement("div");
-    track.className = "photo-swipe-track";
+  const photoPanel = document.createElement('div');
+  photoPanel.className = 'photo-panel';
 
-    const photoPanel = document.createElement("div");
-    photoPanel.className = "photo-panel";
+  const hint = document.createElement('div');
+  hint.className = 'swipe-hint';
+  hint.textContent = 'Swipe for QR';
 
-    const img = document.createElement("img");
-    img.src = url || "/public/images/default-photo.png";
-    img.alt = "Profile Photo";
+  photoPanel.appendChild(img);
+  photoPanel.appendChild(hint);
 
-    const hint = document.createElement("div");
-    hint.className = "swipe-hint";
-    hint.textContent = "Swipe for QR";
+  const qrPanel = document.createElement('div');
+  qrPanel.className = 'qr-panel';
 
-    photoPanel.appendChild(img);
-    photoPanel.appendChild(hint);
+  const qr = document.getElementById('qrCode');
+  if (qr) qrPanel.appendChild(qr.cloneNode(true));
 
-    const qrPanel = document.createElement("div");
-    qrPanel.className = "qr-panel";
+  track.appendChild(photoPanel);
+  track.appendChild(qrPanel);
+  container.appendChild(track);
+  photoArea.appendChild(container);
 
-    const qr = document.getElementById("qrCode");
-    if (qr) qrPanel.appendChild(qr.cloneNode(true));
+  container.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+  }, { passive: true });
 
-    track.appendChild(photoPanel);
-    track.appendChild(qrPanel);
-    container.appendChild(track);
-    area.appendChild(container);
+  container.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) {
+      index = index === 0 ? 1 : 0;
+      track.style.transform = 'translateX(-' + (index * 50) + '%)';
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+  });
 
-    container.addEventListener("touchstart", e => {
-      startX = e.touches[0].clientX;
-    });
+  img.addEventListener('touchend', () => {
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      container.classList.toggle('photo-fullscreen');
+    }
+    lastTap = now;
+  });
+}
 
-    container.addEventListener("touchend", e => {
-      const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 50) {
-        index = index === 0 ? 1 : 0;
-        track.style.transform = 	ranslateX(-%);
-        if (navigator.vibrate) navigator.vibrate(20);
-      }
-    });
+/* =========================
+   DATA LOAD
+========================= */
+async function fetchProfileData() {
+  const slug = new URLSearchParams(window.location.search).get('slug');
+  if (!slug) throw new Error('Missing vCard slug');
 
-    img.addEventListener("touchend", () => {
-      const now = Date.now();
-      if (now - lastTap < 300) {
-        container.classList.toggle("photo-fullscreen");
-      }
-      lastTap = now;
-    });
+  const res = await fetch(API_ROOT + '/api/vcard/' + slug);
+  if (!res.ok) throw new Error('Failed to load vCard');
+
+  const json = await res.json();
+  return json.data;
+}
+
+function renderPhoto(url) {
+  photoArea.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = 'Profile Photo';
+  photoArea.appendChild(img);
+  enhancePhotoSwipe();
+}
+
+/* =========================
+   INIT
+========================= */
+async function init() {
+  const client = await fetchProfileData();
+  if (!client) return;
+
+  renderPhoto(client.photoUrl);
+
+  setHidden(popup1, false);
+  setHidden(popup2, true);
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+if (buttons.moreInfo) {
+  buttons.moreInfo.onclick = () => {
+    setHidden(popup1, true);
+    setHidden(popup2, false);
   };
+}
+
+if (buttons.back) {
+  buttons.back.onclick = () => {
+    setHidden(popup2, true);
+    setHidden(popup1, false);
+  };
+}
+
+/* =========================
+   LIVE CLOCK
+========================= */
+if (liveTime) {
+  setInterval(() => {
+    const options = {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false, timeZone: 'Africa/Nairobi'
+    };
+    liveTime.textContent = new Date().toLocaleString('en-GB', options).replace(',', ' ');
+  }, 1000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
 })();
-
-
-/* === LIVE SAFE Photo ? QR Swipe Enhancer === */
-(function () {
-  function enhancePhotoArea() {
-    const area = document.getElementById("photoArea");
-    if (!area) return;
-
-    const img = area.querySelector("img");
-    if (!img || area.classList.contains("photo-swipe-ready")) return;
-
-    area.classList.add("photo-swipe-ready");
-    area.innerHTML = "";
-
-    let startX = 0;
-    let index = 0;
-    let lastTap = 0;
-
-    const container = document.createElement("div");
-    container.className = "photo-swipe-container";
-
-    const track = document.createElement("div");
-    track.className = "photo-swipe-track";
-
-    const photoPanel = document.createElement("div");
-    photoPanel.className = "photo-panel";
-
-    const hint = document.createElement("div");
-    hint.className = "swipe-hint";
-    hint.textContent = "Swipe for QR";
-
-    photoPanel.appendChild(img);
-    photoPanel.appendChild(hint);
-
-    const qrPanel = document.createElement("div");
-    qrPanel.className = "qr-panel";
-
-    const qr = document.getElementById("qrCode");
-    if (qr) qrPanel.appendChild(qr.cloneNode(true));
-
-    track.appendChild(photoPanel);
-    track.appendChild(qrPanel);
-    container.appendChild(track);
-    area.appendChild(container);
-
-    container.addEventListener("touchstart", e => {
-      startX = e.touches[0].clientX;
-    }, { passive: true });
-
-    container.addEventListener("touchend", e => {
-      const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 50) {
-        index = index === 0 ? 1 : 0;
-        track.style.transform = 	ranslateX(-%);
-        if (navigator.vibrate) navigator.vibrate(20);
-      }
-    });
-
-    img.addEventListener("touchend", () => {
-      const now = Date.now();
-      if (now - lastTap < 300) {
-        container.classList.toggle("photo-fullscreen");
-      }
-      lastTap = now;
-    });
-  }
-
-  const observer = new MutationObserver(enhancePhotoArea);
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  document.addEventListener("DOMContentLoaded", enhancePhotoArea);
-})();
-
