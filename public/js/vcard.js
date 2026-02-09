@@ -1,178 +1,107 @@
 (function () {
-'use strict';
+  'use strict';
 
-/* =========================
-   CONFIG & HELPERS
-========================= */
-const API_ROOT = 'https://smartcardlink-api.onrender.com';
-const el = id => document.getElementById(id);
+  const API_ROOT = 'https://smartcardlink-api.onrender.com';
+  const el = id => document.getElementById(id);
 
-function setHidden(node, hidden) {
-  if (!node) return;
-  if (hidden) {
-    node.style.display = 'none';
-    node.setAttribute('aria-hidden', 'true');
-    node.setAttribute('hidden', '');
-  } else {
-    node.style.display = 'block';
-    node.setAttribute('aria-hidden', 'false');
-    node.removeAttribute('hidden');
+  const popup1 = el('popup1');
+  const popup2 = el('popup2');
+  const photoArea = el('photoArea');
+
+  function setHidden(node, hidden) {
+    if (!node) return;
+    node.style.display = hidden ? 'none' : 'block';
+    node.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+    hidden ? node.setAttribute('hidden','') : node.removeAttribute('hidden');
   }
-}
 
-function alertMsg(msg) {
-  alert(msg);
-}
+  async function fetchProfileData() {
+    const slug = new URLSearchParams(window.location.search).get('slug');
+    if (!slug) throw new Error('Missing slug');
 
-/* =========================
-   DOM REFERENCES
-========================= */
-const popup1 = el('popup1');
-const popup2 = el('popup2');
-const photoArea = el('photoArea');
-const liveTime = el('liveTime');
+    const res = await fetch(API_ROOT + '/api/vcard/' + slug);
+    const json = await res.json();
+    return json.data;
+  }
 
-const buttons = {
-  moreInfo: el('moreInfoBtn'),
-  back: el('backBtn'),
-  facebook: el('facebookBtn'),
-  instagram: el('instagramBtn'),
-  x: el('xBtn'),
-  linkedin: el('linkedinBtn'),
-  tiktok: el('tiktokBtn'),
-  youtube: el('youtubeBtn')
-};
+  function enhancePhotoSwipe() {
+    if (!photoArea || photoArea.classList.contains('photo-swipe-ready')) return;
 
-/* =========================
-   PHOTO ? QR SWIPE (LIVE SAFE)
-========================= */
-function enhancePhotoSwipe() {
-  const img = photoArea?.querySelector('img');
-  if (!photoArea || !img || photoArea.classList.contains('photo-swipe-ready')) return;
+    const img = photoArea.querySelector('img');
+    const qr  = document.getElementById('qrCode');
+    if (!img || !qr) return;
 
-  photoArea.classList.add('photo-swipe-ready');
-  photoArea.innerHTML = '';
+    photoArea.classList.add('photo-swipe-ready');
+    photoArea.innerHTML = '';
 
-  let startX = 0;
-  let index = 0;
-  let lastTap = 0;
+    let startX = 0;
+    let index = 0;
 
-  const container = document.createElement('div');
-  container.className = 'photo-swipe-container';
+    const container = document.createElement('div');
+    container.className = 'photo-swipe-container';
 
-  const track = document.createElement('div');
-  track.className = 'photo-swipe-track';
+    const track = document.createElement('div');
+    track.className = 'photo-swipe-track';
 
-  const photoPanel = document.createElement('div');
-  photoPanel.className = 'photo-panel';
+    const photoPanel = document.createElement('div');
+    photoPanel.className = 'photo-panel';
 
-  const hint = document.createElement('div');
-  hint.className = 'swipe-hint';
-  hint.textContent = 'Swipe for QR';
+    const hint = document.createElement('div');
+    hint.className = 'swipe-hint';
+    hint.textContent = 'Swipe for QR';
 
-  photoPanel.appendChild(img);
-  photoPanel.appendChild(hint);
+    photoPanel.appendChild(img);
+    photoPanel.appendChild(hint);
 
-  const qrPanel = document.createElement('div');
-  qrPanel.className = 'qr-panel';
+    const qrPanel = document.createElement('div');
+    qrPanel.className = 'qr-panel';
+    qrPanel.appendChild(qr);
 
-  const qr = document.getElementById('qrCode');
-  if (qr) qrPanel.appendChild(qr.cloneNode(true));
+    track.appendChild(photoPanel);
+    track.appendChild(qrPanel);
+    container.appendChild(track);
+    photoArea.appendChild(container);
 
-  track.appendChild(photoPanel);
-  track.appendChild(qrPanel);
-  container.appendChild(track);
-  photoArea.appendChild(container);
+    container.addEventListener('touchstart', function (e) {
+      startX = e.touches[0].clientX;
+    });
 
-  container.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX;
-  }, { passive: true });
+    container.addEventListener('touchend', function (e) {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 50) {
+        index = index === 0 ? 1 : 0;
+        track.style.transform = 'translateX(-' + (index * 50) + '%)';
+      }
+    });
+  }
 
-  container.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 50) {
-      index = index === 0 ? 1 : 0;
-      track.style.transform = 'translateX(-' + (index * 50) + '%)';
-      if (navigator.vibrate) navigator.vibrate(20);
+  function renderPhoto(photoUrl, qrUrl) {
+    photoArea.innerHTML = '';
+
+    const img = document.createElement('img');
+    img.src = photoUrl || '/public/images/default-photo.png';
+    img.alt = 'Profile Photo';
+    photoArea.appendChild(img);
+
+    if (qrUrl) {
+      const qrImg = document.createElement('img');
+      qrImg.id = 'qrCode';
+      qrImg.src = qrUrl;
+      qrImg.style.display = 'none';
+      photoArea.appendChild(qrImg);
     }
-  });
 
-  img.addEventListener('touchend', () => {
-    const now = Date.now();
-    if (now - lastTap < 300) {
-      container.classList.toggle('photo-fullscreen');
-    }
-    lastTap = now;
-  });
-}
+    setTimeout(enhancePhotoSwipe, 0);
+  }
 
-/* =========================
-   DATA LOAD
-========================= */
-async function fetchProfileData() {
-  const slug = new URLSearchParams(window.location.search).get('slug');
-  if (!slug) throw new Error('Missing vCard slug');
+  async function init() {
+    const client = await fetchProfileData();
+    if (!client) return;
 
-  const res = await fetch(API_ROOT + '/api/vcard/' + slug);
-  if (!res.ok) throw new Error('Failed to load vCard');
-
-  const json = await res.json();
-  return json.data;
-}
-
-function renderPhoto(url) {
-  photoArea.innerHTML = '';
-  const img = document.createElement('img');
-  img.src = url;
-  img.alt = 'Profile Photo';
-  photoArea.appendChild(img);
-  enhancePhotoSwipe();
-}
-
-/* =========================
-   INIT
-========================= */
-async function init() {
-  const client = await fetchProfileData();
-  if (!client) return;
-
-  renderPhoto(client.photoUrl);
-
-  setHidden(popup1, false);
-  setHidden(popup2, true);
-}
-
-/* =========================
-   NAVIGATION
-========================= */
-if (buttons.moreInfo) {
-  buttons.moreInfo.onclick = () => {
-    setHidden(popup1, true);
-    setHidden(popup2, false);
-  };
-}
-
-if (buttons.back) {
-  buttons.back.onclick = () => {
-    setHidden(popup2, true);
+    renderPhoto(client.photoUrl, client.qrCodeUrl);
     setHidden(popup1, false);
-  };
-}
+    setHidden(popup2, true);
+  }
 
-/* =========================
-   LIVE CLOCK
-========================= */
-if (liveTime) {
-  setInterval(() => {
-    const options = {
-      day: 'numeric', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false, timeZone: 'Africa/Nairobi'
-    };
-    liveTime.textContent = new Date().toLocaleString('en-GB', options).replace(',', ' ');
-  }, 1000);
-}
-
-document.addEventListener('DOMContentLoaded', init);
-
+  document.addEventListener('DOMContentLoaded', init);
 })();
