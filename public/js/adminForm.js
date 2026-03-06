@@ -1,409 +1,141 @@
 ﻿(function () {
-  'use strict';
+    'use strict';
 
-  // ==============================
-  // Global API Configuration
-  // ==============================
-  const API_BASE = "https://smartcardlink-api.onrender.com";
-  const API_URL = `${API_BASE}/api`;
+    const API_BASE = 'https://smartcardlink-api.onrender.com';
+    const API_URL = API_BASE + '/api';
+    const params = new URLSearchParams(window.location.search);
+    const urlClientId = params.get('id');
 
-  const params = new URLSearchParams(window.location.search);
-  const urlClientId = params.get('id');
+    // DOM Elements
+    const form = document.getElementById('adminForm');
+    const clientIdInput = document.getElementById('clientId');
+    const saveBtn = document.getElementById('save-btn');
+    const photoUrlInput = document.getElementById('photoUrl');
+    const photoPreviewContainer = document.getElementById('photo-preview-container');
+    const photoPreview = document.getElementById('photo-preview');
+    const toastMessage = document.getElementById('toast-message');
+    const vcardUrlDisplay = document.getElementById('vcardUrlDisplay');
+    const themeColorInput = document.getElementById('themeColor');
+    const themeColorPicker = document.getElementById('themeColorPicker');
 
-  // ==============================
-  // DOM Elements
-  // ==============================
-  const form = document.getElementById('adminForm');
-  const clientIdInput = document.getElementById('clientId');
+    let isSaving = false;
 
-  const viewPdfBtn = document.getElementById('view-pdf-btn'); // DATA VIEW (PDF replaced)
-  const createVcardBtn = document.getElementById('create-vcard-btn');
-
-  const photoUploadInput = document.getElementById('photoFile');
-  const photoUrlInput = document.getElementById('photoUrl');
-  const photoUploadLabel = document.getElementById('photo-upload-label');
-  const photoPreviewContainer = document.getElementById('photo-preview-container');
-  const photoPreview = document.getElementById('photo-preview');
-
-  const saveBtn = document.getElementById('save-btn');
-  const toastMessage = document.getElementById('toast-message');
-
-  // vCard URL BOX
-  const vcardUrlDisplay = document.getElementById('vcardUrlDisplay');
-  const copyVcardUrlBtn = document.getElementById('copyVcardUrlBtn');
-  const viewQrBtn = document.getElementById('viewQrBtn');
-  const viewVcardBtn = document.getElementById('viewVcardBtn');
-  const emailClientBtn = document.getElementById('emailClientBtn');
-  const resetCopyStateBtn = document.getElementById('resetCopyStateBtn');
-
-  // ==============================
-  // State Variables
-  // ==============================
-  let isSaving = false;
-  let isPdfGenerating = false;
-  let pdfAbortController = null;
-  let lastVcardUrl = null;
-
-  // ==============================
-  // Helper Constants
-  // ==============================
-  const SOCIAL_PREFIXES = {
-    facebook: 'https://facebook.com/',
-    instagram: 'https://instagram.com/',
-    twitter: 'https://twitter.com/',
-    linkedin: 'https://linkedin.com/in/',
-    tiktok: 'https://tiktok.com/@',
-    youtube: 'https://youtube.com/',
-  };
-
-  // ==============================
-  // Helper Functions
-  // ==============================
-  const showToast = (message, isError = false) => {
-    toastMessage.textContent = message;
-    toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
-    toastMessage.style.color = isError ? '#fff' : '#000';
-    toastMessage.style.display = 'block';
-    setTimeout(() => toastMessage.style.display = 'none', 3000);
-  };
-
-  const setLoading = (btn, label) => {
-    btn.disabled = true;
-    btn.innerHTML = `${label} <span class="spinner"></span>`;
-    btn.classList.add('pressed');
-  };
-
-  const resetButton = (btn, label) => {
-    btn.innerHTML = label;
-    btn.disabled = !clientIdInput.value;
-    btn.classList.remove('pressed');
-  };
-
-  const normalizeSocialLink = (platform, input) => {
-    if (!input || !SOCIAL_PREFIXES[platform]) return null;
-    let value = input.trim();
-    if (value.startsWith('http')) return value.replace('http:', 'https:');
-    value = value.replace(/^@/, '');
-    return SOCIAL_PREFIXES[platform] + value;
-  };
-
-  const isValidEmail = (email) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-  const isValidPhone = (phone) => {
-    if (!phone) return true;
-    if (/[a-zA-Z]/.test(phone)) return false;
-    return phone.replace(/\D/g, '').length >= 10;
-  };
-
-  const toggleVcardButtons = (enabled) => {
-    [copyVcardUrlBtn, viewQrBtn, viewVcardBtn, emailClientBtn]
-      .forEach(btn => btn && (btn.disabled = !enabled));
-  };
-
-  // ==============================
-  // Photo Upload
-  // ==============================
-  const uploadPhoto = async (file) => {
-    const formData = new FormData();
-    formData.append('photo', file);
-
-    try {
-      photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
-      const res = await fetch(`${API_URL}/upload-photo`, {
-        method: 'POST',
-        body: formData
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Upload failed');
-
-      photoUrlInput.value = json.data.photoUrl;
-      photoPreview.src = json.data.photoUrl;
-      photoPreviewContainer.style.display = 'block';
-
-      photoUploadLabel.textContent = 'Photo Uploaded';
-      photoUploadLabel.style.backgroundColor = '#22c55e';
-      showToast('Photo uploaded successfully');
-    } catch (err) {
-      photoUploadLabel.textContent = 'Upload Failed';
-      photoUploadLabel.style.backgroundColor = '#ef4444';
-      showToast(err.message, true);
-    }
-  };
-
-// ==============================
-  // Form Submission
-  // ==============================
-  const handleFormSubmission = async (e) => {
-    e.preventDefault();
-    if (isSaving) return;
-
-    isSaving = true;
-    setLoading(saveBtn, 'Saving');
-
-    const payload = {};
-    const socialLinks = {};
-    const workingHours = {};
-    const fd = new FormData(form);
-
-    try {
-      // THEME FIX: Explicitly capture themeColor if it exists in the DOM
-      const themeColorEl = document.getElementById('themeColor');
-      if (themeColorEl) {
-        payload.themeColor = themeColorEl.value;
-      }
-
-      for (const [key, value] of fd.entries()) {
-        // Skip themeColor here because we handled it above, and skip files/ids
-        if (!value || key === 'photoFile' || key === 'clientId' || key === 'themeColor') continue;
-
-        if (SOCIAL_PREFIXES[key]) {
-          const normalized = normalizeSocialLink(key, value);
-          if (normalized) socialLinks[key] = normalized;
-        } else if (key.includes('Start') || key.includes('End')) {
-          workingHours[key] = value;
-        } else {
-          payload[key] = value.trim();
-        }
-      }
-
-      if (payload.email1 && !isValidEmail(payload.email1))
-        throw new Error('Invalid primary email');
-
-      if (payload.phone1 && !isValidPhone(payload.phone1))
-        throw new Error('Invalid primary phone');
-
-      if (Object.keys(socialLinks).length) payload.socialLinks = socialLinks;
-      if (Object.keys(workingHours).length) payload.workingHours = workingHours;
-
-      const method = clientIdInput.value ? 'PUT' : 'POST';
-      const endpoint = clientIdInput.value
-        ? `${API_URL}/clients/${clientIdInput.value}`
-        : `${API_URL}/clients`;
-
-      const res = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Save failed');
-
-      if (!clientIdInput.value && json.data?._id) {
-        clientIdInput.value = json.data._id;
-        window.history.replaceState(null, '', `?id=${json.data._id}`);
-        viewPdfBtn.disabled = false;
-        createVcardBtn.disabled = false;
-      }
-
-      lastVcardUrl = null;
-      vcardUrlDisplay.value = '';
-      toggleVcardButtons(false);
-
-      showToast('Client info saved');
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      isSaving = false;
-      resetButton(saveBtn, 'Save Info');
-    }
-  };
-  
-  // ==============================
-  // VIEW CLIENT INFO (DATA VIEW)
-  // ==============================
-  const generateClientViewHTML = (client) => `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>${client.fullName}</title>
-<style>
-body{font-family:Arial;background:#f4f6f8;padding:30px}
-.card{max-width:800px;margin:auto;background:#fff;padding:25px;border-radius:10px}
-img{max-width:140px;border-radius:8px}
-</style>
-</head>
-<body>
-<div class="card">
-<h2>${client.fullName || ''}</h2>
-<p>${client.title || ''}</p>
-${client.photoUrl ? `<img src="${client.photoUrl}">` : ''}
-<p>${client.phone1 || ''}</p>
-<p>${client.email1 || ''}</p>
-<p>${client.bio || ''}</p>
-</div>
-</body>
-</html>`;
-
-  viewPdfBtn.addEventListener('click', async () => {
-    const id = clientIdInput.value;
-    if (!id) return showToast('Save client first', true);
-
-    setLoading(viewPdfBtn, 'Opening');
-
-    try {
-      const res = await fetch(`${API_URL}/clients/${id}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error('Failed to load client');
-
-      const win = window.open('', '_blank');
-      win.document.write(generateClientViewHTML(json.data));
-      win.document.close();
-
-      showToast('Client info opened');
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      resetButton(viewPdfBtn, 'View Client Info PDF');
-    }
-  });
-
-  // ==============================
-  // CREATE VCARD
-  // ==============================
-  createVcardBtn.addEventListener('click', async () => {
-    if (!clientIdInput.value) return;
-
-    setLoading(createVcardBtn, 'Creating');
-
-    try {
-      const res = await fetch(`${API_URL}/clients/${clientIdInput.value}/vcard`, { method: 'POST' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'vCard failed');
-
-      // FINAL SAFE FIX: Ensure authoritative URL is captured and UI is cleared
-      const vcardUrl = json.data.vcardUrl;
-      
-      vcardUrlDisplay.value = ""; // Clear existing to prevent "ghost" data
-      vcardUrlDisplay.value = vcardUrl;
-      
-      lastVcardUrl = vcardUrl;
-      toggleVcardButtons(true);
-
-      showToast('vCard generated');
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      resetButton(createVcardBtn, 'Create vCard');
-    }
-  });
-
-  // ==============================
-  // VCARD UTILITIES
-  // ==============================
-  copyVcardUrlBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(vcardUrlDisplay.value)
-      .then(() => showToast('URL copied'))
-      .catch(() => showToast('Copy failed', true));
-  });
-
-  viewQrBtn.addEventListener('click', () => {
-    if (!vcardUrlDisplay.value) return;
-    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(vcardUrlDisplay.value)}`);
-  });
-
-  viewVcardBtn.addEventListener('click', () => {
-    if (vcardUrlDisplay.value) window.open(vcardUrlDisplay.value, '_blank');
-  });
-
-  emailClientBtn.addEventListener('click', () => {
-    const email = document.getElementById('email1').value;
-    if (!email) return;
-
-    const name = document.getElementById('fullName').value || 'Client';
-    const body = encodeURIComponent(
-`Hi ${name},
-
-Here is your vCard URL: ${vcardUrlDisplay.value}
-
-Your physical card will be delivered after printing.
-Thank you for choosing our vCard services.
-
-Best regards,
-SmartCardLink Admin`
-    );
-
-    window.location.href = `mailto:${email}?cc=allanmujera91@icloud.com&subject=Your SmartCardLink vCard&body=${body}`;
-  });
-
-  resetCopyStateBtn.addEventListener('click', () => {
-    copyVcardUrlBtn.textContent = 'Copy URL';
-    emailClientBtn.textContent = 'Email Client';
-    showToast('UI states reset');
-  });
-
-  // ==============================
-  // Init
-  // ==============================
-  if (urlClientId) {
-    clientIdInput.value = urlClientId;
-    viewPdfBtn.disabled = false;
-    createVcardBtn.disabled = false;
-  }
-
-  form.addEventListener('submit', handleFormSubmission);
-  photoUploadInput.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = ev => {
-      photoPreview.src = ev.target.result;
-      photoPreviewContainer.style.display = 'block';
+    const SOCIAL_PREFIXES = {
+        facebook: 'https://facebook.com/',
+        instagram: 'https://instagram.com/',
+        twitter: 'https://twitter.com/',
+        linkedin: 'https://linkedin.com/in/',
+        tiktok: 'https://tiktok.com/@',
+        youtube: 'https://youtube.com/',
     };
-    reader.readAsDataURL(file);
-    uploadPhoto(file);
-  });
 
-})();
+    const showToast = (msg, isError = false) => {
+        if (!toastMessage) return;
+        toastMessage.textContent = msg;
+        toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
+        toastMessage.style.display = 'block';
+        setTimeout(() => { toastMessage.style.display = 'none'; }, 3000);
+    };
 
+    const populateForm = (data) => {
+        if (!data) return;
+        if (clientIdInput) clientIdInput.value = data._id || '';
+        
+        const fieldMap = {
+            'fullName': data.fullName,
+            'title': data.title,
+            'company': data.company,
+            'phone1': data.phone1,
+            'email1': data.email1,
+            'bio': data.bio,
+            'address': data.address,
+            'themeColor': data.themeColor,
+            'themeName': data.themeName
+        };
 
+        Object.entries(fieldMap).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el && val) el.value = val;
+        });
 
+        if (data.themeColor && themeColorPicker) themeColorPicker.value = data.themeColor;
 
+        if (data.photoUrl && photoPreview) {
+            if (photoUrlInput) photoUrlInput.value = data.photoUrl;
+            photoPreview.src = data.photoUrl;
+            if (photoPreviewContainer) photoPreviewContainer.style.display = 'block';
+        }
 
-/* SMARTCARDLINK_ADMIN_FORM_STRICT_FETCH */
+        if (data.socialLinks) {
+            Object.entries(data.socialLinks).forEach(([k, v]) => {
+                const el = document.getElementById(k);
+                if (el) el.value = v;
+            });
+        }
+        
+        if (data.vcardUrl && vcardUrlDisplay) vcardUrlDisplay.value = data.vcardUrl;
+    };
 
-(function () {
-  const params = new URLSearchParams(window.location.search);
-  const clientId = params.get("id");
-  if (!clientId) return;
+    const loadClient = async (id) => {
+        try {
+            const res = await fetch(API_URL + '/clients/' + id);
+            const json = await res.json();
+            if (res.ok) populateForm(json.data);
+        } catch (err) { console.error("Load failed", err); }
+    };
 
-  async function loadClientStrict() {
-    try {
-      const res = await fetch(`${window.SCL_CONFIG.API_ROOT}/clients/${clientId}`);
-      const json = await res.json();
-      if (!json || !json.data) return;
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (isSaving) return;
+            isSaving = true;
+            if (saveBtn) saveBtn.innerHTML = 'Saving...';
 
-      const client = json.data;
+            const fd = new FormData(form);
+            const payload = {
+                socialLinks: {},
+                workingHours: {}
+            };
 
-      // Clear any previous state
-      const form = document.querySelector("form");
-      if (form) form.reset();
+            for (const [k, v] of fd.entries()) {
+                if (!v || k === 'photoFile' || k === 'clientId') continue;
+                if (SOCIAL_PREFIXES[k]) {
+                    payload.socialLinks[k] = v;
+                } else {
+                    payload[k] = v;
+                }
+            }
 
-      // Populate form strictly from backend response
-      Object.entries(client).forEach(([key, value]) => {
-        const el = document.querySelector(`[name="${key}"]`);
-        if (el) el.value = value ?? "";
-      });
-    } catch (err) {
-      console.error("Strict admin form fetch failed:", err);
+            try {
+                const id = clientIdInput ? clientIdInput.value : '';
+                const method = id ? 'PUT' : 'POST';
+                const endpoint = id ? (API_URL + '/clients/' + id) : (API_URL + '/clients');
+
+                const res = await fetch(endpoint, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    showToast('Saved Successfully');
+                    if (!id) location.reload(); 
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (err) {
+                showToast(err.message, true);
+            } finally {
+                isSaving = false;
+                if (saveBtn) saveBtn.innerHTML = 'Save Info';
+            }
+        });
     }
-  }
 
-  // Kill any leaked global state
-  window.__ACTIVE_CLIENT__ = null;
-  window.__SELECTED_CLIENT__ = null;
-
-  loadClientStrict();
-})();
-
-    // Sync color picker with text input
-    const picker = document.getElementById('themeColorPicker');
-    const textInput = document.getElementById('themeColor');
-    if(picker && textInput) {
-        picker.addEventListener('input', (e) => textInput.value = e.target.value.toUpperCase());
-        textInput.addEventListener('input', (e) => picker.value = e.target.value);
+    if (themeColorPicker && themeColorInput) {
+        themeColorPicker.addEventListener('input', (e) => { themeColorInput.value = e.target.value.toUpperCase(); });
+        themeColorInput.addEventListener('input', (e) => { themeColorPicker.value = e.target.value; });
     }
+
+    if (urlClientId) loadClient(urlClientId);
+})();
