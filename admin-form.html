@@ -244,6 +244,7 @@
         <div><label for="email2">Email 2</label><input type="email" id="email2" name="email2" /></div>
       </div>
       <div><label for="email3">Email 3</label><input type="email" id="email3" name="email3" /></div>
+      <div class="input-group"><label><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" placeholder="Auto-generated from Email 1 if left blank"></div>\n      <div class="input-group"><label><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" placeholder="https://calendar.google.com/calendar/u/0/appointments/..."></div>
       
 
       <div class="section-header">Business Details</div>
@@ -396,7 +397,7 @@
       setValue('phone3', data.phone3);
       setValue('email1', data.email1);
       setValue('email2', data.email2);
-      setValue('email3', data.email3);
+      setValue('email3', data.email3); setValue('appointmentUrl', data.appointmentUrl);
       setValue('companyName', data.company);
       setValue('businessWebsite', data.businessWebsite);
       setValue('portfolioWebsite', data.portfolioWebsite);
@@ -472,7 +473,12 @@
       }
       
       // THEME COLOR FIX: Ensure themeColor is explicitly added to payload
-      payload.themeColor = document.getElementById('themeColor').value; payload.appointmentUrl = document.getElementById('appointmentUrl').value;
+      payload.themeColor = document.getElementById('themeColor').value;
+      let apptUrl = document.getElementById('appointmentUrl').value;
+      if (!apptUrl && payload.email1) {
+          apptUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&add=' + encodeURIComponent(payload.email1);
+      }
+      payload.appointmentUrl = apptUrl;
 
       if (payload.companyName) { payload.company = payload.companyName; delete payload.companyName; }
       if (payload.locationMapUrl) { payload.locationMap = payload.locationMapUrl; delete payload.locationMapUrl; }
@@ -633,6 +639,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 
