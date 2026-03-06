@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     'use strict';
 
     // AUTO-DETECT API ROOT: Works in local and production without manual changes
