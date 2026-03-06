@@ -399,22 +399,28 @@
     }
   }
 
-  form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = form.querySelector("button[type=submit]");
+    
+    // Prevent double submission
+    if (btn.disabled) return;
+    
     btn.disabled = true;
+    btn.textContent = "Processing... Please wait";
+    
     try {
-      // The redundant placeholder check is now removed as the URL is hardcoded.
-      
-      showMessage("Submitting formâ€¦", "info");
+      showMessage("Submitting your details, please wait...", "info");
       const result = await submitForm();
-      showMessage(`âœ” Success! Your Record ID: ${result.recordId}`, "success");
+      
+      // Success state
+      showMessage("Success! Your Record ID: " + result.recordId, "success");
       form.reset();
+      btn.textContent = "Submitted Successfully";
     } catch (err) {
-      showMessage(`âŒ ${err.message}`, "error");
-      console.error(err);
-    } finally {
+      showMessage("Error: " + err.message, "error");
       btn.disabled = false;
+      btn.textContent = "Submit Form";
     }
   });
 </script>
@@ -473,4 +479,5 @@
 
 </body>
 </html>
+
 
