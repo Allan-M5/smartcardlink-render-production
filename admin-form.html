@@ -345,7 +345,25 @@
     <div id="toast-message" class="toast-message"></div>
   </div>
 
-      <div class="form-section">
+      
+        <div class="form-group">
+          <label>Brand Color (Hex)</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="color" id="themeColorPicker" value="#007aff" style="width: 50px; height: 40px; border: none; cursor: pointer;">
+            <input type="text" id="themeColor" name="themeColor" value="#007aff" style="flex-grow: 1;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-calendar-check"></i> Appointment URL (Optional)</label>
+          <input type="url" id="appointmentUrl" name="appointmentUrl" placeholder="https://calendly.com/yourname">
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top: 20px; text-align: center;">
+        <button type="submit" class="save-btn" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+          <i class="fa fa-save"></i> Save & Process vCard
+        </button>
+      </div>
+          <div class="form-section">
         <h3><i class="fa fa-palette"></i> Pro Theme Settings</h3>
         <div class="form-group">
           <label>Theme Style</label>
@@ -368,8 +386,8 @@
           <input type="url" id="appointmentUrl" name="appointmentUrl" placeholder="https://calendly.com/yourname">
         </div>
       </div>
-      <div class="form-actions" style="margin-top: 20px; text-align: center;">
-        <button type="submit" class="save-btn" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+      <div class="form-actions" style="margin-top: 20px;">
+        <button type="submit" class="save-btn" style="width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">
           <i class="fa fa-save"></i> Save & Process vCard
         </button>
       </div>
@@ -689,5 +707,6 @@
 </script>
 </body>
 </html>
+
 
 
