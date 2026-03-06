@@ -13,32 +13,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
-const clientSchema = new mongoose.Schema({
-    slug: { type: String, required: true, unique: true },
-    name: { type: String, required: true },
-    title: { type: String, default: "" },
-    company: { type: String, default: "" },
-    phone1: { type: String, default: "" },
-    phone2: { type: String, default: "" },
-    email1: { type: String, trim: true, lowercase: true, default: "" },
-    email2: { type: String, trim: true, lowercase: true, default: "" },
-    email3: { type: String, trim: true, lowercase: true, default: "" },
-    appointmentUrl: { type: String, default: "" },
-    address: { type: String, default: "" },
-    website: { type: String, default: "" },
-    bio: { type: String, default: "" },
-    photoUrl: { type: String, default: "" },
-    socialLinks: {
-        facebook: { type: String, default: "" },
-        twitter: { type: String, default: "" },
-        instagram: { type: String, default: "" },
-        linkedin: { type: String, default: "" },
-        whatsapp: { type: String, default: "" }
-    },
-    status: { type: String, default: 'Active' }
-}, { timestamps: true });
 
-const Client = mongoose.model('Client', clientSchema);
 
 app.get('/api/vcard/:slug', async (req, res) => {
     try {
@@ -75,18 +50,7 @@ app.get('/:slug', (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 // Client Schema & Model
-const clientSchema = new mongoose.Schema({
-    fullName: String, title: String, company: String,
-    phone1: String, phone2: String, phone3: String,
-    email1: String, email2: String, email3: String,
-    businessWebsite: String, portfolioWebsite: String,
-    locationMap: String, bio: String, address: String,
-    socialLinks: { type: Map, of: String },
-    workingHours: { type: Map, of: String },
-    appointmentUrl: String, themeColor: String
-}, { timestamps: true });
 
-const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
 
 // Handle POST to /api/clients
 app.post("/api/clients", async (req, res) => {
@@ -101,18 +65,7 @@ app.post("/api/clients", async (req, res) => {
 });
 
 // Client Schema & Model
-const clientSchema = new mongoose.Schema({
-    fullName: String, title: String, company: String,
-    phone1: String, phone2: String, phone3: String,
-    email1: String, email2: String, email3: String,
-    businessWebsite: String, portfolioWebsite: String,
-    locationMap: String, bio: String, address: String,
-    socialLinks: { type: Map, of: String },
-    workingHours: { type: Map, of: String },
-    appointmentUrl: String, themeColor: String
-}, { timestamps: true });
 
-const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
 
 // Handle POST to /api/clients
 app.post("/api/clients", async (req, res) => {
@@ -126,7 +79,33 @@ app.post("/api/clients", async (req, res) => {
     }
 });
 
+// --- Unified Client Model & Route ---
+const clientSchema = new mongoose.Schema({
+    fullName: String, title: String, company: String,
+    phone1: String, phone2: String, phone3: String,
+    email1: String, email2: String, email3: String,
+    businessWebsite: String, portfolioWebsite: String,
+    locationMap: String, bio: String, address: String,
+    socialLinks: { type: Map, of: String },
+    workingHours: { type: Map, of: String },
+    appointmentUrl: String, themeColor: String
+}, { timestamps: true });
+
+const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
+
+app.post("/api/clients", async (req, res) => {
+    try {
+        const newClient = new Client(req.body);
+        const saved = await newClient.save();
+        res.status(201).json({ status: "success", data: saved });
+    } catch (err) {
+        res.status(400).json({ status: "error", message: err.message });
+    }
+});
+// --- End Unified ---
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
 
