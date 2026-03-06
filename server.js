@@ -904,6 +904,18 @@ const ALLOWED_ORIGINS_LOG = [
 ].join(' and ');
 
 
+
+// GET Client by Slug (Public vCard Access)
+app.get('/api/vcard/:slug', async (req, res) => {
+    try {
+        const client = await Client.findOne({ slug: req.params.slug, status: 'active' });
+        if (!client) return res.status(404).json({ status: 'error', message: 'VCard not found or inactive' });
+        res.json({ status: 'success', data: client });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: 'Server error' });
+    }
+});
+
 app.listen(PORT, HOST, () => {
     // Logs the live URL from your environment settings
     logger.info(` Server live and listening on ${PUBLIC_URL}`); 
