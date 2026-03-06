@@ -114,8 +114,10 @@ const ClientSchema = new mongoose.Schema({
     locationMap: { type: String, trim: true, default: "" },
     address: { type: String, default: "" },
     
+  // Professional Customization
+    themeColor: { type: String, default: "#FFD700" }, 
+    themeName: { type: String, default: "Default Gold" }, 
     bio: { type: String, default: "" },
-
 
     // Nested Data
     workingHours: workingHoursSchema,
@@ -126,15 +128,13 @@ const ClientSchema = new mongoose.Schema({
     slug: { type: String, required: true, unique: true, index: true },
     status: { type: String, enum: ["Pending", "Active", "Suspended", "Deleted"], default: "Pending" },
 
-
     vcardUrl: { type: String, default: "" }, // Cloudinary URL to .vcf file
-    qrCodeUrl: { type: String, default: "" }, // Data URL for QR code (or Cloudinary if uploaded)
-
+    qrCodeUrl: { type: String, default: "" }, // Data URL for QR code
 
     history: [historySchema],
 }, { timestamps: true });
 
-
+// Model definition
 const Client = mongoose.model("Client", ClientSchema);
 
 
@@ -148,9 +148,9 @@ const staticPath = path.join(__dirname, "public");
 // MongoDB Connection: Uses MONGODB_URI
 mongoose
     .connect(MONGO_URI)
-    .then(() => logger.info("âœ… MongoDB connected successfully"))
+    .then(() => logger.info("Ã�Å“â⬦ MongoDB connected successfully"))
     .catch((err) => {
-        logger.error({ err }, "âŒ MongoDB connection error. Check MONGODB_URI.");
+        logger.error({ err }, "Ã�ÝÅ’ MongoDB connection error. Check MONGODB_URI.");
         process.exit(1);
     });
 
@@ -334,7 +334,7 @@ const sendEmail = async (to, subject, text, html) => {
         const info = await transporter.sendMail(mailOptions);
         logger.info(`Email sent to ${to}: ${info.messageId}`);
     } catch (err) {
-        logger.error({ err }, `âŒ Failed to send email to ${to}`);
+        logger.error({ err }, `Ã�ÝÅ’ Failed to send email to ${to}`);
     }
 };
 
@@ -374,7 +374,7 @@ app.use(
                 "'self'", 
                 BACKEND_API_URL, 
                 new URL(FRONTEND_BASE_URL).origin, // Added to ensure fetch requests work
-                new URL(VCARD_BASE_URL).origin, Â  // Added for public vCard access
+                new URL(VCARD_BASE_URL).origin, Ã‚� // Added for public vCard access
                 "res.cloudinary.com", 
                 "https://api.cloudinary.com", 
                 "*.google-analytics.com", 
@@ -518,12 +518,12 @@ const handleValidationErrors = (req, res, next) => {
          }, "vCard data retrieved successfully");
 
      } catch (err) {
-         logger.error({ err }, "❌ GET /api/vcard/:slug error");
+         logger.error({ err }, "? GET /api/vcard/:slug error");
          return respError(res, "Failed to load vCard.", 500, null, err);
      }
  });
 
- app.use(express.static(staticPath));
+ app.use(express.static(staticPath, { index: false, extensions: false }));
 
 // Favicon check
 app.get("/favicon.ico", (req, res) => {
@@ -565,7 +565,7 @@ app.post("/api/upload-photo", publicLimiter, upload.single("photo"), async (req,
         // Return a simplified JSON response for frontend consumption
         return respSuccess(res, { photoUrl: result.secure_url }, "Photo uploaded successfully");
     } catch (err) {
-        logger.error({ err }, "âŒ POST /api/upload-photo error");
+        logger.error({ err }, "Ã�ÝÅ’ POST /api/upload-photo error");
         return respError(res, "Upload error", 500, null, err);
     }
 });
@@ -595,7 +595,7 @@ app.post("/api/clients", publicLimiter, validateClientCreation, handleValidation
         // Notify admin by email (Uses ADMIN_EMAIL and SMTP details)
         if (ADMIN_EMAIL) {
             const subject = `New SmartCardLink submission: ${clientDoc.fullName}`;
-            const text = `New client submitted. ID: ${clientDoc._id} â€” ${clientDoc.fullName}. Check admin panel to process.`;
+            const text = `New client submitted. ID: ${clientDoc._id} Ã�â‚�â⬝ ${clientDoc.fullName}. Check admin panel to process.`;
             await sendEmail(ADMIN_EMAIL, subject, text);
         }
         
@@ -604,7 +604,7 @@ app.post("/api/clients", publicLimiter, validateClientCreation, handleValidation
         if (err.name === 'ValidationError') {
             return respError(res, `Validation Error: ${err.message}`, 400, null, err);
         }
-        logger.error({ err }, "âŒ POST /api/clients error");
+        logger.error({ err }, "Ã�ÝÅ’ POST /api/clients error");
         return respError(res, err?.message || "Server error", 500, null, err);
     }
 });
@@ -621,7 +621,7 @@ app.get("/api/clients/all", publicLimiter, async (req, res) => {
 
         return respSuccess(res, clients, "All clients retrieved successfully");
     } catch (err) {
-        logger.error({ err }, "âŒ GET /api/clients/all error");
+        logger.error({ err }, "Ã�ÝÅ’ GET /api/clients/all error");
         return respError(res, "Server error fetching all clients", 500, null, err);
     }
 });
@@ -668,7 +668,7 @@ app.get("/api/admin/clients", publicLimiter, async (req, res) => {
 
         return respSuccess(res, clients, "Admin clients list retrieved successfully", 200, meta);
     } catch (err) {
-        logger.error({ err }, "âŒ GET /api/admin/clients error");
+        logger.error({ err }, "Ã�ÝÅ’ GET /api/admin/clients error");
         return respError(res, "Server error fetching clients", 500, null, err);
     }
 });
@@ -688,97 +688,47 @@ app.get("/api/clients/:id", publicLimiter, async (req, res) => {
 
 
 // PUT /api/clients/:id: Update client info (Admin update route)
-// CRITICAL FIX: Added Validation Middleware
-app.put("/api/clients/:id", publicLimiter, upload.single("photo"), validateClientUpdate, handleValidationErrors, async (req, res) => {
+app.put("/api/clients/:id", publicLimiter, async (req, res) => {
     try {
         const id = req.params.id;
+        const incoming = req.body;
         const client = await Client.findById(id);
-        if (!client) return respError(res, "Client not found.", 404);
-        
-        const incoming = req.body || {};
-        
-        // --- Safe Field Update Logic ---
-        const allowedTopLevelFields = [
-            'fullName', 'title', 'company', 'businessWebsite', 'portfolioWebsite', 'locationMap',
-            'phone1', 'phone2', 'phone3', 'email1', 'email2', 'email3', 'address', 'bio', 'status'
-        ];
-        
-        // 1. Check for fullName change and regenerate slug if necessary
-        if (incoming.fullName && incoming.fullName !== client.fullName) {
-            client.slug = await generateUniqueSlug(incoming.fullName);
-            await logAction("admin", "SLUG_REGENERATED", id, `Slug changed from ${client.slug} based on new fullName.`, {});
-        }
+        if (!client) return respError(res, "Client not found", 404);
 
+        // Update Pro Theme & Base Fields
+        if (incoming.photoUrl) client.photoUrl = incoming.photoUrl;
+        if (incoming.themeColor) client.themeColor = incoming.themeColor;
+        if (incoming.themeName) client.themeName = incoming.themeName;
 
-        // 2. Handle photo upload if file is present (photoUrl is updated if successful)
-        if (req.file) {
-            const uploadResult = await cloudinary.uploader.upload(
-                `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
-                {
-                    folder: "smartcardlink_photos",
-                    resource_type: "image",
-                    tags: ["client_photo", `client_${id}`],
-                }
-            );
-            incoming.photoUrl = uploadResult.secure_url;
-            await logAction("admin", "CLIENT_PHOTO_UPDATED", id, "Photo updated via PUT route.", { newPhoto: incoming.photoUrl });
-        }
+        const allowedFields = ['fullName','title','company','businessWebsite','portfolioWebsite','locationMap','phone1','phone2','phone3','email1','email2','email3','address','bio','status'];
+        allowedFields.forEach(f => { if(incoming[f] !== undefined) client[f] = incoming[f]; });
 
+        if (incoming.socialLinks) Object.assign(client.socialLinks, incoming.socialLinks);
+        if (incoming.workingHours) Object.assign(client.workingHours, incoming.workingHours);
 
-        // 3. Apply updates safely, preventing overwrites of critical fields like slug, _id, history
-        for (const field of allowedTopLevelFields) {
-            if (incoming[field] !== undefined) { 
-                client[field] = incoming[field];
-            }
-        }
+        client.history.push({
+            action: "CLIENT_UPDATED",
+            notes: "Admin updated client profile and Pro themes.",
+            actor: "admin",
+            time: new Date().toLocaleString("en-KE", { timeZone: "Africa/Nairobi" })
+        });
 
-
-        // CRITICAL FIX: Merge nested fields (socialLinks, workingHours) safely
-        if (incoming.socialLinks && typeof incoming.socialLinks === 'object') {
-            Object.keys(incoming.socialLinks).forEach(key => {
-                if (key in client.socialLinks.toObject()) {
-                    client.socialLinks[key] = incoming.socialLinks[key];
-                }
-            });
-        }
-        if (incoming.workingHours && typeof incoming.workingHours === 'object') {
-            Object.keys(incoming.workingHours).forEach(key => {
-                if (key in client.workingHours.toObject()) {
-                    client.workingHours[key] = incoming.workingHours[key];
-                }
-            });
-        }
-        
-        // 4. Update photoUrl if present (either from file upload or direct URL input)
-        if (incoming.photoUrl) {
-            client.photoUrl = incoming.photoUrl;
-        }
-        
-        client.history.push({ action: "CLIENT_UPDATED", notes: "Admin updated client data.", actor: "admin" });
         await client.save();
-        
-        return respSuccess(res, { recordId: client._id }, "Client data saved successfully.");
+        return respSuccess(res, { recordId: client._id }, "Client updated successfully.");
     } catch (err) {
-        if (err.name === 'ValidationError') {
-            return respError(res, `Validation Error: ${err.message}`, 400, null, err);
-        }
-        logger.error({ err }, "âŒ PUT /api/clients/:id error");
-        return respError(res, "Server error saving client info.", 500, null, err);
+        return respError(res, "Update failed", 500, null, err);
     }
 });
 
-
-// PUT /api/clients/:id/status/:newStatus: Handle status changes (Activate, Disable, Processed, Deleted)
-// NOTE: Security Warning - This route is unauthenticated as requested.
-app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) => {
+// ----------------------
+// STATUS ROUTE
+// ----------------------app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) => {
     try {
         const id = req.params.id;
-        const newStatus = req.params.newStatus; // e.g., Active, Suspended, Processed, Deleted
-        const { notes } = req.body; // Notes from the modal
+        const newStatus = req.params.newStatus; 
+        const { notes } = req.body; 
         
-        // Note: 'Disabled' is mapped to DB schema 'Suspended'
         const dbStatus = newStatus === 'Disabled' ? 'Suspended' : newStatus; 
-
 
         if (!['Active', 'Suspended', 'Pending', 'Deleted'].includes(dbStatus)) {
             return respError(res, "Invalid status requested.", 400);
@@ -787,20 +737,22 @@ app.put("/api/clients/:id/status/:newStatus", publicLimiter, async (req, res) =>
         const client = await Client.findById(id);
         if (!client) return respError(res, "Client not found.", 404);
 
-
         if (client.status === dbStatus) {
              return respSuccess(res, { recordId: client._id, newStatus: dbStatus }, `Client already in status ${dbStatus}.`, 200);
         }
         
         client.status = dbStatus;
-        client.history.push({ action: `STATUS_CHANGED_TO_${dbStatus.toUpperCase()}`, notes: notes || `Status changed to ${dbStatus}.`, actor: "admin" });
-
+        client.history.push({ 
+            action: `STATUS_CHANGED_TO_${dbStatus.toUpperCase()}`, 
+            notes: notes || `Status changed to ${dbStatus}.`, 
+            actor: "admin" 
+        });
 
         await client.save();
         
         return respSuccess(res, { recordId: client._id, newStatus: client.status }, `Client status updated to ${newStatus}.`);
     } catch (err) {
-        logger.error({ err }, "âŒ PUT /api/clients/:id/status/:newStatus error");
+        logger.error({ err }, "Ã�ÝÅ’ PUT /api/clients/:id/status/:newStatus error");
         return respError(res, err?.message || "Server error updating status", 500, null, err);
     }
 });
@@ -827,7 +779,7 @@ app.delete("/api/clients/:id", publicLimiter, async (req, res) => {
         await logAction("admin", "CLIENT_DELETED", client._id, notes, { previousStatus: previous, newStatus: "Deleted" });
         return respSuccess(res, null, "Client soft-deleted successfully");
     } catch (err) {
-        logger.error({ err }, "âŒ DELETE /api/clients/:id error");
+        logger.error({ err }, "Ã�ÝÅ’ DELETE /api/clients/:id error");
         return respError(res, "Server error deleting client", 500, null, err);
     }
 });
@@ -851,7 +803,7 @@ app.post("/api/clients/:id/pdf", publicLimiter, async (req, res) => {
 
         return respSuccess(res, { pdfUrl }, "PDF URL generated successfully", 200, { redirect: pdfUrl });
     } catch (err) {
-        logger.error({ err }, "âŒ POST /api/clients/:id/pdf error");
+        logger.error({ err }, "Ã�ÝÅ’ POST /api/clients/:id/pdf error");
         return respError(res, "Server error generating PDF.", 500, null, err);
     }
 });
@@ -902,7 +854,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
         `;
         await sendEmail(client.email1, emailSubject, `Your digital smart card link is: ${publicVcardPage}`, emailHtml);
 
-        // âœ… REQUIRED SERVER RESPONSE CONTRACT (CORRECTED)
+        // Ã�Å“â⬦ REQUIRED SERVER RESPONSE CONTRACT (CORRECTED)
         // Returning email1 and slug allows the Action Bar buttons to work immediately.
         return respSuccess(res, { 
             vcardUrl: publicVcardPage, 
@@ -912,7 +864,7 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
             slug: client.slug 
         }, "vCard created, client active, email sent.", 200);
     } catch (err) {
-        logger.error({ err }, "âŒ POST /api/clients/:id/vcard error");
+        logger.error({ err }, "Ã�ÝÅ’ POST /api/clients/:id/vcard error");
         return respError(res, err?.message || "vCard generation failed.", 500, null, err);
     }
 })
@@ -922,7 +874,8 @@ app.post("/api/clients/:id/vcard", publicLimiter, async (req, res) => {
 // ------------------------
 
 
-// GET /:slug: Public route to fetch the client data for client-side rendering// ------------------------
+// GET /:slug: Public route to fetch the client data for client-side rendering
+// ------------------------
 // Health Check Route (For Render Deployment)
 // ------------------------
 app.get('/health', (req, res) => {
@@ -953,8 +906,8 @@ const ALLOWED_ORIGINS_LOG = [
 
 app.listen(PORT, HOST, () => {
     // Logs the live URL from your environment settings
-    logger.info(`ðŸš€ Server live and listening on ${PUBLIC_URL}`); 
-    logger.info(`ðŸŒ Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
+    logger.info(`Ã�Å�Å�â‚� Server live and listening on ${PUBLIC_URL}`); 
+    logger.info(`Ã�Å�Å’Ð Frontend expects CORS from: ${ALLOWED_ORIGINS_LOG}`);
 });
 
 
