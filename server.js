@@ -733,7 +733,7 @@ app.put("/api/clients/:id", publicLimiter, async (req, res) => {
         if (!['Active', 'Suspended', 'Pending', 'Deleted'].includes(dbStatus)) {
             return respError(res, "Invalid status requested.", 400);
         }
-        
+app.put("/api/clients/:id/status", publicLimiter, async (req, res) => {
         const client = await Client.findById(id);
         if (!client) return respError(res, "Client not found.", 404);
 
