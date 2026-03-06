@@ -55,7 +55,16 @@ const PORT = process.env.PORT || 10000;
 // Handle POST to /api/clients
 app.post("/api/clients", async (req, res) => {
     try {
-        const newClient = new Client(req.body);
+        const newClient = new Client({
+            ...req.body,
+            status: "Pending",
+            history: [{
+                action: "CLIENT_CREATED",
+                notes: "Initial form submission",
+                actor: "client_submission",
+                timestamp: new Date()
+            }]
+        });
         const saved = await newClient.save();
         res.status(201).json({ status: "success", data: saved });
     } catch (err) {
@@ -70,7 +79,16 @@ app.post("/api/clients", async (req, res) => {
 // Handle POST to /api/clients
 app.post("/api/clients", async (req, res) => {
     try {
-        const newClient = new Client(req.body);
+        const newClient = new Client({
+            ...req.body,
+            status: "Pending",
+            history: [{
+                action: "CLIENT_CREATED",
+                notes: "Initial form submission",
+                actor: "client_submission",
+                timestamp: new Date()
+            }]
+        });
         const saved = await newClient.save();
         res.status(201).json({ status: "success", data: saved });
     } catch (err) {
@@ -95,7 +113,16 @@ const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
 
 app.post("/api/clients", async (req, res) => {
     try {
-        const newClient = new Client(req.body);
+        const newClient = new Client({
+            ...req.body,
+            status: "Pending",
+            history: [{
+                action: "CLIENT_CREATED",
+                notes: "Initial form submission",
+                actor: "client_submission",
+                timestamp: new Date()
+            }]
+        });
         const saved = await newClient.save();
         res.status(201).json({ status: "success", data: saved });
     } catch (err) {
@@ -105,6 +132,7 @@ app.post("/api/clients", async (req, res) => {
 // --- End Unified ---
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
 
