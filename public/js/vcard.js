@@ -183,3 +183,5 @@
 
     document.addEventListener('DOMContentLoaded', init);
 })();
+
+function showPopup(show) { popup2.hidden = !show; if(show){ popup2.removeAttribute('inert'); } else { popup2.setAttribute('inert', ''); } }

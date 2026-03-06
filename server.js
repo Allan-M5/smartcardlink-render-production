@@ -8,7 +8,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(__dirname));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB'))
@@ -69,8 +68,9 @@ app.put('/api/clients/:id', async (req, res) => {
     }
 });
 
+// FIX: Point to public/index.html
 app.get('/:slug', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 10000;
