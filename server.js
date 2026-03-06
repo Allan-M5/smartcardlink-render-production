@@ -128,6 +128,13 @@ const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
     }
 });
 
+
+    } catch (error) {
+        console.error("Submission error:", error);
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
 app.post("/api/clients", async (req, res) => {
     try {
         const clientData = {
@@ -189,6 +196,7 @@ app.get('/api/clients/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
 
