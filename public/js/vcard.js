@@ -1,5 +1,9 @@
 ﻿(function () {
     'use strict';
+    // SPEED FIX: Prefetch data immediately
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug');
+    if (slug) fetch(`${window.location.origin}/api/vcard/${slug}`).then(r => r.json()).then(j => { window.cachedData = j.data; });
 
     // AUTO-DETECT API ROOT: Works in local and production without manual changes
     const API_ROOT = window.location.origin; 
@@ -10,6 +14,16 @@
     const popup1 = el('popup1');
     const popup2 = el('popup2');
     const photoArea = el('photoArea');
+    // QR REVEAL: Horizontal slide on tap
+    const track = document.querySelector('.photo-swipe-track');
+    if (track) {
+        let showingQR = false;
+        track.style.cursor = 'pointer';
+        track.onclick = () => {
+            showingQR = !showingQR;
+            track.style.transform = showingQR ? 'translateX(-50%)' : 'translateX(0)';
+        };
+    }
     const fullName = el('fullName');
     const jobName = el('jobName');
     const titlePosition = el('titlePosition');
