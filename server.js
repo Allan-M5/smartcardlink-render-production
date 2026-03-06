@@ -110,27 +110,7 @@ const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
 
 // GET all clients for the Admin Dashboard (supports status filtering)
 // Handle POST to /api/clients (Standardized Creation)
-app.post("/api/clients", async (req, res) => {
-    try {
-        const clientData = {
-            ...req.body,
-            status: 'Pending',
-            history: [{
-                action: 'CLIENT_CREATED',
-                notes: 'Initial form submission',
-                actor: 'client_submission',
-                timestamp: new Date()
-            }]
-        };
 
-        const newClient = new Client(clientData);
-        const savedClient = await newClient.save();
-        
-        res.status(201).json({ 
-            success: true, 
-            message: "Application submitted successfully", 
-            data: savedClient 
-        });
     } catch (error) {
         console.error("Submission error:", error);
         res.status(400).json({ 
@@ -145,6 +125,27 @@ app.post("/api/clients", async (req, res) => {
             success: false, 
             message: error.message 
         });
+    }
+});
+
+app.post("/api/clients", async (req, res) => {
+    try {
+        const clientData = {
+            ...req.body,
+            status: 'Pending',
+            history: [{
+                action: 'CLIENT_CREATED',
+                notes: 'Initial form submission',
+                actor: 'client_submission',
+                timestamp: new Date()
+            }]
+        };
+        const newClient = new Client(clientData);
+        const savedClient = await newClient.save();
+        res.status(201).json({ success: true, message: "Application submitted successfully", data: savedClient });
+    } catch (error) {
+        console.error("Submission error:", error);
+        res.status(400).json({ success: false, message: error.message });
     }
 });
 
@@ -188,6 +189,7 @@ app.get('/api/clients/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
 
