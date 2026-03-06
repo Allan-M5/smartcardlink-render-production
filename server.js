@@ -139,3 +139,31 @@ app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 
 
+
+
+// GET all clients for the Admin Dashboard (supports status filtering)
+app.get('/api/admin/clients', async (req, res) => {
+    try {
+        const { status, q } = req.query;
+        let query = {};
+        if (status) query.status = status;
+        if (q) query.fullName = { $regex: q, $options: 'i' };
+
+        const clients = await Client.find(query).sort({ createdAt: -1 });
+        res.json({ success: true, data: clients });
+    } catch (error) {
+        console.error("Error fetching admin clients:", error);
+        res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+});
+
+// GET a single client by ID (for auto-populate)
+app.get('/api/clients/:id', async (req, res) => {
+    try {
+        const client = await Client.findById(req.params.id);
+        if (!client) return res.status(404).json({ message: "Client not found" });
+        res.json({ success: true, data: client });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
