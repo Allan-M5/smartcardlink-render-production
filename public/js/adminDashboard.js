@@ -1,4 +1,4 @@
-// C:\Users\ADMIN\Desktop\smartcardlink-app\public\js\adminDashboard.js
+﻿// C:\Users\ADMIN\Desktop\smartcardlink-app\public\js\adminDashboard.js
 
 
 // --- Global Variables ---
@@ -454,8 +454,4 @@ window.showNotesModal = showNotesModal;
 
 /* SMARTCARDLINK_ADMIN_DASHBOARD_ID_ONLY */
 
-// Force Admin Form navigation by ID only
-function openAdminForm(clientId) {
-  if (!clientId) return;
-  window.location.href = `${window.SCL_CONFIG.ADMIN_FORM_URL}?id=${clientId}`;
-}
+
