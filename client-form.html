@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -406,12 +406,12 @@
     try {
       // The redundant placeholder check is now removed as the URL is hardcoded.
       
-      showMessage("Submitting form…", "info");
+      showMessage("Submitting formâ€¦", "info");
       const result = await submitForm();
-      showMessage(`✔ Success! Your Record ID: ${result.recordId}`, "success");
+      showMessage(`âœ” Success! Your Record ID: ${result.recordId}`, "success");
       form.reset();
     } catch (err) {
-      showMessage(`❌ ${err.message}`, "error");
+      showMessage(`âŒ ${err.message}`, "error");
       console.error(err);
     } finally {
       btn.disabled = false;
@@ -473,3 +473,4 @@
 
 </body>
 </html>
+
