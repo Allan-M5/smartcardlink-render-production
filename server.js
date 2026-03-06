@@ -153,7 +153,39 @@ mongoose.connect(MONGO_URI).then(() => {
     });
 });
 
+// ASSETS: Photo Upload to Cloudinary
+const upload = multer({ storage: multer.memoryStorage() });
+app.post("/api/upload-photo", upload.single("photo"), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: "No file provided" });
+        const b64 = Buffer.from(req.file.buffer).toString("base64");
+        const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+        const result = await cloudinary.uploader.upload(dataURI, { folder: "smartcardlink_photos" });
+        res.json({ success: true, photoUrl: result.secure_url });
+    } catch (err) {
+        console.error("Upload Error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ADMIN: Change Client Status (Fixed for your Dashboard PUT request)
+app.put("/api/clients/:id/status/:newStatus", async (req, res) => {
+    try {
+        const { id, newStatus } = req.params;
+        const client = await Client.findByIdAndUpdate(
+            id, 
+            { status: newStatus }, 
+            { new: true }
+        );
+        if (!client) return res.status(404).json({ success: false, message: "Client not found" });
+        res.json({ success: true, data: client });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
 
