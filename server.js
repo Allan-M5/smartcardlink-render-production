@@ -139,6 +139,14 @@ app.post("/api/clients", async (req, res) => {
         });
     }
 });
+    } catch (error) {
+        console.error("Submission error:", error);
+        res.status(400).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
 
 app.get('/api/admin/clients', async (req, res) => {
     try {
@@ -180,5 +188,6 @@ app.get('/api/clients/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
