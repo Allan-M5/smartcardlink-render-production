@@ -53,18 +53,7 @@ const PORT = process.env.PORT || 10000;
 
 
 // Handle POST to /api/clients
-app.post("/api/clients", async (req, res) => {
-    try {
-        const newClient = new Client({
-            ...req.body,
-            status: "Pending",
-            history: [{
-                action: "CLIENT_CREATED",
-                notes: "Initial form submission",
-                actor: "client_submission",
-                timestamp: new Date()
-            }]
-        });
+
         const saved = await newClient.save();
         res.status(201).json({ status: "success", data: saved });
     } catch (err) {
@@ -77,18 +66,7 @@ app.post("/api/clients", async (req, res) => {
 
 
 // Handle POST to /api/clients
-app.post("/api/clients", async (req, res) => {
-    try {
-        const newClient = new Client({
-            ...req.body,
-            status: "Pending",
-            history: [{
-                action: "CLIENT_CREATED",
-                notes: "Initial form submission",
-                actor: "client_submission",
-                timestamp: new Date()
-            }]
-        });
+
         const saved = await newClient.save();
         res.status(201).json({ status: "success", data: saved });
     } catch (err) {
@@ -111,18 +89,7 @@ const clientSchema = new mongoose.Schema({
 
 const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
 
-app.post("/api/clients", async (req, res) => {
-    try {
-        const newClient = new Client({
-            ...req.body,
-            status: "Pending",
-            history: [{
-                action: "CLIENT_CREATED",
-                notes: "Initial form submission",
-                actor: "client_submission",
-                timestamp: new Date()
-            }]
-        });
+
         const saved = await newClient.save();
         res.status(201).json({ status: "success", data: saved });
     } catch (err) {
@@ -131,7 +98,7 @@ app.post("/api/clients", async (req, res) => {
 });
 // --- End Unified ---
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
 
@@ -142,14 +109,58 @@ app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 
 // GET all clients for the Admin Dashboard (supports status filtering)
+// Handle POST to /api/clients (Standardized Creation)
+app.post("/api/clients", async (req, res) => {
+    try {
+        const clientData = {
+            ...req.body,
+            status: 'Pending',
+            history: [{
+                action: 'CLIENT_CREATED',
+                notes: 'Initial form submission',
+                actor: 'client_submission',
+                timestamp: new Date()
+            }]
+        };
+
+        const newClient = new Client(clientData);
+        const savedClient = await newClient.save();
+        
+        res.status(201).json({ 
+            success: true, 
+            message: "Application submitted successfully", 
+            data: savedClient 
+        });
+    } catch (error) {
+        console.error("Submission error:", error);
+        res.status(400).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
 app.get('/api/admin/clients', async (req, res) => {
     try {
         const { status, q } = req.query;
         let query = {};
-        if (status) query.status = status;
+        
+        if (status === 'Pending') {
+            // Find records where status is 'Pending' OR the field doesn't exist
+            query.status = { $in: ['Pending', null, undefined] };
+        } else if (status) {
+            query.status = status;
+        }
+
         if (q) query.fullName = { $regex: q, $options: 'i' };
 
         const clients = await Client.find(query).sort({ createdAt: -1 });
+        res.json({ success: true, data: clients });
+    } catch (error) {
+        console.error("Error fetching admin clients:", error);
+        res.status(500).json({ success: false, message: "Error fetching data" });
+    }
+});
         res.json({ success: true, data: clients });
     } catch (error) {
         console.error("Error fetching admin clients:", error);
@@ -167,3 +178,7 @@ app.get('/api/clients/:id', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+
