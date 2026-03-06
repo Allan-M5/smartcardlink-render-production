@@ -267,13 +267,93 @@
   <div class="form-message" id="formMessage"></div>
 </div>
 
+<script>
+  const MAIN_API = "https://smartcardlink-api.onrender.com";
+  const form = document.getElementById("clientForm");
+  const formMessage = document.getElementById("formMessage");
 
+  // Enable Sunday fields immediately
+  ["sunStart","sunEnd"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
 
+  function showMessage(message, type) {
+    // Remove any special characters to ensure clean display
+    const cleanMessage = message.replace(/[^\x00-\x7F]/g, "");
+    formMessage.innerHTML = cleanMessage;
+    formMessage.className = "form-message " + type;
+    formMessage.style.display = "block";
+    formMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector("button[type=submit]");
+    
+    // 1. Lock UI and show "Processing"
+    btn.disabled = true;
+    const originalText = "Submit Form";
+    btn.textContent = "Processing... Please wait";
+    showMessage("Submitting your details to the database...", "info");
+
+    try {
+      const formData = new FormData(form);
+      const payload = {
+        fullName: formData.get("fullName"),
+        title: formData.get("title"),
+        company: formData.get("company"),
+        phone1: formData.get("phone1"),
+        phone2: formData.get("phone2"),
+        phone3: formData.get("phone3"),
+        email1: formData.get("email1"),
+        email2: formData.get("email2"),
+        email3: formData.get("email3"),
+        businessWebsite: formData.get("businessWebsite"),
+        portfolioWebsite: formData.get("portfolioWebsite"),
+        locationMap: formData.get("locationMap"),
+        bio: formData.get("bio"),
+        address: formData.get("address"),
+        socialLinks: {},
+        workingHours: {}
+      };
+
+      ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k => {
+        const v = formData.get(k); if(v) payload.socialLinks[k] = v;
+      });
+      ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
+        const v = formData.get(k); if(v) payload.workingHours[k] = v;
+      });
+
+      // 2. Execute Data Submission
+      const response = await fetch(MAIN_API + "/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Server rejected submission");
+      }
+
+      // 3. Handle Success: Show Record ID then reset
+      const recordId = result.data?._id || result.data?.id || result.recordId || "Success";
+      showMessage("Success! Your Record ID: " + recordId, "success");
+      form.reset();
+      btn.textContent = "Saved Successfully";
+
+    } catch (err) {
+      // 4. Handle Error: Restore button and show message
+      showMessage("Error: " + err.message, "error");
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+</script>
 </body>
 </html>
-
-
-
 
 
 
