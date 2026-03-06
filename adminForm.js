@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   'use strict';
 
   /* =====================================================
@@ -353,7 +353,7 @@
   copyVcardUrlBtn.addEventListener('click', () => {
     if (!lastVcardUrl) return;
     navigator.clipboard.writeText(lastVcardUrl).then(() => {
-      copyVcardUrlBtn.textContent = 'Copied ✓';
+      copyVcardUrlBtn.textContent = 'Copied âœ“';
       showToast('vCard URL copied');
       setTimeout(() => (copyVcardUrlBtn.textContent = 'Copy URL'), 2000);
     });
@@ -416,3 +416,10 @@
   viewPdfBtn.addEventListener('click', handleViewPdf);
   createVcardBtn.addEventListener('click', handleCreateVcard);
 })();
+
+    const picker = document.getElementById('themeColorPicker');
+    const textInput = document.getElementById('themeColor');
+    if(picker && textInput) {
+        picker.addEventListener('input', (e) => textInput.value = e.target.value.toUpperCase());
+        textInput.addEventListener('input', (e) => picker.value = e.target.value);
+    }
