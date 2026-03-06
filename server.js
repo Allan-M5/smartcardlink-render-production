@@ -74,5 +74,59 @@ app.get('/:slug', (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
+// Client Schema & Model
+const clientSchema = new mongoose.Schema({
+    fullName: String, title: String, company: String,
+    phone1: String, phone2: String, phone3: String,
+    email1: String, email2: String, email3: String,
+    businessWebsite: String, portfolioWebsite: String,
+    locationMap: String, bio: String, address: String,
+    socialLinks: { type: Map, of: String },
+    workingHours: { type: Map, of: String },
+    appointmentUrl: String, themeColor: String
+}, { timestamps: true });
+
+const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
+
+// Handle POST to /api/clients
+app.post("/api/clients", async (req, res) => {
+    try {
+        const newClient = new Client(req.body);
+        const saved = await newClient.save();
+        res.status(201).json({ status: "success", data: saved });
+    } catch (err) {
+        console.error("Save Error:", err);
+        res.status(400).json({ status: "error", message: err.message });
+    }
+});
+
+// Client Schema & Model
+const clientSchema = new mongoose.Schema({
+    fullName: String, title: String, company: String,
+    phone1: String, phone2: String, phone3: String,
+    email1: String, email2: String, email3: String,
+    businessWebsite: String, portfolioWebsite: String,
+    locationMap: String, bio: String, address: String,
+    socialLinks: { type: Map, of: String },
+    workingHours: { type: Map, of: String },
+    appointmentUrl: String, themeColor: String
+}, { timestamps: true });
+
+const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
+
+// Handle POST to /api/clients
+app.post("/api/clients", async (req, res) => {
+    try {
+        const newClient = new Client(req.body);
+        const saved = await newClient.save();
+        res.status(201).json({ status: "success", data: saved });
+    } catch (err) {
+        console.error("Save Error:", err);
+        res.status(400).json({ status: "error", message: err.message });
+    }
+});
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+
 
