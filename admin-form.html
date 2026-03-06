@@ -227,7 +227,7 @@
     </div>
 
     <form id="adminForm" autocomplete="off">
-      <input type="hidden" id="clientId" name="clientId">
+      <input type="hidden" id="clientId" value="" name="clientId">
       
       <div class="section-header">Personal Details</div>
       <div class="grid-2col">
@@ -244,10 +244,11 @@
         <div><label for="email2">Email 2</label><input type="email" id="email2" name="email2" /></div>
       </div>
       <div><label for="email3">Email 3</label><input type="email" id="email3" name="email3" /></div>
-      <div class="input-group"><label><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" placeholder="Auto-generated from Email 1 if left blank"></div>\n      <div class="input-group"><label><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" placeholder="https://calendar.google.com/calendar/u/0/appointments/..."></div>
+      \n      
       
 
-      <div class="section-header">Business Details</div>
+      <div class="input-group"><label for="appointmentUrl"><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" autocomplete="off" placeholder="Auto-generated from Email 1 if left blank"></div>
+      <div class='section-header'>Business Details</div>
       <div class="grid-2col">
         <div><label for="companyName">Company Name</label><input type="text" id="companyName" name="companyName" /></div>
         <div><label for="businessWebsite">Business Website</label><input type="url" id="businessWebsite" name="businessWebsite" /></div>
@@ -620,9 +621,15 @@
       emailClientBtn.textContent = 'Email Client';
     };
 
-    document.addEventListener('DOMContentLoaded', () => { 
-      if (urlClientId) fetchClientData(urlClientId); 
-      else { viewPdfBtn.disabled = createVcardBtn.disabled = true; } 
+        document.addEventListener('DOMContentLoaded', () => { 
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('id');
+      if (id) {
+        clientIdInput.value = id;
+        fetchClientData(id); 
+      } else { 
+        viewPdfBtn.disabled = createVcardBtn.disabled = true; 
+      } 
     });
     
 // PROCESS THEME BUTTON LOGIC
@@ -664,6 +671,10 @@
 </script>
 </body>
 </html>
+
+
+
+
 
 
 
