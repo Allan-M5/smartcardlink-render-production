@@ -1,140 +1,61 @@
-﻿const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-require('dotenv').config();
+﻿/**
+ * SmartCardLink - Master Server Controller
+ * Version: 2.2.0 - Production Ready (Fixed Async Syntax & Route Merging)
+ */
+
+const express = require("express");
+const path = require("path");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const helmet = require("helmet");
+const RateLimit = require("express-rate-limit");
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const qrcode = require("qrcode");
+const vCardJS = require("vcards-js");
+const nodemailer = require("nodemailer");
+const pino = require("pino");
+const pinoHttp = require("pino-http");
+require('dotenv').config(); 
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const logger = pino({ level: "info" });
+const PORT = process.env.PORT || 8080;
+const MONGO_URI = process.env.MONGODB_URI;
+const VCARD_BASE_URL = process.env.VCARD_BASE_URL || "https://smartcardlink-public.onrender.com";
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
-
-
-
-app.get('/api/vcard/:slug', async (req, res) => {
-    try {
-        const client = await Client.findOne({ slug: req.params.slug, status: 'Active' });
-        if (!client) return res.status(404).json({ error: 'Not found' });
-        if (client.photoUrl && client.photoUrl.includes('cloudinary')) {
-            client.photoUrl = client.photoUrl.replace('/upload/', '/upload/f_auto,q_auto/');
-        }
-        res.json({ data: client });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+// --- DB SCHEMAS ---
+const historySchema = new mongoose.Schema({
+    action: String,
+    notes: String,
+    actor: { type: String, default: "system" },
+    timestamp: { type: Date, default: Date.now }
 });
 
-app.put('/api/clients/:id', async (req, res) => {
-    try {
-        const incoming = req.body;
-        const allowed = ['name', 'title', 'company', 'phone1', 'phone2', 'email1', 'email2', 'email3', 'address', 'website', 'bio', 'status', 'appointmentUrl', 'socialLinks'];
-        const updateData = {};
-        allowed.forEach(field => {
-            if (incoming[field] !== undefined) updateData[field] = incoming[field];
-        });
-        const updatedClient = await Client.findByIdAndUpdate(req.params.id, { $set: updateData }, { new: true });
-        res.json({ success: true, data: updatedClient });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// FIX: Point to public/index.html
-app.get('/:slug', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-const PORT = process.env.PORT || 10000;
-// Client Schema & Model
-
-
-// Handle POST to /api/clients
-
-        const saved = await newClient.save();
-        res.status(201).json({ status: "success", data: saved });
-    } catch (err) {
-        console.error("Save Error:", err);
-        res.status(400).json({ status: "error", message: err.message });
-    }
-});
-
-// Client Schema & Model
-
-
-// Handle POST to /api/clients
-
-        const saved = await newClient.save();
-        res.status(201).json({ status: "success", data: saved });
-    } catch (err) {
-        console.error("Save Error:", err);
-        res.status(400).json({ status: "error", message: err.message });
-    }
-});
-
-// --- Unified Client Model & Route ---
-const clientSchema = new mongoose.Schema({
-    fullName: String, title: String, company: String,
+const ClientSchema = new mongoose.Schema({
+    fullName: { type: String, required: true },
+    title: String,
+    slug: { type: String, unique: true, sparse: true },
     phone1: String, phone2: String, phone3: String,
     email1: String, email2: String, email3: String,
-    businessWebsite: String, portfolioWebsite: String,
-    locationMap: String, bio: String, address: String,
-    socialLinks: { type: Map, of: String },
-    workingHours: { type: Map, of: String },
-    appointmentUrl: String, themeColor: String
+    company: String, businessWebsite: String, portfolioWebsite: String,
+    address: String, bio: String, themeName: String,
+    status: { type: String, default: "Pending" },
+    vcardUrl: String, qrCodeUrl: String,
+    history: [historySchema]
 }, { timestamps: true });
 
-const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
+const Client = mongoose.model("Client", ClientSchema);
 
+// --- MIDDLEWARE ---
+app.use(pinoHttp({ logger }));
+app.use(express.json());
+app.use(cors());
+app.use(express.static(path.join(__dirname, "public")));
 
-        const saved = await newClient.save();
-        res.status(201).json({ status: "success", data: saved });
-    } catch (err) {
-        res.status(400).json({ status: "error", message: err.message });
-    }
-});
-// --- End Unified ---
+// --- ROUTES ---
 
-
-
-
-
-
-
-
-
-
-
-// GET all clients for the Admin Dashboard (supports status filtering)
-// Handle POST to /api/clients (Standardized Creation)
-
-    } catch (error) {
-        console.error("Submission error:", error);
-        res.status(400).json({ 
-            success: false, 
-            message: error.message 
-        });
-    }
-});
-    } catch (error) {
-        console.error("Submission error:", error);
-        res.status(400).json({ 
-            success: false, 
-            message: error.message 
-        });
-    }
-});
-
-
-    } catch (error) {
-        console.error("Submission error:", error);
-        res.status(400).json({ success: false, message: error.message });
-    }
-});
-
+// 1. GOLDEN POST ROUTE (Enforces Status & History)
 app.post("/api/clients", async (req, res) => {
     try {
         const clientData = {
@@ -148,56 +69,71 @@ app.post("/api/clients", async (req, res) => {
             }]
         };
         const newClient = new Client(clientData);
-        const savedClient = await newClient.save();
-        res.status(201).json({ success: true, message: "Application submitted successfully", data: savedClient });
-    } catch (error) {
-        console.error("Submission error:", error);
-        res.status(400).json({ success: false, message: error.message });
+        const saved = await newClient.save();
+        res.status(201).json({ success: true, data: saved });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
     }
 });
 
-app.get('/api/admin/clients', async (req, res) => {
+// 2. ADMIN LISTING (Includes Pending Fix)
+app.get("/api/admin/clients", async (req, res) => {
     try {
-        const { status, q } = req.query;
+        const { status } = req.query;
         let query = {};
-        
         if (status === 'Pending') {
-            // Find records where status is 'Pending' OR the field doesn't exist
             query.status = { $in: ['Pending', null, undefined] };
         } else if (status) {
             query.status = status;
         }
-
-        if (q) query.fullName = { $regex: q, $options: 'i' };
-
         const clients = await Client.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: clients });
-    } catch (error) {
-        console.error("Error fetching admin clients:", error);
-        res.status(500).json({ success: false, message: "Error fetching data" });
-    }
-});
-        res.json({ success: true, data: clients });
-    } catch (error) {
-        console.error("Error fetching admin clients:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// GET a single client by ID (for auto-populate)
-app.get('/api/clients/:id', async (req, res) => {
+// 3. SINGLE CLIENT & UPDATE
+app.get("/api/clients/:id", async (req, res) => {
+    const client = await Client.findById(req.params.id);
+    res.json({ success: true, data: client });
+});
+
+app.put("/api/clients/:id", async (req, res) => {
+    try {
+        const updated = await Client.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json({ success: true, data: updated });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// 4. VCARD GENERATION (Logic for Theme)
+app.post("/api/clients/:id/vcard", async (req, res) => {
     try {
         const client = await Client.findById(req.params.id);
-        if (!client) return res.status(404).json({ message: "Client not found" });
-        res.json({ success: true, data: client });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        const slug = client.slug || client.fullName.toLowerCase().replace(/ /g, '-');
+        const publicUrl = `${VCARD_BASE_URL}/?slug=${slug}`;
+        const qr = await qrcode.toDataURL(publicUrl);
+        
+        client.vcardUrl = publicUrl;
+        client.qrCodeUrl = qr;
+        client.status = "Active";
+        await client.save();
+        
+        res.json({ success: true, vcardUrl: publicUrl });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// --- STARTUP ---
+mongoose.connect(MONGO_URI).then(() => {
+    app.listen(PORT, "0.0.0.0", () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+    });
+});
 
-
-
-
-
+app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+});
