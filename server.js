@@ -20,9 +20,28 @@ require('dotenv').config();
 
 const app = express();
 const logger = pino({ level: "info" });
+// --- CONFIGURATION FROM ENV ---
 const PORT = process.env.PORT || 8080;
 const MONGO_URI = process.env.MONGODB_URI;
 const VCARD_BASE_URL = process.env.VCARD_BASE_URL || "https://smartcardlink-public.onrender.com";
+
+// Cloudinary Configuration
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// SMTP Configuration
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: process.env.SMTP_PORT || 587,
+    secure: false,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
 
 // --- DB SCHEMAS ---
 const historySchema = new mongoose.Schema({
@@ -137,3 +156,4 @@ mongoose.connect(MONGO_URI).then(() => {
 app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
