@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   'use strict';
 
   // ==============================
@@ -132,7 +132,7 @@
     }
   };
 
-  // ==============================
+// ==============================
   // Form Submission
   // ==============================
   const handleFormSubmission = async (e) => {
@@ -148,8 +148,15 @@
     const fd = new FormData(form);
 
     try {
+      // THEME FIX: Explicitly capture themeColor if it exists in the DOM
+      const themeColorEl = document.getElementById('themeColor');
+      if (themeColorEl) {
+        payload.themeColor = themeColorEl.value;
+      }
+
       for (const [key, value] of fd.entries()) {
-        if (!value || key === 'photoFile' || key === 'clientId') continue;
+        // Skip themeColor here because we handled it above, and skip files/ids
+        if (!value || key === 'photoFile' || key === 'clientId' || key === 'themeColor') continue;
 
         if (SOCIAL_PREFIXES[key]) {
           const normalized = normalizeSocialLink(key, value);
@@ -203,7 +210,7 @@
       resetButton(saveBtn, 'Save Info');
     }
   };
-
+  
   // ==============================
   // VIEW CLIENT INFO (DATA VIEW)
   // ==============================
@@ -392,3 +399,11 @@ SmartCardLink Admin`
 
   loadClientStrict();
 })();
+
+    // Sync color picker with text input
+    const picker = document.getElementById('themeColorPicker');
+    const textInput = document.getElementById('themeColor');
+    if(picker && textInput) {
+        picker.addEventListener('input', (e) => textInput.value = e.target.value.toUpperCase());
+        textInput.addEventListener('input', (e) => picker.value = e.target.value);
+    }

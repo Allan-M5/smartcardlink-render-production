@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -209,7 +209,7 @@
     Your browser does not support the video tag.
   </video>
 
-  <div class="form-card">
+<div class="form-card">
     <h1 class="title">SmartCardLink Admin Form</h1>
     
     <div class="top-buttons">
@@ -292,9 +292,26 @@
       <div class="section-header">Bio</div>
       <textarea id="bio" name="bio" rows="4"></textarea>
 
-      <div class="section-header">Address</div>
-      <input type="text" id="address" name="address" />
+      <div class="section-header">Professional Customization & Address</div>
+      <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem;">
+        
+        <div>
+          <label for="address">Physical Address</label>
+          <input type="text" id="address" name="address" placeholder="e.g. Nairobi, Kenya" />
+        </div>
 
+        <div>
+          <label for="themeColor">Theme Hex Code</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="themeColor" name="themeColor" value="#FFD700" placeholder="#50c878" style="text-transform: uppercase;" />
+            <div id="colorPreview" style="width: 40px; height: 38px; border-radius: 4px; border: 1px solid #444; background: #FFD700; flex-shrink: 0; transition: background 0.3s;"></div>
+          </div>
+        </div>
+
+        <div>
+          <button type="button" id="processThemeBtn" class="action-button" style="margin-top:0; height: 38px; background-color: #111; border: 1px solid #FFD700; color: white;">Process Theme</button>
+        </div>
+      </div>
       <button type="submit" id="save-btn" class="btn-save-info">Save Info</button>
     </form>
     
@@ -368,7 +385,7 @@
       setTimeout(() => { toastMessage.style.display = 'none'; }, 3000);
     };
 
-    const populateForm = (data) => {
+  const populateForm = (data) => {
       if (!data) return;
       clientIdInput.value = data._id || '';
       const setValue = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
@@ -384,6 +401,15 @@
       setValue('businessWebsite', data.businessWebsite);
       setValue('portfolioWebsite', data.portfolioWebsite);
       setValue('locationMapUrl', data.locationMap);
+      
+      // THEME COLOR FIX: Load saved color and update preview
+      if (data.themeColor) {
+        const tc = document.getElementById('themeColor');
+        const cp = document.getElementById('colorPreview');
+        tc.value = data.themeColor;
+        cp.style.backgroundColor = data.themeColor;
+      }
+
       if (data.photoUrl) {
         photoUrlInput.value = data.photoUrl;
         photoPreview.src = data.photoUrl;
@@ -432,7 +458,7 @@
       }
     };
 
-    const handleFormSubmission = async (e) => {
+   const handleFormSubmission = async (e) => {
       e.preventDefault();
       if (isSaving) return;
       isSaving = true;
@@ -445,6 +471,9 @@
         if (v && k !== 'photoFile' && k !== 'clientId') payload[k] = v.trim();
       }
       
+      // THEME COLOR FIX: Ensure themeColor is explicitly added to payload
+      payload.themeColor = document.getElementById('themeColor').value;
+
       if (payload.companyName) { payload.company = payload.companyName; delete payload.companyName; }
       if (payload.locationMapUrl) { payload.locationMap = payload.locationMapUrl; delete payload.locationMapUrl; }
       ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(k => { if(payload[k]) payload.workingHours[k] = payload[k]; delete payload[k]; });
@@ -462,9 +491,9 @@
         showToast('Saved!');
         const newId = json.data?._id || json._id;
         if (!id && newId) {
-             clientIdInput.value = newId;
-             window.history.pushState(null, '', `?id=${newId}`);
-             viewPdfBtn.disabled = createVcardBtn.disabled = false;
+              clientIdInput.value = newId;
+              window.history.pushState(null, '', `?id=${newId}`);
+              viewPdfBtn.disabled = createVcardBtn.disabled = false;
         }
       } catch (e) { showToast(e.message, true); }
       finally { isSaving = false; saveBtn.innerHTML = 'Save Info'; saveBtn.disabled = false; }
@@ -565,6 +594,31 @@
       else { viewPdfBtn.disabled = createVcardBtn.disabled = true; } 
     });
     
+// PROCESS THEME BUTTON LOGIC
+    const themeColorInput = document.getElementById('themeColor');
+    const colorPreview = document.getElementById('colorPreview');
+    const processThemeBtn = document.getElementById('processThemeBtn');
+
+    themeColorInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if(/^#[0-9A-F]{6}$/i.test(val)) {
+        colorPreview.style.backgroundColor = val;
+      }
+    });
+
+    processThemeBtn.addEventListener('click', () => {
+      const hex = themeColorInput.value;
+      if(/^#[0-9A-F]{6}$/i.test(hex)) {
+        showToast(`Theme ${hex} applied! Click 'Save Info' to finish.`);
+        processThemeBtn.style.borderColor = "#22c55e";
+        processThemeBtn.style.color = "#22c55e";
+        processThemeBtn.textContent = "Ready ✓";
+        colorPreview.style.backgroundColor = hex;
+      } else {
+        showToast("Invalid Hex Code (e.g., #50c878)", true);
+      }
+    });
+
     photoUploadInput.addEventListener('change', (e) => { if (e.target.files[0]) uploadPhoto(e.target.files[0]); });
     form.addEventListener('submit', handleFormSubmission);
     viewPdfBtn.addEventListener('click', handleViewPdfClick);
@@ -576,6 +630,6 @@
     resetCopyStateBtn.addEventListener('click', handleResetCopyState);
 
   })();
-</script src="/js/adminForm.js"></script>
+</script>
 </body>
 </html>
