@@ -386,56 +386,76 @@
       setTimeout(() => { toastMessage.style.display = 'none'; }, 3000);
     };
 
-  const populateForm = (data) => {
+    const populateForm = (data) => {
       if (!data) return;
-      clientIdInput.value = data._id || '';
+      const client = data.data || data; // Handle both nested and flat responses
+      clientIdInput.value = client._id || '';
       const setValue = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-      setValue('fullName', data.fullName);
-      setValue('title', data.title);
-      setValue('phone1', data.phone1);
-      setValue('phone2', data.phone2);
-      setValue('phone3', data.phone3);
-      setValue('email1', data.email1);
-      setValue('email2', data.email2);
-      setValue('email3', data.email3); setValue('appointmentUrl', data.appointmentUrl);
-      setValue('companyName', data.company);
-      setValue('businessWebsite', data.businessWebsite);
-      setValue('portfolioWebsite', data.portfolioWebsite);
-      setValue('locationMapUrl', data.locationMap);
       
-      // THEME COLOR FIX: Load saved color and update preview
-      if (data.themeColor) {
-        const tc = document.getElementById('themeColor');
-        const cp = document.getElementById('colorPreview');
-        tc.value = data.themeColor;
-        cp.style.backgroundColor = data.themeColor;
+      setValue('fullName', client.fullName);
+      setValue('title', client.title);
+      setValue('phone1', client.phone1);
+      setValue('phone2', client.phone2);
+      setValue('phone3', client.phone3);
+      setValue('email1', client.email1);
+      setValue('email2', client.email2);
+      setValue('email3', client.email3);
+      
+      // Smart Booking URL Logic: If empty, generate a Google Calendar link
+      if (client.appointmentUrl) {
+          setValue('appointmentUrl', client.appointmentUrl);
+      } else if (client.email1) {
+          const autoUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&add=${encodeURIComponent(client.email1)}`;
+          setValue('appointmentUrl', autoUrl);
       }
 
-      if (data.photoUrl) {
-        photoUrlInput.value = data.photoUrl;
-        photoPreview.src = data.photoUrl;
-        photoPreviewContainer.style.display = 'block';
-        photoUploadLabel.textContent = 'Photo Uploaded';
-        photoUploadLabel.style.backgroundColor = '#22c55e';
+      setValue('companyName', client.company || client.companyName);
+      setValue('businessWebsite', client.businessWebsite);
+      setValue('portfolioWebsite', client.portfolioWebsite);
+      setValue('locationMapUrl', client.locationMap || client.locationMapUrl);
+      setValue('bio', client.bio);
+      setValue('address', client.address);
+
+      // Theme Sync
+      if (client.themeColor) {
+          document.getElementById('themeColor').value = client.themeColor;
+          document.getElementById('colorPreview').style.backgroundColor = client.themeColor;
       }
-      if (data.workingHours) {
-        ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(d => setValue(d, data.workingHours[d]));
+      
+      if (client.photoUrl) {
+          photoUrlInput.value = client.photoUrl;
+          photoPreview.src = client.photoUrl;
+          photoPreviewContainer.style.display = 'block';
+          photoUploadLabel.textContent = 'Photo Uploaded';
+          photoUploadLabel.style.backgroundColor = '#22c55e';
       }
-      if (data.socialLinks) {
-        ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(p => setValue(p, data.socialLinks[p]));
+      if (client.workingHours) {
+          ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(d => setValue(d, client.workingHours[d]));
       }
-      setValue('bio', data.bio);
-      setValue('address', data.address);
+      if (client.socialLinks) {
+          ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(p => setValue(p, client.socialLinks[p]));
+      }
+      
+      // Load vCard URL if it exists
+      if (client.vcardUrl) vcardUrlDisplay.value = client.vcardUrl;
     };
 
-    const fetchClientData = async (id) => {
+        const fetchClientData = async (id) => {
       try {
         const response = await fetch(`${API_URL}/clients/${id}`);
-        if (!response.ok) throw new Error('Client lookup failed');
         const json = await response.json();
-        if (json.status !== 'success') throw new Error(json.message);
-        populateForm(json.data || json);
-      } catch (e) { showToast(`Error: ${e.message}`, true); }
+        if (!response.ok) throw new Error(json.message || 'Client lookup failed');
+        
+        // High Intelligence Mapping: Extract the nested data object
+        const clientData = json.data || json; 
+        populateForm(clientData);
+        
+        showToast('Data Loaded Successfully');
+      } catch (e) { 
+        showToast(`Error: ${e.message}`, true); 
+        console.error("Fetch Error:", e);
+      }
+    };
     };
 
     const uploadPhoto = async (file) => {
@@ -492,14 +512,19 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
-        if (!res.ok || json.status !== 'success') throw new Error(json.message || 'Save failed');
-        showToast('Saved!');
-        const newId = json.data?._id || json._id;
+                const json = await res.json();
+        if (!res.ok || (json.status !== 'success' && !json._id)) throw new Error(json.message || 'Save failed');
+        showToast('Saved Successfully!');
+        
+        const savedData = json.data || json;
+        const newId = savedData._id;
+        
         if (!id && newId) {
-              clientIdInput.value = newId;
-              window.history.pushState(null, '', `?id=${newId}`);
-              viewPdfBtn.disabled = createVcardBtn.disabled = false;
+            clientIdInput.value = newId;
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('id', newId);
+            window.history.pushState({}, '', newUrl);
+            viewPdfBtn.disabled = createVcardBtn.disabled = false;
         }
       } catch (e) { showToast(e.message, true); }
       finally { isSaving = false; saveBtn.innerHTML = 'Save Info'; saveBtn.disabled = false; }
@@ -639,6 +664,10 @@
 </script>
 </body>
 </html>
+
+
+
+
 
 
 
