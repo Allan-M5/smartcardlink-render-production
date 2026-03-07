@@ -402,3 +402,53 @@ SmartCardLink Admin`
         textInput.addEventListener('input', (e) => picker.value = e.target.value);
     }
 })();
+
+
+document.addEventListener('DOMContentLoaded',async()=>{
+
+const params=new URLSearchParams(window.location.search);
+const id=params.get('id');
+
+if(!id) return;
+
+try{
+
+const res=await fetch('/api/clients/'+id);
+const json=await res.json();
+
+if(!json.success) return;
+
+const client=json.data;
+
+Object.keys(client).forEach(key=>{
+ const field=document.querySelector('[name="'+key+'"]');
+ if(field) field.value=client[key];
+});
+
+}catch(err){
+
+console.error('Client load failed',err);
+
+}
+
+});
+
+const processBtn=document.getElementById('processThemeBtn');
+const themeInput=document.getElementById('themeColor');
+
+if(processBtn){
+
+processBtn.addEventListener('click',()=>{
+
+const hex=themeInput.value.trim();
+
+if(!/^#([0-9A-Fa-f]{6})$/.test(hex)){
+ alert('Invalid Hex Color');
+ return;
+}
+
+document.documentElement.style.setProperty('--theme-color',hex);
+
+});
+
+}

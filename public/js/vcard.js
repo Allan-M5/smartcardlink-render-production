@@ -149,7 +149,14 @@
         bind(actions.wa, () => window.open(`https://wa.me/${phone.replace(/\D/g,'')}`, '_blank'), phone);
         
         bind(actions.save, () => {
-            const vcf = `BEGIN:VCARD\nVERSION:3.0\nFN:${client.fullName}\nTEL;TYPE=CELL:${client.phone1}\nEMAIL:${client.email1}\nORG:${client.company || ""}\nTITLE:${client.title || ""}\nEND:VCARD`;
+            const vcf = `BEGIN:VCARD
+VERSION:3.0
+FN:${client.fullName}
+TEL;TYPE=CELL:${client.phone1}
+EMAIL:${client.email1}
+ORG:${client.company || ""}
+TITLE:${client.title || ""}
+END:VCARD`;
             const blob = new Blob([vcf], { type: "text/vcard" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
@@ -185,3 +192,29 @@
 })();
 
 function showPopup(show) { popup2.hidden = !show; if(show){ popup2.removeAttribute('inert'); } else { popup2.setAttribute('inert', ''); } }
+
+
+let startX=0;
+
+const photo=document.getElementById('photoArea');
+
+if(photo){
+
+photo.addEventListener('touchstart',e=>{
+startX=e.touches[0].clientX;
+});
+
+photo.addEventListener('touchend',e=>{
+
+const endX=e.changedTouches[0].clientX;
+
+if(startX-endX>60)
+ document.getElementById('photoArea').style.display='block';
+
+if(endX-startX>60)
+ document.getElementById('photoArea').style.display='none';
+
+});
+
+}
+

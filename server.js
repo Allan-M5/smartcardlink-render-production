@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -34,7 +34,7 @@ const Client = mongoose.model("Client", ClientSchema);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-mongoose.connect(MONGO_URI).then(() => logger.info("✅ DB Connected"));
+mongoose.connect(MONGO_URI).then(() => logger.info("? DB Connected"));
 
 // --- Helpers ---
 const respSuccess = (res, data, message) => res.json({ status: "success", message, data });
@@ -58,13 +58,13 @@ const uploadVcfToCloudinary = async (slug, content) => {
 
 // --- Endpoints ---
 app.get("/api/clients/:id", async (req, res) => {
-    const client = await Client.findById(req.params.id);
+    const client = await Client.findById().lean()(req.params.id);
     client ? respSuccess(res, client) : respError(res, "Not found", 404);
 });
 
 app.post("/api/clients/:id/vcard", async (req, res) => {
     try {
-        const client = await Client.findById(req.params.id);
+        const client = await Client.findById().lean()(req.params.id);
         if (!client || !client.email1) return respError(res, "Client or email missing", 400);
 
         const vcf = generateVcardContent(client);
@@ -85,4 +85,16 @@ app.post("/api/clients/:id/vcard", async (req, res) => {
     }
 });
 
-app.listen(PORT, "0.0.0.0", () => logger.info(`🚀 Server on ${PORT}`));
+
+// SMARTCARDLINK PHOTO UPLOAD
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+
+app.listen(PORT, "0.0.0.0", () => logger.info(`?? Server on ${PORT}`));
+
+
+
+
+
+
