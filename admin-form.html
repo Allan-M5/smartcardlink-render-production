@@ -625,18 +625,14 @@
       emailClientBtn.textContent = 'Email Client';
     };
 
-        document.addEventListener('DOMContentLoaded', function () {
-  const urlParams = new URLSearchParams(window.location.search);
-  const id = urlParams.get('id');
-
-  if (id) {
-    clientIdInput.value = id;
-    fetchClientData(id);
-  } else {
-    viewPdfBtn.disabled = true;
-    createVcardBtn.disabled = true;
-  }
-});
+            document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('id');
+      if (id) {
+        clientIdInput.value = id;
+        fetchClientData(id);
+      }
+    });
     
 // PROCESS THEME BUTTON LOGIC
     const themeColorInput = document.getElementById('themeColor');
@@ -677,6 +673,7 @@
 </script>
 </body>
 </html>
+
 
 
 
