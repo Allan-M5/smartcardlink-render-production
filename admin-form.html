@@ -244,9 +244,6 @@
         <div><label for="email2">Email 2</label><input type="email" id="email2" name="email2" /></div>
       </div>
       <div><label for="email3">Email 3</label><input type="email" id="email3" name="email3" /></div>
-      \n      
-      
-
       <div class="input-group"><label for="appointmentUrl"><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" autocomplete="off" placeholder="Auto-generated from Email 1 if left blank"></div>
       <div class='section-header'>Business Details</div>
       <div class="grid-2col">
@@ -442,21 +439,25 @@
     };
 
         const fetchClientData = async (id) => {
-      try {
-        const response = await fetch(`${API_URL}/clients/${id}`);
-        const json = await response.json();
-        if (!response.ok) throw new Error(json.message || 'Client lookup failed');
-        
-        // High Intelligence Mapping: Extract the nested data object
-        const clientData = json.data || json; 
-        populateForm(clientData);
-        
-        showToast('Data Loaded Successfully');
-      } catch (e) { 
-        showToast(`Error: ${e.message}`, true); 
-        console.error("Fetch Error:", e);
-      }
-    };
+  try {
+    const res = await fetch(API_URL + "/clients/" + id);
+    const json = await res.json();
+
+    if (!res.ok) throw new Error("Client not found");
+
+    const client = json.data || json;
+
+    populateForm(client);
+
+    viewPdfBtn.disabled = false;
+    createVcardBtn.disabled = false;
+
+    showToast("Client Data Loaded");
+  } catch (e) {
+    console.error(e);
+    showToast("Load Failed", true);
+  }
+};
     };
 
     const uploadPhoto = async (file) => {
@@ -601,7 +602,7 @@
 
       try {
         const subject = encodeURIComponent('Your SmartCardLink vCard');
-        const body = encodeURIComponent(`Hi ${clientName},\n\nHere is your vCard URL: ${vcardUrl}\n\nYour physical card will be delivered after printing. Thank you for choosing our vCard services.\n\nBest regards,\nSmartCardLink Admin`);
+        const body = encodeURIComponent(`Hi ${clientName},Here is your vCard URL: ${vcardUrl}Your physical card will be delivered after printing. Thank you for choosing our vCard services.Best regards,SmartCardLink Admin`);
         
         // Final mailto logic including CC for admin
         window.location.href = `mailto:${clientEmail}?cc=${adminCC}&subject=${subject}&body=${body}`;
@@ -624,16 +625,18 @@
       emailClientBtn.textContent = 'Email Client';
     };
 
-        document.addEventListener('DOMContentLoaded', () => { 
-      const urlParams = new URLSearchParams(window.location.search);
-      const id = urlParams.get('id');
-      if (id) {
-        clientIdInput.value = id;
-        fetchClientData(id); 
-      } else { 
-        viewPdfBtn.disabled = createVcardBtn.disabled = true; 
-      } 
-    });
+        document.addEventListener('DOMContentLoaded', function () {
+  const urlParams = new URLSearchParams(window.location.search);
+  const id = urlParams.get('id');
+
+  if (id) {
+    clientIdInput.value = id;
+    fetchClientData(id);
+  } else {
+    viewPdfBtn.disabled = true;
+    createVcardBtn.disabled = true;
+  }
+});
     
 // PROCESS THEME BUTTON LOGIC
     const themeColorInput = document.getElementById('themeColor');
@@ -674,6 +677,7 @@
 </script>
 </body>
 </html>
+
 
 
 
