@@ -506,6 +506,9 @@
       ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(k => { if(payload[k]) payload.workingHours[k] = payload[k]; delete payload[k]; });
       ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(k => { const n = normalizeSocialLink(k, payload[k]); if(n) payload.socialLinks[k] = n; delete payload[k]; });
 
+            // Force Status to Processed on Save
+      payload.status = "Processed";
+      
       try {
         const id = clientIdInput.value;
         const res = await fetch(id ? `${API_URL}/clients/${id}` : `${API_URL}/clients`, {
@@ -671,6 +674,7 @@
 </script>
 </body>
 </html>
+
 
 
 
