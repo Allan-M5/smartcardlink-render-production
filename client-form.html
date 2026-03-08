@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -284,12 +284,13 @@
     formMessage.innerHTML = cleanMessage;
     formMessage.className = "form-message " + type;
     formMessage.style.display = "block";
-    formMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+    formMessage.scrollIntoView({ behavior: "auto", block: "center" });
   }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = form.querySelector("button[type=submit]");
+    formMessage.style.display = "none";
     
     // 1. Lock UI and show "Processing"
     btn.disabled = true;
