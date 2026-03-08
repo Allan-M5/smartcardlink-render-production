@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     'use strict';
     // SPEED FIX: Prefetch data immediately
     const params = new URLSearchParams(window.location.search);
@@ -188,7 +188,13 @@ END:VCARD`;
         if (buttons.back) buttons.back.onclick = () => { setHidden(popup2, true); setHidden(popup1, false); };
     }
 
-    document.addEventListener('DOMContentLoaded', init);
+    
+document.addEventListener('click',function(e){
+ const fs=document.querySelector('.photo-fullscreen');
+ if(!fs) return;
+ fs.remove();
+});
+document.addEventListener('DOMContentLoaded', init);
 })();
 
 function showPopup(show) { popup2.hidden = !show; if(show){ popup2.removeAttribute('inert'); } else { popup2.setAttribute('inert', ''); } }
