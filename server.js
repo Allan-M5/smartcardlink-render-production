@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -103,6 +103,9 @@ const ClientSchema = new mongoose.Schema({
     vcardAssetUrl: { type: String, default: '' },
     vcardUrl: { type: String, default: '' },
     qrCodeUrl: { type: String, default: '' },
+    vcardCreatedDate: { type: Date, default: null },
+    subscriptionLastPaidDate: { type: Date, default: null },
+    subscriptionRenewalNote: { type: String, trim: true, default: '' },
 
     socialLinks: { type: socialLinksSchema, default: () => ({}) },
     workingHours: { type: workingHoursSchema, default: () => ({}) },
@@ -131,7 +134,7 @@ const normalizeStatus = (value) => {
         pending: 'Pending',
         processed: 'Processed',
         active: 'Active',
-        disabled: 'Disabled',
+        disabled: 'Suspended',
         suspended: 'Suspended',
         deleted: 'Deleted',
     };
@@ -231,6 +234,9 @@ const mapClientForResponse = (clientDoc) => {
         vcardAssetUrl: client.vcardAssetUrl || '',
         vcardUrl: client.vcardUrl || '',
         qrCodeUrl: client.qrCodeUrl || '',
+        vcardCreatedDate: client.vcardCreatedDate || null,
+        subscriptionLastPaidDate: client.subscriptionLastPaidDate || null,
+        subscriptionRenewalNote: client.subscriptionRenewalNote || '',
         socialLinks: client.socialLinks || {},
         workingHours: client.workingHours || {},
         history: Array.isArray(client.history) ? client.history : [],
@@ -660,13 +666,32 @@ app.put('/api/clients/:id/status/:newStatus', publicLimiter, async (req, res) =>
         const notes = String(req.body && req.body.notes || '').trim();
         if (!notes) return respError(res, 'A reason is required for this action.', 400);
 
-        const nextStatus = normalizeStatus(req.params.newStatus);
+        const requestedStatus = String(req.params.newStatus || '').trim().toLowerCase();
+        const nextStatus = normalizeStatus(requestedStatus);
+        const now = new Date();
+
+        if (nextStatus === 'Deleted') {
+            return respError(res, 'Delete is not allowed through this status route.', 400);
+        }
+
         client.status = nextStatus;
+
+        if (nextStatus === 'Active') {
+            client.vcardCreatedDate = now;
+            client.subscriptionLastPaidDate = now;
+            client.subscriptionRenewalNote = notes;
+        }
+
+        if (nextStatus === 'Suspended') {
+            client.subscriptionRenewalNote = notes;
+        }
+
         client.history.push({
             action: 'STATUS_CHANGE',
             actor: 'admin',
             notes: 'Status changed to ' + nextStatus + '. Reason: ' + notes,
         });
+
         await client.save();
 
         return respSuccess(res, mapClientForResponse(client), 'Client status updated successfully.');
@@ -716,6 +741,15 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
         client.vcardUrl = publicUrl;
         client.qrCodeUrl = qrCodeData;
         client.status = 'Active';
+        if (!client.vcardCreatedDate) {
+            client.vcardCreatedDate = new Date();
+        }
+        if (!client.subscriptionLastPaidDate) {
+            client.subscriptionLastPaidDate = new Date();
+        }
+        if (!client.subscriptionRenewalNote) {
+            client.subscriptionRenewalNote = 'Initial vCard activation';
+        }
         client.appointmentUrl = buildAppointmentUrl(client.email1, client.appointmentUrl);
         client.history.push({
             action: 'VCARD_DEPLOYMENT',
@@ -770,3 +804,4 @@ app.get('*', (req, res) => {
 app.listen(PORT, HOST, () => {
     logger.info('Server on ' + PORT);
 });
+

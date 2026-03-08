@@ -1,479 +1,1128 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SmartCardLink | Client Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
-  
+
     <style>
         :root {
             --primary: #FFD700;
-            --text-main: #e2e8f0;
-            --bg-dark: #111;
-            --card-bg: #1a1a1a;
-            --border: #333;
-            --success: #38a169;
-            --danger: #e53e3e;
-            --pending: #d69e2e;
-            --processed: #4299e1;
-            --deleted: #4a5568;
+            --text-main: #f1f5f9;
+            --text-soft: #94a3b8;
+            --bg-dark: rgba(10, 10, 10, 0.84);
+            --border: rgba(255, 255, 255, 0.08);
+            --shadow: 0 20px 55px rgba(0, 0, 0, 0.5);
+            --radius-lg: 1.25rem;
+            --radius-md: 0.9rem;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --info: #2563eb;
+            --deleted: #64748b;
         }
 
-        body {
-            font-family: 'Inter', sans-serif;
+        * { box-sizing: border-box; }
+
+        html, body {
             margin: 0;
-            padding: 2rem 1rem;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
             color: var(--text-main);
-            background: black;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            background: #000;
             min-height: 100vh;
         }
 
+        body {
+            position: relative;
+            padding: 26px 16px 36px;
+            background: #000;
+        }
+
         #bg-video {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            min-width: 100%;
-            min-height: 100%;
-            z-index: -100;
-            filter: brightness(0.4) saturate(1.2);
-            object-fit: cover;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: -2;
+    opacity: 1;
+    filter: brightness(0.65) saturate(1.05);
+    pointer-events: none;
+}
+
+        .bg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(circle at top left, rgba(255,215,0,0.06), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(255,215,0,0.04), transparent 30%),
+        linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.25));
+    pointer-events: none;
+}
+
+        .dashboard-shell {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            animation: fadeUp 0.5s ease;
         }
 
         .dashboard-card {
-            background-color: var(--bg-dark);
-            border-radius: 1rem;
-            padding: 2rem;
-            width: 100%;
-            max-width: 1200px;
-            border: 1px solid var(--border);
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
-            animation: fadeIn 0.8s ease-out;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(15,15,15,0.75);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+    overflow: hidden;
+}
+
+        .dashboard-header {
+            padding: 28px 28px 18px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255,215,0,0.06), rgba(255,215,0,0.01));
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        h1.title {
-            color: var(--primary);
-            font-size: 1.75rem;
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .controls-container {
+        .title-row {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: 16px;
+            flex-wrap: wrap;
+            text-align: center;
         }
 
-        .search-container {
-            display: flex;
-            gap: 0.5rem;
-            flex-grow: 1;
-            max-width: 400px;
+        .title-wrap {
+            width: 100%;
+            text-align: center;
         }
 
-        input, select, textarea { 
-            flex-grow: 1;
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            border: 1px solid #555;
-            background-color: #222;
-            color: white;
-            transition: border-color 0.3s;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
-        }
-
-        .button-group { display: flex; gap: 0.5rem; }
-
-        button { 
-            padding: 0.75rem 1.2rem;
-            border-radius: 0.375rem;
-            border: 1px solid var(--primary);
-            background-color: var(--card-bg);
+        .title-wrap h1 {
+            margin: 0;
+            font-size: 1.7rem;
+            font-weight: 800;
             color: var(--primary);
+            letter-spacing: 0.2px;
+        }
+
+        .title-wrap p {
+            margin: 8px 0 0;
+            color: var(--text-soft);
+            font-size: 0.96rem;
+            line-height: 1.5;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border: 1px solid rgba(22, 163, 74, 0.35);
+            border-radius: 999px;
+            background: rgba(22, 163, 74, 0.12);
+            color: #bbf7d0;
+            font-size: 0.88rem;
             font-weight: 700;
-            cursor: pointer;
-            transition: 0.3s;
             white-space: nowrap;
         }
 
-        button:hover {
-            background-color: var(--primary);
-            color: #000;
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse 1.6s infinite;
         }
 
-        .table-container {
-            overflow-x: auto;
-            border-radius: 0.5rem;
-            margin-top: 1rem;
+        .top-stats {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px;
+            padding: 20px 28px 8px;
         }
+
+        .stat-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+        }
+
+        .stat-label {
+            color: var(--text-soft);
+            font-size: 0.82rem;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .dashboard-body {
+            padding: 22px 28px 28px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .toolbar-left,
+        .toolbar-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .input-wrap,
+        .select-wrap {
+            position: relative;
+        }
+
+        .input-wrap i,
+        .select-wrap i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7c8798;
+            pointer-events: none;
+        }
+
+        .input-wrap input,
+        .select-wrap select {
+            min-height: 46px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.11);
+            background: rgba(18, 18, 18, 0.95);
+            color: #fff;
+            padding: 0 14px 0 40px;
+            outline: none;
+            font-size: 0.94rem;
+            transition: 0.2s ease;
+        }
+
+        .input-wrap input { width: 320px; }
+
+        .select-wrap select {
+            min-width: 180px;
+            appearance: none;
+            cursor: pointer;
+            padding-right: 40px;
+        }
+
+        .btn {
+            min-height: 46px;
+            border: 1px solid rgba(255, 215, 0, 0.38);
+            border-radius: 12px;
+            padding: 0 16px;
+            background: rgba(255, 215, 0, 0.08);
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.92rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            transition: 0.2s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255, 215, 0, 0.18);
+            transform: translateY(-1px);
+        }
+
+        .btn.secondary {
+            border-color: rgba(255,255,255,0.11);
+            color: #fff;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .refresh-note {
+            color: var(--text-soft);
+            font-size: 0.83rem;
+        }
+
+        .table-shell {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: rgba(12, 12, 12, 0.7);
+        }
+
+        .table-wrap { overflow-x: auto; }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 900px;
+            min-width: 1180px;
         }
 
-        th, td {
-            padding: 1rem;
+        thead th {
+            background: rgba(255,255,255,0.04);
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-size: 0.78rem;
+            font-weight: 800;
+            padding: 14px;
             text-align: left;
             border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
 
-        th {
-            background-color: #222;
-            color: var(--primary);
-            font-size: 0.85rem;
-            text-transform: uppercase;
+        tbody td {
+            padding: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.92rem;
+            vertical-align: middle;
+            background: rgba(255,255,255,0.015);
         }
 
-        td {
-            background-color: var(--card-bg);
-            font-size: 0.9rem;
+        .client-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 220px;
         }
 
-        tbody tr:hover { background-color: #252525; }
+        .client-photo {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.12);
+            background: #111;
+            flex-shrink: 0;
+        }
 
-        .row-success {
-            background-color: rgba(56, 161, 105, 0.2) !important;
-            transition: background-color 0.5s;
+        .client-name {
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .client-sub {
+            margin-top: 4px;
+            font-size: 0.82rem;
+            color: var(--text-soft);
         }
 
         .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            border: 1px solid transparent;
         }
 
-        .status-Pending { background-color: var(--pending); } 
-        .status-Processed { background-color: var(--processed); } 
-        .status-Active { background-color: var(--success); } 
-        .status-Disabled { background-color: var(--danger); } 
-        .status-Deleted { background-color: var(--deleted); }
+        .status-active { color: #bbf7d0; background: rgba(22, 163, 74, 0.16); border-color: rgba(22, 163, 74, 0.28); }
+        .status-pending { color: #fde68a; background: rgba(217, 119, 6, 0.16); border-color: rgba(217, 119, 6, 0.28); }
+        .status-suspended { color: #fecaca; background: rgba(220, 38, 38, 0.16); border-color: rgba(220, 38, 38, 0.28); }
+        .status-deleted { color: #cbd5e1; background: rgba(100, 116, 139, 0.16); border-color: rgba(100, 116, 139, 0.28); }
 
-        .client-photo {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #444;
+        .countdown-good { color: #86efac; font-weight: 700; }
+        .countdown-warning { color: #fde68a; font-weight: 700; }
+        .countdown-expired { color: #fca5a5; font-weight: 800; }
+
+        .muted { color: var(--text-soft); font-size: 0.83rem; }
+
+        .menu-wrap { position: relative; display: inline-block; }
+
+        .menu-btn {
+            min-width: 46px;
+            min-height: 42px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            cursor: pointer;
         }
 
-        /* Modals & Toasts */
-        .modal {
+        .action-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 230px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.09);
+            background: rgba(18, 18, 18, 0.98);
+            box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+            overflow: hidden;
             display: none;
+            z-index: 30;
+        }
+
+        .action-menu.show { display: block; }
+
+        .action-menu button {
+            width: 100%;
+            border: none;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: transparent;
+            color: #fff;
+            text-align: left;
+            padding: 13px 14px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .loading-panel,
+        .empty-panel {
+            padding: 38px 16px;
+            text-align: center;
+            color: var(--text-soft);
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(255,255,255,0.14);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            margin: 0 auto 14px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .modal {
             position: fixed;
             inset: 0;
-            z-index: 1000;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.78);
             backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 100;
         }
 
-        .modal-content {
-            background: var(--card-bg);
-            margin: 10vh auto;
-            padding: 2rem;
-            width: 90%;
-            max-width: 450px;
-            border-radius: 0.75rem;
-            border: 1px solid var(--border);
+        .modal.show { display: flex; }
+
+        .modal-card {
+            width: 100%;
+            max-width: 520px;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(18, 18, 18, 0.98);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+            overflow: hidden;
+        }
+
+        .modal-header { padding: 20px 22px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .modal-header h2 { margin: 0; color: var(--primary); font-size: 1.15rem; }
+        .modal-header p { margin: 8px 0 0; color: var(--text-soft); font-size: 0.9rem; line-height: 1.45; }
+        .modal-body { padding: 18px 22px 22px; }
+        .modal-body textarea {
+            width: 100%;
+            min-height: 120px;
+            resize: vertical;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            color: #fff;
+            padding: 14px;
+            font: inherit;
+            outline: none;
+        }
+
+        .modal-actions {
             display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 16px;
+            flex-wrap: wrap;
         }
 
         .toast-container {
             position: fixed;
-            top: 1.5rem;
-            right: 1.5rem;
-            z-index: 9999;
+            top: 18px;
+            right: 18px;
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 12px;
+            z-index: 300;
         }
 
         .toast {
-            min-width: 280px;
-            padding: 1rem;
-            border-radius: 0.5rem;
+            min-width: 290px;
+            max-width: 380px;
+            border-radius: 14px;
+            padding: 14px 16px;
             color: white;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            box-shadow: 0 14px 32px rgba(0,0,0,0.35);
+            transform: translateX(40px);
             opacity: 0;
-            transform: translateX(50px);
-            transition: 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            transition: 0.22s ease;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(20,20,20,0.95);
         }
 
-        .toast.show { opacity: 1; transform: translateX(0); }
-        .toast.success { background: #059669; }
-        .toast.error { background: #dc2626; }
-
-        .loading-spinner {
-            border: 3px solid #333;
-            border-top: 3px solid var(--primary);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 0.8s linear infinite;
-        }
+        .toast.show { transform: translateX(0); opacity: 1; }
+        .toast.success { border-left: 4px solid #16a34a; }
+        .toast.error { border-left: 4px solid #dc2626; }
+        .toast.info { border-left: 4px solid #2563eb; }
 
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 9px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 1200px) {
+            .top-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
 
         @media (max-width: 768px) {
-            .controls-container { flex-direction: column; }
-            .search-container { max-width: 100%; }
-            .button-group { width: 100%; }
-            .button-group button { flex: 1; }
+            body { padding: 16px 10px 24px; }
+            .dashboard-header, .dashboard-body { padding-left: 16px; padding-right: 16px; }
+            .top-stats { grid-template-columns: 1fr; padding-left: 16px; padding-right: 16px; }
+            .input-wrap input, .select-wrap select, .btn { width: 100%; }
+            .toolbar-left, .toolbar-right { width: 100%; }
         }
-    </style>
+    
+        /* FINAL VISIBILITY OVERRIDES */
+        #bg-video {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: cover !important;
+            z-index: 0 !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: block !important;
+            filter: brightness(0.72) saturate(1.08) !important;
+            pointer-events: none !important;
+            background: #000 !important;
+        }
+
+        .bg-overlay {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 1 !important;
+            background:
+                radial-gradient(circle at top left, rgba(255,215,0,0.04), transparent 35%),
+                radial-gradient(circle at bottom right, rgba(255,215,0,0.03), transparent 30%),
+                linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.18)) !important;
+            pointer-events: none !important;
+        }
+
+        .dashboard-shell {
+            position: relative !important;
+            z-index: 2 !important;
+        }
+
+        .dashboard-card {
+            background: rgba(15,15,15,0.62) !important;
+            backdrop-filter: blur(6px) !important;
+            border: 1.5px solid rgba(255, 215, 0, 0.42) !important;
+            box-shadow:
+                0 0 0 1px rgba(255, 215, 0, 0.12),
+                0 24px 60px rgba(0,0,0,0.55) !important;
+        }
+
+</style>
 </head>
 <body>
-
-    <video autoplay muted loop playsinline id="bg-video">
-        <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+    <video autoplay muted loop playsinline webkit-playsinline preload="auto" id="bg-video" poster="https://res.cloudinary.com/dicvwaud3/video/upload/so_0/oyvgam7oizwizgwxaxge.jpg" aria-hidden="true">
+        <source src="https://res.cloudinary.com/dicvwaud3/video/upload/f_mp4,q_auto:good,vc_auto/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
     </video>
+    <div class="bg-overlay"></div>
 
-    <div class="dashboard-card">
-        <h1 class="title">SmartCardLink Client Dashboard</h1>
+    <div class="dashboard-shell">
+        <div class="dashboard-card">
+            <div class="dashboard-header">
+                <div class="title-row">
+                    <div class="title-wrap">
+                        <h1>SmartCardLink Client Dashboard</h1>
+                        <p>Live client subscription control panel for viewing status, remaining validity days, and managing renewals or suspension.</p>
+                    </div>
 
-        <div class="controls-container">
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search name, phone, email..." />
-                <button id="searchBtn"><i class="fas fa-search"></i></button>
+                    <div class="live-badge" id="liveRefreshBadge">
+                        <span class="live-dot"></span>
+                        <span>Live Auto Refresh Active</span>
+                    </div>
+                </div>
             </div>
-            <div class="button-group">
-                <select id="statusFilter">
-                    <option value="">All Statuses</option>
-                    <option value="Active">Active</option>
-                    <option value="Disabled">Disabled</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Processed">Processed</option>
-                    <option value="Deleted">Deleted</option>
-                </select>
-                <button id="exportBtn" title="Export CSV"><i class="fas fa-file-export"></i></button>
-                <button id="resetBtn" title="Reset Filters"><i class="fas fa-undo"></i></button>
+
+            <div class="top-stats">
+                <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-value" id="statTotal">0</div></div>
+                <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" id="statActive">0</div></div>
+                <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value" id="statPending">0</div></div>
+                <div class="stat-card"><div class="stat-label">Suspended</div><div class="stat-value" id="statSuspended">0</div></div>
+                <div class="stat-card"><div class="stat-label">Deleted</div><div class="stat-value" id="statDeleted">0</div></div>
+            </div>
+
+            <div class="dashboard-body">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <div class="input-wrap">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchInput" placeholder="Search name, company, email, phone, slug..." />
+                        </div>
+
+                        <div class="select-wrap">
+                            <i class="fas fa-filter"></i>
+                            <select id="statusFilter">
+                                <option value="">All Statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Suspended">Suspended</option>
+                                <option value="Deleted">Deleted</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-right">
+                        <button class="btn secondary" id="refreshBtn"><i class="fas fa-rotate-right"></i><span>Refresh Now</span></button>
+                        <button class="btn secondary" id="resetBtn"><i class="fas fa-rotate-left"></i><span>Reset</span></button>
+                        <button class="btn" id="exportBtn"><i class="fas fa-file-export"></i><span>Export CSV</span></button>
+                    </div>
+                </div>
+
+                <div class="refresh-note" id="refreshNote">Last sync: --</div>
+
+                <div class="table-shell" style="margin-top: 14px;">
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Company</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Created Date</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Remaining</th>
+                                    <th>Status</th>
+                                    <th>Subscription</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="loading-panel" id="loadingPanel">
+                        <div class="loading-spinner"></div>
+                        <div>Syncing clients from database...</div>
+                    </div>
+
+                    <div class="empty-panel" id="emptyPanel">
+                        No matching client records found.
+                    </div>
+                </div>
             </div>
         </div>
-        
-        <div id="totals" style="text-align: center; color: var(--primary); font-size: 0.9rem; margin-bottom: 1rem; display: none;"></div>
-        
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Photo</th>
-                        <th>Name</th>
-                        <th>Company</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Created</th>
-                        <th>Duration</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="clientTableBody"></tbody>
-            </table>
-        </div>
-        
-        <div id="loadingMessage" style="display: none; text-align: center; padding: 3rem;">
-            <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
-            <p>Syncing with database...</p>
-        </div>
-        <div id="noResults" style="display: none; text-align: center; padding: 3rem; color: #666;">No records found.</div>
     </div>
-  
-    <div id="notesModal" class="modal">
-        <div class="modal-content">
-            <h2 id="modalTitle" style="margin: 0; font-size: 1.25rem; color: var(--primary);">Reason for Action</h2>
-            <textarea id="modalTextarea" placeholder="Provide audit reason..."></textarea>
-            <div style="display: flex; gap: 0.5rem;">
-                <button id="modalConfirmBtn" style="flex: 2; background: var(--primary); color: #000;">Confirm</button>
-                <button id="modalCloseBtn" style="flex: 1; border-color: #555;">Cancel</button>
+
+    <div class="modal" id="actionModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="modalTitle">Confirm Action</h2>
+                <p id="modalSubtext">Please review and confirm this client account action.</p>
+            </div>
+            <div class="modal-body">
+                <label for="actionReason">Admin Note</label>
+                <textarea id="actionReason" placeholder="Enter payment confirmation or reason for suspension..."></textarea>
+
+                <div class="modal-actions">
+                    <button class="btn secondary" id="modalCancelBtn">Cancel</button>
+                    <button class="btn" id="modalConfirmBtn">Confirm Action</button>
+                </div>
             </div>
         </div>
     </div>
-  
-    <div class="toast-container" id="toast-container"></div>
+
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
-        const API_BASE_URL = "https://smartcardlink-api.onrender.com"; 
-        let allClientData = [];
+        const API_BASE_URL = "https://smartcardlink-api.onrender.com";
+        const CLIENTS_ENDPOINT = `${API_BASE_URL}/api/admin/clients`;
+        const SUBSCRIPTION_UPDATE_ENDPOINT = (id, nextStatus) => `${API_BASE_URL}/api/clients/${id}/status/${encodeURIComponent(nextStatus)}`;
+        const REFRESH_INTERVAL_MS = 20000;
 
-        const elements = {
-            table: document.getElementById('clientTableBody'),
-            search: document.getElementById('searchInput'),
-            filter: document.getElementById('statusFilter'),
-            loader: document.getElementById('loadingMessage'),
-            empty: document.getElementById('noResults'),
-            totals: document.getElementById('totals'),
-            modal: document.getElementById('notesModal'),
-            modalText: document.getElementById('modalTextarea'),
-            modalConfirm: document.getElementById('modalConfirmBtn'),
-            toastBox: document.getElementById('toast-container')
+        let allClientData = [];
+        let refreshTimer = null;
+        let modalState = { clientId: null, action: null, clientName: "" };
+
+        const el = {
+            tableBody: document.getElementById("clientTableBody"),
+            loadingPanel: document.getElementById("loadingPanel"),
+            emptyPanel: document.getElementById("emptyPanel"),
+            searchInput: document.getElementById("searchInput"),
+            statusFilter: document.getElementById("statusFilter"),
+            refreshBtn: document.getElementById("refreshBtn"),
+            resetBtn: document.getElementById("resetBtn"),
+            exportBtn: document.getElementById("exportBtn"),
+            refreshNote: document.getElementById("refreshNote"),
+            liveRefreshBadge: document.getElementById("liveRefreshBadge"),
+            statTotal: document.getElementById("statTotal"),
+            statActive: document.getElementById("statActive"),
+            statPending: document.getElementById("statPending"),
+            statSuspended: document.getElementById("statSuspended"),
+            statDeleted: document.getElementById("statDeleted"),
+            actionModal: document.getElementById("actionModal"),
+            modalTitle: document.getElementById("modalTitle"),
+            modalSubtext: document.getElementById("modalSubtext"),
+            actionReason: document.getElementById("actionReason"),
+            modalCancelBtn: document.getElementById("modalCancelBtn"),
+            modalConfirmBtn: document.getElementById("modalConfirmBtn"),
+            toastContainer: document.getElementById("toastContainer")
         };
 
-        function showToast(msg, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `<span>${msg}</span>`;
-            elements.toastBox.prepend(toast);
-            setTimeout(() => toast.classList.add('show'), 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 5000);
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
-        const getStatusBadge = (s) => {
-            const label = s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : 'Pending';
-            return `<span class="status-badge status-${label}">${label}</span>`;
-        };
+        function showToast(title, message, type = "success") {
+            const toast = document.createElement("div");
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<div><strong>${escapeHtml(title)}</strong><div>${escapeHtml(message)}</div></div>`;
+            el.toastContainer.prepend(toast);
+            requestAnimationFrame(() => toast.classList.add("show"));
+            setTimeout(() => {
+                toast.classList.remove("show");
+                setTimeout(() => toast.remove(), 250);
+            }, 4200);
+        }
 
-        const calculateMonths = (date) => {
-            if (!date) return 'N/A';
-            const d = new Date(date), n = new Date();
-            let m = (n.getFullYear() - d.getFullYear()) * 12 + (n.getMonth() - d.getMonth());
-            if (n.getDate() < d.getDate()) m--;
-            return `${Math.max(0, m)} months`;
-        };
+        function normalizeStatus(rawStatus) {
+            const value = String(rawStatus || "").trim().toLowerCase();
+            if (value === "active") return "Active";
+            if (value === "pending") return "Pending";
+            if (value === "suspended" || value === "disabled") return "Suspended";
+            if (value === "deleted") return "Deleted";
+            return "Pending";
+        }
 
-        async function fetchClients() {
-            elements.loader.style.display = 'block';
-            elements.table.innerHTML = '';
+        function maskEmail(email) {
+            const value = String(email || "").trim();
+            if (!value || !value.includes("@")) return "-";
+            const parts = value.split("@");
+            const name = parts[0];
+            const domain = parts[1] || "";
+            if (name.length <= 2) return name.charAt(0) + "***@" + domain;
+            return name.slice(0, 2) + "***@" + domain;
+        }
+
+        function maskPhone(phone) {
+            const value = String(phone || "").trim();
+            if (!value) return "-";
+            const compact = value.replace(/\s+/g, "");
+            if (compact.length <= 4) return "****";
+            return compact.slice(0, 4) + " **** " + compact.slice(-2);
+        }
+
+        function addOneYear(dateObj) {
+            const newDate = new Date(dateObj);
+            newDate.setFullYear(newDate.getFullYear() + 1);
+            return newDate;
+        }
+
+        function formatDate(dateInput) {
+            if (!dateInput) return "-";
+            const date = new Date(dateInput);
+            if (Number.isNaN(date.getTime())) return "-";
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, "0");
+            const d = String(date.getDate()).padStart(2, "0");
+            return `${y}-${m}-${d}`;
+        }
+
+        function formatDateTime(dateInput) {
+            if (!dateInput) return "--";
+            const date = new Date(dateInput);
+            if (Number.isNaN(date.getTime())) return "--";
+            return date.toLocaleString("en-KE", {
+                year: "numeric",
+                month: "short",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit"
+            });
+        }
+
+        function getCreatedDate(client) {
+            return client.vcardCreatedDate || client.createdAt || client.updatedAt || null;
+        }
+
+        function getExpiryData(client) {
+            const createdRaw = getCreatedDate(client);
+            if (!createdRaw) return { createdDate: null, expiryDate: null, daysRemaining: null, isExpired: false };
+
+            const createdDate = new Date(createdRaw);
+            if (Number.isNaN(createdDate.getTime())) return { createdDate: null, expiryDate: null, daysRemaining: null, isExpired: false };
+
+            const expiryDate = addOneYear(createdDate);
+            const now = new Date();
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const daysRemaining = Math.ceil((expiryDate.getTime() - now.getTime()) / msPerDay);
+
+            return { createdDate, expiryDate, daysRemaining, isExpired: daysRemaining < 0 };
+        }
+
+        function deriveDisplayStatus(client) {
+            const baseStatus = normalizeStatus(client.status);
+            const expiry = getExpiryData(client);
+            if (baseStatus === "Deleted") return "Deleted";
+            if (expiry.isExpired) return "Suspended";
+            return baseStatus;
+        }
+
+        function getSubscriptionState(client) {
+            const { daysRemaining, isExpired } = getExpiryData(client);
+            if (daysRemaining === null) return { label: "No created date", cssClass: "countdown-warning" };
+            if (isExpired) return { label: `${Math.abs(daysRemaining)} day(s) overdue`, cssClass: "countdown-expired" };
+            if (daysRemaining <= 30) return { label: `${daysRemaining} day(s) left`, cssClass: "countdown-warning" };
+            return { label: `${daysRemaining} day(s) left`, cssClass: "countdown-good" };
+        }
+
+        function getStatusBadge(status) {
+            const normalized = normalizeStatus(status);
+            const cssMap = {
+                Active: "status-active",
+                Pending: "status-pending",
+                Suspended: "status-suspended",
+                Deleted: "status-deleted"
+            };
+            return `<span class="status-badge ${cssMap[normalized] || "status-pending"}">${escapeHtml(normalized)}</span>`;
+        }
+
+        function getSafePublicUrl(client) {
+            if (client.vcardUrl) return client.vcardUrl;
+            if (client.slug) return `https://smartcardlink-public.onrender.com/?slug=${encodeURIComponent(client.slug)}`;
+            return "";
+        }
+
+        function buildFilteredClients() {
+            const term = el.searchInput.value.trim().toLowerCase();
+            const selectedStatus = el.statusFilter.value;
+
+            return allClientData.filter((client) => {
+                const displayStatus = deriveDisplayStatus(client);
+                const haystack = [
+                    client.fullName,
+                    client.company,
+                    client.email1,
+                    client.phone1,
+                    client.slug,
+                    client.status
+                ].filter(Boolean).join(" ").toLowerCase();
+
+                return (!term || haystack.includes(term)) && (!selectedStatus || displayStatus === selectedStatus);
+            });
+        }
+
+        function updateStats(clients) {
+            const counts = { Total: clients.length, Active: 0, Pending: 0, Suspended: 0, Deleted: 0 };
+            clients.forEach((client) => {
+                const status = deriveDisplayStatus(client);
+                if (counts[status] !== undefined) counts[status] += 1;
+            });
+
+            el.statTotal.textContent = counts.Total;
+            el.statActive.textContent = counts.Active;
+            el.statPending.textContent = counts.Pending;
+            el.statSuspended.textContent = counts.Suspended;
+            el.statDeleted.textContent = counts.Deleted;
+        }
+
+        function renderTable() {
+            const filteredClients = buildFilteredClients();
+            updateStats(filteredClients);
+
+            if (!filteredClients.length) {
+                el.tableBody.innerHTML = "";
+                el.emptyPanel.style.display = "block";
+                return;
+            }
+
+            el.emptyPanel.style.display = "none";
+
+            el.tableBody.innerHTML = filteredClients.map((client) => {
+                const expiry = getExpiryData(client);
+                const displayStatus = deriveDisplayStatus(client);
+                const subscriptionState = getSubscriptionState(client);
+                const publicUrl = getSafePublicUrl(client);
+                const createdDateFormatted = expiry.createdDate ? formatDate(expiry.createdDate) : "-";
+                const expiryDateFormatted = expiry.expiryDate ? formatDate(expiry.expiryDate) : "-";
+
+                const noteText = displayStatus === "Suspended"
+                    ? "Suspended until renewal"
+                    : displayStatus === "Pending"
+                        ? "Awaiting activation / processing"
+                        : displayStatus === "Deleted"
+                            ? "Record marked deleted"
+                            : "Subscription valid";
+
+                return `
+                    <tr data-id="${escapeHtml(client.id || "")}">
+                        <td>
+                            <div class="client-cell">
+                                <img class="client-photo" src="${escapeHtml(client.photoUrl || "https://placehold.co/100x100/111111/ffffff?text=%3F")}" alt="${escapeHtml(client.fullName || "Client Photo")}" onerror="this.src='https://placehold.co/100x100/111111/ffffff?text=%3F'" />
+                                <div>
+                                    <div class="client-name">${escapeHtml(client.fullName || "-")}</div>
+                                    <div class="client-sub">${escapeHtml(client.slug || "No slug")}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(client.company || "-")}</td>
+                        <td>${escapeHtml(maskEmail(client.email1))}</td>
+                        <td>${escapeHtml(maskPhone(client.phone1))}</td>
+                        <td>${createdDateFormatted}</td>
+                        <td>${expiryDateFormatted}</td>
+                        <td><div class="${subscriptionState.cssClass}">${escapeHtml(subscriptionState.label)}</div></td>
+                        <td>${getStatusBadge(displayStatus)}</td>
+                        <td>
+                            <div>${escapeHtml(noteText)}</div>
+                            <div class="muted">${expiry.expiryDate ? `Expires ${expiryDateFormatted}` : "No vCard start date yet"}</div>
+                        </td>
+                        <td>
+                            <div class="menu-wrap">
+                                <button class="menu-btn" onclick="toggleMenu(event, '${escapeHtml(client.id || "")}')">
+                                    <i class="fas fa-ellipsis-vertical"></i>
+                                </button>
+                                <div class="action-menu" id="menu-${escapeHtml(client.id || "")}">
+                                    <button type="button" onclick="viewClientCard('${escapeHtml(publicUrl)}')">
+                                        <i class="fas fa-up-right-from-square"></i>
+                                        <span>Open Public vCard</span>
+                                    </button>
+                                    <button type="button" onclick="openActionModal('${escapeHtml(client.id || "")}', 'reactivate', '${escapeHtml(client.fullName || "Client")}')">
+                                        <i class="fas fa-circle-check"></i>
+                                        <span>Reactivate After KES 500 Payment</span>
+                                    </button>
+                                    <button type="button" onclick="openActionModal('${escapeHtml(client.id || "")}', 'suspend', '${escapeHtml(client.fullName || "Client")}')">
+                                        <i class="fas fa-ban"></i>
+                                        <span>Suspend Pending Payment</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function fetchClients(showLoader = true) {
+            if (showLoader) el.loadingPanel.style.display = "block";
             try {
-                const res = await fetch(`${API_BASE_URL}/api/clients/all`);
-                if (!res.ok) throw new Error('Fetch failed');
-                const result = await res.json();
-                allClientData = Array.isArray(result.data) ? result.data : [];
-                render();
-            } catch (err) {
-                showToast(err.message, 'error');
+                const response = await fetch(CLIENTS_ENDPOINT, { cache: "no-store" });
+                if (!response.ok) throw new Error(`Failed to load clients. HTTP ${response.status}`);
+                const result = await response.json();
+                allClientData = Array.isArray(result?.data) ? result.data : [];
+                renderTable();
+                el.refreshNote.textContent = `Last sync: ${formatDateTime(new Date())}`;
+            } catch (error) {
+                console.error(error);
+                showToast("Load failed", error.message || "Unable to fetch client records.", "error");
             } finally {
-                elements.loader.style.display = 'none';
+                el.loadingPanel.style.display = "none";
             }
         }
 
-        function render() {
-            const search = elements.search.value.toLowerCase();
-            const filter = elements.filter.value;
-
-            const filtered = allClientData.filter(c => {
-                const matchStr = `${c.fullName} ${c.email1} ${c.phone1} ${c.company}`.toLowerCase();
-                return matchStr.includes(search) && (!filter || c.status === filter);
-            });
-
-            elements.empty.style.display = filtered.length ? 'none' : 'block';
-            elements.totals.style.display = filtered.length ? 'block' : 'none';
-            elements.table.innerHTML = filtered.map(c => `
-                <tr data-id="${c._id}">
-                    <td><img src="${c.photoUrl || 'https://placehold.co/50x50/222/fff?text=?'}" class="client-photo" onerror="this.src='https://placehold.co/50x50/222/fff?text=?'"></td>
-                    <td>${c.fullName || '-'}</td>
-                    <td>${c.company || '-'}</td>
-                    <td>${c.email1 || '-'}</td>
-                    <td>${c.phone1 || '-'}</td>
-                    <td>${c.vcardCreatedDate ? c.vcardCreatedDate.split('T')[0] : '-'}</td>
-                    <td>${calculateMonths(c.vcardCreatedDate)}</td>
-                    <td>${getStatusBadge(c.status)}</td>
-                    <td>
-                        <button onclick="openActionModal('${c._id}', '${c.status === 'Active' ? 'Disabled' : 'Active'}')">
-                            <i class="fas ${c.status === 'Active' ? 'fa-ban' : 'fa-check'}"></i>
-                        </button>
-                        <button onclick="openActionModal('${c._id}', 'Deleted')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-
-            updateStats(filtered);
+        function closeAllMenus() {
+            document.querySelectorAll(".action-menu.show").forEach((menu) => menu.classList.remove("show"));
         }
 
-        function updateStats(data) {
-            const counts = data.reduce((acc, curr) => {
-                const s = curr.status || 'Pending';
-                acc[s] = (acc[s] || 0) + 1;
-                return acc;
-            }, {});
-            elements.totals.innerHTML = `Total: ${data.length} | Active: ${counts.Active || 0} | Pending: ${counts.Pending || 0} | Disabled: ${counts.Disabled || 0}`;
+        window.toggleMenu = function(event, clientId) {
+            event.stopPropagation();
+            const menu = document.getElementById(`menu-${clientId}`);
+            if (!menu) return;
+            const isOpen = menu.classList.contains("show");
+            closeAllMenus();
+            if (!isOpen) menu.classList.add("show");
+        };
+
+        window.viewClientCard = function(url) {
+            closeAllMenus();
+            if (!url) {
+                showToast("Link missing", "This client does not yet have a valid public vCard URL.", "error");
+                return;
+            }
+            window.open(url, "_blank");
+        };
+
+        window.openActionModal = function(clientId, action, clientName) {
+            closeAllMenus();
+            modalState = { clientId, action, clientName };
+            const isReactivate = action === "reactivate";
+            el.modalTitle.textContent = isReactivate ? "Reactivate Client Subscription" : "Suspend Client Subscription";
+            el.modalSubtext.textContent = isReactivate
+                ? `${clientName}: confirm that KES 500 renewal subscription has been received before reactivating this client.`
+                : `${clientName}: provide the reason for suspending this account pending subscription payment.`;
+            el.actionReason.value = "";
+            el.actionModal.classList.add("show");
+        };
+
+        function closeActionModal() {
+            el.actionModal.classList.remove("show");
+            modalState = { clientId: null, action: null, clientName: "" };
         }
 
-        window.openActionModal = (id, nextStatus) => {
-            elements.modal.style.display = 'block';
-            elements.modalText.value = '';
-            elements.modalConfirm.onclick = async () => {
-                const note = elements.modalText.value.trim();
-                if (!note) return showToast('Reason required', 'error');
-                
-                elements.modal.style.display = 'none';
-                try {
-                    const res = await fetch(`${API_BASE_URL}/api/clients/${id}/status/${nextStatus}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ notes: note })
+        async function submitClientAction() {
+            const { clientId, action, clientName } = modalState;
+            const note = el.actionReason.value.trim();
+
+            if (!clientId || !action) return showToast("Action failed", "Client action context is missing.", "error");
+            if (!note) return showToast("Note required", "Please provide an admin note before confirming.", "error");
+
+            const nextStatus = action === "reactivate" ? "Active" : "Suspended";
+            const original = el.modalConfirmBtn.innerHTML;
+            el.modalConfirmBtn.disabled = true;
+            el.modalConfirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing...`;
+
+            try {
+                const response = await fetch(SUBSCRIPTION_UPDATE_ENDPOINT(clientId, nextStatus), {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ notes: note })
+                });
+
+                if (!response.ok) {
+                    let msg = `Failed to ${action} client.`;
+                    try {
+                        const err = await response.json();
+                        msg = err?.message || msg;
+                    } catch (_) {}
+                    throw new Error(msg);
+                }
+
+                closeActionModal();
+                await fetchClients(false);
+
+                if (action === "reactivate") {
+                    showToast("Client reactivated", `${clientName} has been reactivated after subscription confirmation.`, "success");
+                } else {
+                    showToast("Client suspended", `${clientName} has been suspended pending subscription payment.`, "success");
+                }
+            } catch (error) {
+                console.error(error);
+                showToast("Update failed", error.message || "Could not update this client status.", "error");
+            } finally {
+                el.modalConfirmBtn.disabled = false;
+                el.modalConfirmBtn.innerHTML = original;
+            }
+        }
+
+        function resetFilters() {
+            el.searchInput.value = "";
+            el.statusFilter.value = "";
+            renderTable();
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            if (document.hidden) return;
+            refreshTimer = setInterval(() => {
+                if (!document.hidden) fetchClients(false);
+            }, REFRESH_INTERVAL_MS);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+
+        document.addEventListener("click", () => closeAllMenus());
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                fetchClients(false);
+                startAutoRefresh();
+            }
+        });
+
+        el.searchInput.addEventListener("input", renderTable);
+        el.statusFilter.addEventListener("change", renderTable);
+        el.refreshBtn.addEventListener("click", () => fetchClients(false));
+        el.resetBtn.addEventListener("click", resetFilters);
+        el.modalCancelBtn.addEventListener("click", closeActionModal);
+        el.modalConfirmBtn.addEventListener("click", submitClientAction);
+
+        el.actionModal.addEventListener("click", (event) => {
+            if (event.target === el.actionModal) closeActionModal();
+        });
+
+        const bgVideo = document.getElementById("bg-video");
+        if (bgVideo) {
+            bgVideo.muted = true;
+            bgVideo.defaultMuted = true;
+            bgVideo.loop = true;
+            bgVideo.playsInline = true;
+            bgVideo.preload = "auto";
+            bgVideo.setAttribute("muted", "");
+            bgVideo.setAttribute("autoplay", "");
+            bgVideo.setAttribute("loop", "");
+            bgVideo.setAttribute("playsinline", "");
+            bgVideo.setAttribute("webkit-playsinline", "");
+            bgVideo.load();
+
+            const playVideo = () => {
+                const playPromise = bgVideo.play();
+                if (playPromise && typeof playPromise.catch === "function") {
+                    playPromise.catch((err) => {
+                        console.warn("Background video autoplay blocked or failed:", err);
                     });
-                    if (!res.ok) throw new Error('Update failed');
-                    
-                    const idx = allClientData.findIndex(c => c._id === id);
-                    if (idx > -1) {
-                        allClientData[idx].status = nextStatus;
-                        render();
-                        const row = document.querySelector(`tr[data-id="${id}"]`);
-                        row?.classList.add('row-success');
-                        setTimeout(() => row?.classList.remove('row-success'), 2000);
-                    }
-                    showToast(`Updated to ${nextStatus}`);
-                } catch (err) {
-                    showToast(err.message, 'error');
                 }
             };
-        };
 
-        document.getElementById('exportBtn').onclick = () => {
-            const headers = "ID,Name,Company,Email,Phone,Status,Created\n";
-            const csv = allClientData.map(c => 
-                `"${c._id}","${c.fullName}","${c.company}","${c.email1}","${c.phone1}","${c.status}","${c.vcardCreatedDate}"`
-            ).join("\n");
-            const blob = new Blob([headers + csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `clients_${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
-        };
+            bgVideo.addEventListener("canplay", playVideo, { once: true });
 
-        document.getElementById('resetBtn').onclick = () => {
-            elements.search.value = '';
-            elements.filter.value = '';
-            render();
-        };
+            bgVideo.addEventListener("ended", () => {
+                bgVideo.currentTime = 0;
+                playVideo();
+            });
 
-        document.getElementById('modalCloseBtn').onclick = () => elements.modal.style.display = 'none';
-        elements.search.oninput = render;
-        elements.filter.onchange = render;
+            playVideo();
+        }
 
-        fetchClients();
+        fetchClients(true);
+        startAutoRefresh();
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
