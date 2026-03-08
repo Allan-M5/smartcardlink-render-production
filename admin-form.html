@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,10 +7,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   <style>
-    /* ========================================
-    CSS PRESERVED FROM AUTHORITATIVE SOURCE
-    ========================================
-    */
+    :root {
+      --theme-color: #FFD700;
+      --theme-dark: #111111;
+      --theme-soft: rgba(255, 215, 0, 0.12);
+    }
     body {
       font-family: 'Inter', sans-serif;
       display: flex;
@@ -44,14 +45,15 @@
       overflow-y: auto;
     }
     h1.title {
-      color: #FFD700;
+      color: var(--theme-color);
       text-align: center;
       font-size: 1.5rem;
       font-weight: 700;
       margin-bottom: 1rem;
+      transition: color 0.25s ease;
     }
     button, .file-input-label {
-      transition: background-color 0.3s, color 0.3s;
+      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
       font-weight: 600;
       padding: 0.75rem;
       border-radius: 0.375rem;
@@ -63,13 +65,14 @@
     }
     .section-header {
       background-color: #1f2937;
-      color: #FFD700;
+      color: var(--theme-color);
       padding: 0.5rem;
       text-align: center;
       border-radius: 0.375rem;
       margin-top: 1rem;
       margin-bottom: 0.5rem;
       font-weight: 600;
+      transition: color 0.25s ease;
     }
     label {
       color: white;
@@ -105,16 +108,16 @@
     .action-button {
       background-color: black;
       color: white;
-      border: 1px solid #FFD700;
+      border: 1px solid var(--theme-color);
     }
     .action-button:hover {
-      background-color: #FFD700;
+      background-color: var(--theme-color);
       color: black;
     }
     .btn-view-pdf {
       background-color: #fff;
       color: black;
-      border: 1px solid #FFD700;
+      border: 1px solid var(--theme-color);
     }
     .btn-view-pdf:hover, .btn-view-pdf.pressed {
       background-color: #2563eb;
@@ -124,7 +127,7 @@
     .btn-create-vcard {
       background-color: black;
       color: white;
-      border: 1px solid #FFD700;
+      border: 1px solid var(--theme-color);
     }
     .btn-create-vcard:hover, .btn-create-vcard.pressed {
       background-color: #22c55e;
@@ -143,7 +146,7 @@
       background-color: #ef4444;
       color: white;
       border: none;
-      flex: 0 0 120px;
+      flex: 0 0 140px;
       margin-top: 0;
       display: flex;
       justify-content: center;
@@ -154,16 +157,16 @@
       background-color: #3b82f6;
       color: white;
     }
-    #photoFile { 
-      display: none; 
+    #photoFile {
+      display: none;
     }
     .btn-save-info {
       background-color: black;
       color: white;
-      border: 1px solid #FFD700;
+      border: 1px solid var(--theme-color);
     }
     .btn-save-info:hover {
-      background-color: #FFD700;
+      background-color: var(--theme-color);
       color: black;
     }
     .toast-message {
@@ -171,7 +174,7 @@
       bottom: 2rem;
       left: 50%;
       transform: translateX(-50%);
-      background-color: #FFD700;
+      background-color: var(--theme-color);
       color: black;
       padding: 1rem 2rem;
       border-radius: 0.5rem;
@@ -179,6 +182,8 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       z-index: 1000;
       display: none;
+      max-width: 90vw;
+      text-align: center;
     }
     .spinner {
       border: 4px solid rgba(0, 0, 0, 0.1);
@@ -191,9 +196,9 @@
       vertical-align: middle;
       margin-left: 8px;
     }
-    @keyframes spin { 
-      0% { transform: rotate(0deg); } 
-      100% { transform: rotate(360deg); } 
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
     @media (min-width: 768px) {
       .photo-upload-container {
@@ -209,12 +214,12 @@
     Your browser does not support the video tag.
   </video>
 
-<div class="form-card">
+  <div class="form-card">
     <h1 class="title">SmartCardLink Admin Form</h1>
-    
+
     <div class="top-buttons">
-      <button id="view-pdf-btn" class="btn-view-pdf">View Client Info PDF</button>
-      <button id="create-vcard-btn" class="btn-create-vcard">Create vCard</button>
+      <button id="view-pdf-btn" class="btn-view-pdf" type="button">View Client Info PDF</button>
+      <button id="create-vcard-btn" class="btn-create-vcard" type="button">Create vCard</button>
     </div>
 
     <div id="vcard-url-bar" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; background: #222; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid #444;">
@@ -223,12 +228,12 @@
       <button id="viewQrBtn" type="button" style="margin-top: 0; width: auto; padding: 0.5rem 0.75rem; font-size: 0.8rem; background: #fff; color: #000;">QR</button>
       <button id="viewVcardBtn" type="button" style="margin-top: 0; width: auto; padding: 0.5rem 0.75rem; font-size: 0.8rem; background: #2563eb; color: #fff;">View</button>
       <button id="emailClientBtn" type="button" style="margin-top: 0; width: auto; padding: 0.5rem 0.75rem; font-size: 0.8rem; background: #ea4335; color: #fff;">Email Client</button>
-      <button id="resetCopyStateBtn" type="button" style="margin-top: 0; width: auto; padding: 0.5rem; background: transparent; border: none; color: #FFD700;"><i class="fas fa-sync-alt"></i></button>
+      <button id="resetCopyStateBtn" type="button" style="margin-top: 0; width: auto; padding: 0.5rem 0.75rem; font-size: 0.8rem; background: #111; color: #FFD700; border: 1px solid #FFD700;">Refresh</button>
     </div>
 
     <form id="adminForm" autocomplete="off">
       <input type="hidden" id="clientId" value="" name="clientId">
-      
+
       <div class="section-header">Personal Details</div>
       <div class="grid-2col">
         <div><label for="fullName">Full Name</label><input type="text" id="fullName" name="fullName" required /></div>
@@ -245,7 +250,8 @@
       </div>
       <div><label for="email3">Email 3</label><input type="email" id="email3" name="email3" /></div>
       <div class="input-group"><label for="appointmentUrl"><i class="fas fa-calendar-check"></i> Appointment/Booking URL (Optional)</label><input type="text" id="appointmentUrl" name="appointmentUrl" autocomplete="off" placeholder="Auto-generated from Email 1 if left blank"></div>
-      <div class='section-header'>Business Details</div>
+
+      <div class="section-header">Business Details</div>
       <div class="grid-2col">
         <div><label for="companyName">Company Name</label><input type="text" id="companyName" name="companyName" /></div>
         <div><label for="businessWebsite">Business Website</label><input type="url" id="businessWebsite" name="businessWebsite" /></div>
@@ -294,7 +300,6 @@
 
       <div class="section-header">Professional Customization & Address</div>
       <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem;">
-        
         <div>
           <label for="address">Physical Address</label>
           <input type="text" id="address" name="address" placeholder="e.g. Nairobi, Kenya" />
@@ -312,382 +317,552 @@
           <button type="button" id="processThemeBtn" class="action-button" style="margin-top:0; height: 38px; background-color: #111; border: 1px solid #FFD700; color: white;">Process Theme</button>
         </div>
       </div>
-      <button type="submit" id="save-btn" class="btn-save-info">Save Info</button></form>
-    
+      <button type="submit" id="save-btn" class="btn-save-info">Save Info</button>
+    </form>
+
     <div id="toast-message" class="toast-message"></div>
   </div>
 
-<script>
-  (function () {
-    'use strict';
+  <script>
+    (function () {
+      'use strict';
 
-    const API_BASE = "https://smartcardlink-api.onrender.com"; 
-    const API_URL = `${API_BASE}/api`; 
+      const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:8080'
+        : 'https://smartcardlink-api.onrender.com';
+      const API_URL = API_BASE + '/api';
 
-    const params = new URLSearchParams(window.location.search);
-    const urlClientId = params.get('id');
+      const form = document.getElementById('adminForm');
+      const clientIdInput = document.getElementById('clientId');
+      const viewPdfBtn = document.getElementById('view-pdf-btn');
+      const createVcardBtn = document.getElementById('create-vcard-btn');
+      const photoUploadInput = document.getElementById('photoFile');
+      const photoUrlInput = document.getElementById('photoUrl');
+      const photoUploadLabel = document.getElementById('photo-upload-label');
+      const photoPreviewContainer = document.getElementById('photo-preview-container');
+      const photoPreview = document.getElementById('photo-preview');
+      const saveBtn = document.getElementById('save-btn');
+      const toastMessage = document.getElementById('toast-message');
+      const vcardUrlDisplay = document.getElementById('vcardUrlDisplay');
+      const copyVcardUrlBtn = document.getElementById('copyVcardUrlBtn');
+      const viewQrBtn = document.getElementById('viewQrBtn');
+      const viewVcardBtn = document.getElementById('viewVcardBtn');
+      const emailClientBtn = document.getElementById('emailClientBtn');
+      const resetCopyStateBtn = document.getElementById('resetCopyStateBtn');
+      const themeColorInput = document.getElementById('themeColor');
+      const colorPreview = document.getElementById('colorPreview');
+      const processThemeBtn = document.getElementById('processThemeBtn');
+      const titleEl = document.querySelector('h1.title');
+      const sectionHeaders = Array.from(document.querySelectorAll('.section-header'));
 
-    const form = document.getElementById('adminForm');
-    const clientIdInput = document.getElementById('clientId');
-    const viewPdfBtn = document.getElementById('view-pdf-btn');
-    const createVcardBtn = document.getElementById('create-vcard-btn');
-    const photoUploadInput = document.getElementById('photoFile');
-    const photoUrlInput = document.getElementById('photoUrl');
-    const photoUploadLabel = document.getElementById('photo-upload-label');
-    const photoPreviewContainer = document.getElementById('photo-preview-container');
-    const photoPreview = document.getElementById('photo-preview');
-    const saveBtn = document.getElementById('save-btn');
-    const toastMessage = document.getElementById('toast-message');
+      let isSaving = false;
+      let currentQrCodeUrl = '';
 
-    const vcardUrlDisplay = document.getElementById('vcardUrlDisplay');
-    const copyVcardUrlBtn = document.getElementById('copyVcardUrlBtn');
-    const viewQrBtn = document.getElementById('viewQrBtn');
-    const viewVcardBtn = document.getElementById('viewVcardBtn');
-    const emailClientBtn = document.getElementById('emailClientBtn');
-    const resetCopyStateBtn = document.getElementById('resetCopyStateBtn');
+      const SOCIAL_PREFIXES = {
+        facebook: 'https://facebook.com/',
+        instagram: 'https://instagram.com/',
+        twitter: 'https://twitter.com/',
+        linkedin: 'https://linkedin.com/in/',
+        tiktok: 'https://tiktok.com/@',
+        youtube: 'https://youtube.com/'
+      };
 
-    let isSaving = false;
-
-    const SOCIAL_PREFIXES = {
-      facebook: 'https://facebook.com/',
-      instagram: 'https://instagram.com/',
-      twitter: 'https://twitter.com/',
-      linkedin: 'https://linkedin.com/in/',
-      tiktok: 'https://tiktok.com/@',
-      youtube: 'https://youtube.com/', 
-    };
-
-    const normalizeSocialLink = (platform, input) => {
-      if (!input || typeof input !== 'string' || input.trim() === '') return null;
-      let value = input.trim();
-      const prefix = SOCIAL_PREFIXES[platform];
-      if (!prefix) return null;
-      if (value.startsWith('http')) return value.replace('http:', 'https:');
-      value = value.replace(/^(www\.)?/, '');
-      if (platform === 'linkedin') { value = value.replace(/^linkedin\.com\/(in\/|pub\/)?/i, ''); }
-      else if (platform === 'tiktok') { value = value.replace(/^tiktok\.com\/@/i, '').replace(/^@/, ''); }
-      else if (platform === 'instagram' || platform === 'twitter' || platform === 'facebook') {
-        value = value.replace(/^(instagram|twitter|facebook)\.com\//i, '').toLowerCase().replace(/^@/, '');
-      } else if (platform === 'youtube') { value = value.replace(/^youtube\.com\//i, ''); }
-      value = value.replace(/\/$/, '');
-      if (value === '') return null;
-      return prefix + value;
-    };
-
-    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-    
-    const showToast = (message, isError = false) => {
-      toastMessage.textContent = message;
-      toastMessage.style.backgroundColor = isError ? '#ef4444' : '#FFD700';
-      toastMessage.style.color = isError ? 'white' : 'black';
-      toastMessage.style.display = 'block';
-      setTimeout(() => { toastMessage.style.display = 'none'; }, 3000);
-    };
-
-    const populateForm = (data) => {
-      if (!data) return;
-      const client = data.data || data; // Handle both nested and flat responses
-      clientIdInput.value = client._id || '';
-      const setValue = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-      
-      setValue('fullName', client.fullName);
-      setValue('title', client.title);
-      setValue('phone1', client.phone1);
-      setValue('phone2', client.phone2);
-      setValue('phone3', client.phone3);
-      setValue('email1', client.email1);
-      setValue('email2', client.email2);
-      setValue('email3', client.email3);
-      
-      // Smart Booking URL Logic: If empty, generate a Google Calendar link
-      if (client.appointmentUrl) {
-          setValue('appointmentUrl', client.appointmentUrl);
-      } else if (client.email1) {
-          const autoUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&add=${encodeURIComponent(client.email1)}`;
-          setValue('appointmentUrl', autoUrl);
+      function showToast(message, isError) {
+        toastMessage.textContent = message;
+        toastMessage.style.backgroundColor = isError ? '#ef4444' : getComputedStyle(document.documentElement).getPropertyValue('--theme-color') || '#FFD700';
+        toastMessage.style.color = isError ? 'white' : 'black';
+        toastMessage.style.display = 'block';
+        window.clearTimeout(showToast._timer);
+        showToast._timer = window.setTimeout(function () {
+          toastMessage.style.display = 'none';
+        }, 3200);
       }
 
-      setValue('companyName', client.company || client.companyName);
-      setValue('businessWebsite', client.businessWebsite);
-      setValue('portfolioWebsite', client.portfolioWebsite);
-      setValue('locationMapUrl', client.locationMap || client.locationMapUrl);
-      setValue('bio', client.bio);
-      setValue('address', client.address);
-
-      // Theme Sync
-      if (client.themeColor) {
-          document.getElementById('themeColor').value = client.themeColor;
-          document.getElementById('colorPreview').style.backgroundColor = client.themeColor;
+      function setBusy(button, busyText, idleText, busy) {
+        if (!button) return;
+        if (busy) {
+          button.dataset.idleText = idleText || button.textContent;
+          button.innerHTML = busyText + ' <span class="spinner"></span>';
+          button.disabled = true;
+        } else {
+          button.textContent = idleText || button.dataset.idleText || button.textContent;
+          button.disabled = false;
+        }
       }
-      
-      if (client.photoUrl) {
+
+      function safeValue(value) {
+        return value == null ? '' : String(value);
+      }
+
+      function autoBookingUrl(email, overrideValue) {
+        const override = safeValue(overrideValue).trim();
+        if (override) {
+          return override;
+        }
+        const cleanEmail = safeValue(email).trim().toLowerCase();
+        if (!cleanEmail) {
+          return '';
+        }
+        const subject = encodeURIComponent('Appointment Booking Request');
+        const body = encodeURIComponent('Hello, I would like to book an appointment regarding your SmartCardLink profile.');
+        return 'mailto:' + cleanEmail + '?subject=' + subject + '&body=' + body;
+      }
+
+      function normalizeSocialLink(platform, input) {
+        const raw = safeValue(input).trim();
+        if (!raw) {
+          return '';
+        }
+        if (/^https?:\/\//i.test(raw)) {
+          return raw.replace(/^http:\/\//i, 'https://');
+        }
+        const prefix = SOCIAL_PREFIXES[platform] || '';
+        let value = raw.replace(/^(www\.)?/i, '');
+
+        if (platform === 'linkedin') {
+          value = value.replace(/^linkedin\.com\/(in\/|pub\/)?/i, '');
+        } else if (platform === 'tiktok') {
+          value = value.replace(/^tiktok\.com\/@/i, '').replace(/^@/, '');
+        } else if (platform === 'instagram' || platform === 'twitter' || platform === 'facebook') {
+          value = value.replace(/^(instagram|twitter|facebook)\.com\//i, '').replace(/^@/, '');
+        } else if (platform === 'youtube') {
+          value = value.replace(/^youtube\.com\//i, '');
+        }
+
+        value = value.replace(/\/$/, '');
+        return value ? prefix + value : '';
+      }
+
+      function setFieldValue(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = safeValue(value);
+      }
+
+      function updateThemePreview(hex) {
+        const theme = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex.toUpperCase() : '#FFD700';
+        document.documentElement.style.setProperty('--theme-color', theme);
+        colorPreview.style.backgroundColor = theme;
+        titleEl.style.color = theme;
+        processThemeBtn.style.borderColor = theme;
+        sectionHeaders.forEach(function (header) {
+          header.style.color = theme;
+        });
+        saveBtn.style.borderColor = theme;
+        createVcardBtn.style.borderColor = theme;
+        viewPdfBtn.style.borderColor = theme;
+        photoPreview.style.borderColor = theme;
+      }
+
+      function resetActionLabels() {
+        copyVcardUrlBtn.textContent = 'Copy URL';
+        emailClientBtn.textContent = 'Email Client';
+      }
+
+      function setVcardState(data) {
+        const payload = data || {};
+        vcardUrlDisplay.value = payload.vcardUrl || '';
+        currentQrCodeUrl = payload.qrCodeUrl || '';
+        resetActionLabels();
+      }
+
+      function populateForm(payload) {
+        const client = payload && payload.data ? payload.data : payload;
+        if (!client) return;
+
+        clientIdInput.value = client._id || client.id || '';
+        setFieldValue('fullName', client.fullName);
+        setFieldValue('title', client.title);
+        setFieldValue('phone1', client.phone1);
+        setFieldValue('phone2', client.phone2);
+        setFieldValue('phone3', client.phone3);
+        setFieldValue('email1', client.email1);
+        setFieldValue('email2', client.email2);
+        setFieldValue('email3', client.email3);
+        setFieldValue('companyName', client.company || client.companyName);
+        setFieldValue('businessWebsite', client.businessWebsite);
+        setFieldValue('portfolioWebsite', client.portfolioWebsite);
+        setFieldValue('locationMapUrl', client.locationMap || client.locationMapUrl);
+        setFieldValue('bio', client.bio);
+        setFieldValue('address', client.address);
+        setFieldValue('appointmentUrl', client.appointmentUrl || client.bookingLink || autoBookingUrl(client.email1, ''));
+        setFieldValue('themeColor', client.themeColor || '#FFD700');
+
+        const workingHours = client.workingHours || {};
+        ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(function (key) {
+          setFieldValue(key, workingHours[key] || '');
+        });
+
+        const socialLinks = client.socialLinks || {};
+        ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(function (key) {
+          setFieldValue(key, socialLinks[key] || '');
+        });
+
+        if (client.photoUrl) {
           photoUrlInput.value = client.photoUrl;
           photoPreview.src = client.photoUrl;
           photoPreviewContainer.style.display = 'block';
           photoUploadLabel.textContent = 'Photo Uploaded';
           photoUploadLabel.style.backgroundColor = '#22c55e';
-      }
-      if (client.workingHours) {
-          ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(d => setValue(d, client.workingHours[d]));
-      }
-      if (client.socialLinks) {
-          ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(p => setValue(p, client.socialLinks[p]));
-      }
-      
-      // Load vCard URL if it exists
-      if (client.vcardUrl) vcardUrlDisplay.value = client.vcardUrl;
-    };
+        } else {
+          photoUrlInput.value = '';
+          photoPreview.src = '#';
+          photoPreviewContainer.style.display = 'none';
+          photoUploadLabel.textContent = 'Photo Upload';
+          photoUploadLabel.style.backgroundColor = '#ef4444';
+        }
 
-        const fetchClientData = async (id) => {
-  try {
-    const res = await fetch(API_URL + "/clients/" + id);
-    const json = await res.json();
-
-    if (!res.ok) throw new Error("Client not found");
-
-    const client = json.data || json;
-
-    populateForm(client);
-
-    viewPdfBtn.disabled = false;
-    createVcardBtn.disabled = false;
-
-    showToast("Client Data Loaded");
-  } catch (e) {
-    console.error(e);
-    showToast("Load Failed", true);
-  }
-};
-    };
-
-    const uploadPhoto = async (file) => {
-      const formData = new FormData();
-      formData.append('photo', file);
-      try {
-        photoUploadLabel.innerHTML = 'Uploading... <span class="spinner"></span>';
-        const response = await fetch(`${API_URL}/upload-photo`, { method: 'POST', body: formData });
-        if (!response.ok) throw new Error('Photo upload failed');
-        const json = await response.json();
-        const photoUrl = json.data?.photoUrl || json.photoUrl;
-        photoUrlInput.value = photoUrl;
-        photoUploadLabel.textContent = 'Photo Uploaded';
-        photoUploadLabel.style.backgroundColor = '#22c55e';
-        photoPreview.src = photoUrl;
-        photoPreviewContainer.style.display = 'block';
-        showToast('Photo uploaded!');
-      } catch (e) { 
-        showToast('Upload failed', true); 
-        photoUploadLabel.textContent = 'Photo Upload';
-      }
-    };
-
-   const handleFormSubmission = async (e) => {
-      e.preventDefault();
-      if (isSaving) return;
-      isSaving = true;
-      saveBtn.innerHTML = 'Saving... <span class="spinner"></span>';
-      saveBtn.disabled = true;
-
-      const formData = new FormData(form);
-      const payload = { workingHours: {}, socialLinks: {} };
-      for (const [k, v] of formData.entries()) {
-        if (v && k !== 'photoFile' && k !== 'clientId') payload[k] = v.trim();
-      }
-      
-      // THEME COLOR FIX: Ensure themeColor is explicitly added to payload
-      payload.themeColor = document.getElementById('themeColor').value;
-      let apptUrl = document.getElementById('appointmentUrl').value;
-      if (!apptUrl && payload.email1) {
-          apptUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&add=' + encodeURIComponent(payload.email1);
-      }
-      payload.appointmentUrl = apptUrl;
-
-      if (payload.companyName) { payload.company = payload.companyName; delete payload.companyName; }
-      if (payload.locationMapUrl) { payload.locationMap = payload.locationMapUrl; delete payload.locationMapUrl; }
-      ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(k => { if(payload[k]) payload.workingHours[k] = payload[k]; delete payload[k]; });
-      ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(k => { const n = normalizeSocialLink(k, payload[k]); if(n) payload.socialLinks[k] = n; delete payload[k]; });
-
-            // Force Status to Processed on Save
-      payload.status = "Processed";
-      
-      try {
-        const id = clientIdInput.value;
-        const res = await fetch(id ? `${API_URL}/clients/${id}` : `${API_URL}/clients`, {
-          method: id ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+        updateThemePreview(document.getElementById('themeColor').value);
+        setVcardState({
+          vcardUrl: client.vcardUrl || '',
+          qrCodeUrl: client.qrCodeUrl || ''
         });
-                const json = await res.json();
-        if (!res.ok || (json.status !== 'success' && !json._id)) throw new Error(json.message || 'Save failed');
-        showToast('Saved Successfully!');
-        
-        const savedData = json.data || json;
-        const newId = savedData._id;
-        
-        if (!id && newId) {
-            clientIdInput.value = newId;
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('id', newId);
-            window.history.pushState({}, '', newUrl);
-            viewPdfBtn.disabled = createVcardBtn.disabled = false;
+      }
+
+      async function fetchClientData(id) {
+        try {
+          const response = await fetch(API_URL + '/clients/' + encodeURIComponent(id), { cache: 'no-store' });
+          const json = await response.json();
+          if (!response.ok) {
+            throw new Error(json.message || 'Client not found');
+          }
+          populateForm(json);
+          showToast('Client data loaded', false);
+        } catch (error) {
+          console.error(error);
+          showToast(error.message || 'Load failed', true);
         }
-      } catch (e) { showToast(e.message, true); }
-      finally { isSaving = false; saveBtn.innerHTML = 'Save Info'; saveBtn.disabled = false; }
-    };
+      }
 
-    const handleViewPdfClick = async () => {
-      const id = clientIdInput.value;
-      if (!id) return;
-      viewPdfBtn.innerHTML = 'Generating... <span class="spinner"></span>';
-      viewPdfBtn.disabled = true;
-      try {
-        const res = await fetch(`${API_URL}/clients/${id}/pdf`, { method: 'POST' });
-        const json = await res.json();
-        const url = json.data?.pdfUrl || json.pdfUrl;
-        if (url) window.open(url, '_blank');
-      } catch (e) { showToast('PDF Error', true); }
-      finally { viewPdfBtn.innerHTML = 'View Client Info PDF'; viewPdfBtn.disabled = false; }
-    };
+      async function uploadPhoto(file) {
+        const body = new FormData();
+        body.append('photo', file);
+        try {
+          photoUploadLabel.innerHTML = 'Uploading <span class="spinner"></span>';
+          photoUploadLabel.style.backgroundColor = '#111827';
 
-    const handleCreateVcardClick = async () => {
-      const id = clientIdInput.value;
-      if (!id) { showToast('Please save client info first', true); return; }
-      createVcardBtn.innerHTML = 'Creating... <span class="spinner"></span>';
-      createVcardBtn.disabled = true;
-      try {
-        const res = await fetch(`${API_URL}/clients/${id}/vcard`, { method: 'POST' });
-        if (!res.ok) throw new Error('vCard generation failed');
-        const json = await res.json();
-        const data = json.data || json;
-        if (data.vcardUrl) {
-          vcardUrlDisplay.value = data.vcardUrl;
-          showToast('vCard generated!');
+          const response = await fetch(API_URL + '/upload-photo', {
+            method: 'POST',
+            body: body
+          });
+          const json = await response.json();
+          if (!response.ok) {
+            throw new Error(json.message || 'Photo upload failed');
+          }
+
+          const url = (json && json.data && json.data.photoUrl)
+            || (json && json.photoUrl)
+            || (json && json.secure_url)
+            || (json && json.url)
+            || (json && json.data && json.data.secure_url)
+            || '';
+          if (!url) {
+            console.error('Upload response payload:', json);
+            throw new Error('Photo URL missing from upload response');
+          }
+
+          photoUrlInput.value = url;
+          photoPreview.src = url;
+          photoPreview.alt = 'Uploaded client photo';
+          photoPreviewContainer.style.display = 'block';
+          photoUploadLabel.textContent = 'Uploaded ✓';
+          photoUploadLabel.style.backgroundColor = '#22c55e';
+          showToast('Photo uploaded successfully', false);
+        } catch (error) {
+          console.error(error);
+          photoUploadLabel.textContent = 'Photo Upload';
+          photoUploadLabel.style.backgroundColor = '#ef4444';
+          showToast(error.message || 'Upload failed', true);
         }
-      } catch (e) { showToast(e.message, true); }
-      finally { createVcardBtn.innerHTML = 'Create vCard'; createVcardBtn.disabled = false; }
-    };
+      }
 
-    const handleCopyVcardUrl = () => {
-      const url = vcardUrlDisplay.value;
-      if (!url) return;
-      navigator.clipboard.writeText(url).then(() => {
-        copyVcardUrlBtn.textContent = 'Copied ?';
+      function collectPayload() {
+        const payload = {
+          fullName: safeValue(document.getElementById('fullName').value).trim(),
+          title: safeValue(document.getElementById('title').value).trim(),
+          phone1: safeValue(document.getElementById('phone1').value).trim(),
+          phone2: safeValue(document.getElementById('phone2').value).trim(),
+          phone3: safeValue(document.getElementById('phone3').value).trim(),
+          email1: safeValue(document.getElementById('email1').value).trim(),
+          email2: safeValue(document.getElementById('email2').value).trim(),
+          email3: safeValue(document.getElementById('email3').value).trim(),
+          company: safeValue(document.getElementById('companyName').value).trim(),
+          businessWebsite: safeValue(document.getElementById('businessWebsite').value).trim(),
+          portfolioWebsite: safeValue(document.getElementById('portfolioWebsite').value).trim(),
+          locationMap: safeValue(document.getElementById('locationMapUrl').value).trim(),
+          address: safeValue(document.getElementById('address').value).trim(),
+          bio: safeValue(document.getElementById('bio').value).trim(),
+          photoUrl: safeValue(photoUrlInput.value).trim(),
+          themeColor: safeValue(themeColorInput.value).trim().toUpperCase(),
+          status: 'Processed',
+          appointmentUrl: autoBookingUrl(document.getElementById('email1').value, document.getElementById('appointmentUrl').value),
+          socialLinks: {},
+          workingHours: {}
+        };
+
+        ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube'].forEach(function (key) {
+          const normalized = normalizeSocialLink(key, document.getElementById(key).value);
+          if (normalized) {
+            payload.socialLinks[key] = normalized;
+          }
+        });
+
+        ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(function (key) {
+          const value = safeValue(document.getElementById(key).value).trim();
+          if (value) {
+            payload.workingHours[key] = value;
+          }
+        });
+
+        return payload;
+      }
+
+      async function handleFormSubmission(event) {
+        event.preventDefault();
+        if (isSaving) {
+          return;
+        }
+
+        const id = clientIdInput.value.trim();
+        const payload = collectPayload();
+
+        if (!payload.fullName || !payload.phone1 || !payload.email1) {
+          showToast('Full name, primary phone and primary email are required.', true);
+          return;
+        }
+
+        isSaving = true;
+        setBusy(saveBtn, 'Saving', 'Save Info', true);
+
+        try {
+          const method = id ? 'PUT' : 'POST';
+          const endpoint = id ? API_URL + '/clients/' + encodeURIComponent(id) : API_URL + '/clients';
+          const response = await fetch(endpoint, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const json = await response.json();
+          if (!response.ok) {
+            throw new Error(json.message || 'Save failed');
+          }
+
+          const savedClient = json.data || {};
+          const savedId = savedClient._id || savedClient.id || json.recordId || id;
+          if (savedId) {
+            clientIdInput.value = savedId;
+            const url = new URL(window.location.href);
+            url.searchParams.set('id', savedId);
+            window.history.replaceState({}, '', url.toString());
+          }
+
+          setFieldValue('appointmentUrl', savedClient.appointmentUrl || payload.appointmentUrl);
+          if (savedClient.slug && savedClient.vcardUrl) {
+            setVcardState(savedClient);
+          }
+          showToast('Saved successfully. Client moved to Processed.', false);
+        } catch (error) {
+          console.error(error);
+          showToast(error.message || 'Save failed', true);
+        } finally {
+          isSaving = false;
+          setBusy(saveBtn, '', 'Save Info', false);
+        }
+      }
+
+      function buildPrintableHtml(payload) {
+        const client = payload || collectPayload();
+        const socialRows = Object.entries(client.socialLinks || {}).filter(function (entry) { return entry[1]; }).map(function (entry) {
+          return '<tr><td style="padding:8px;border:1px solid #ccc;">' + entry[0] + '</td><td style="padding:8px;border:1px solid #ccc;">' + entry[1] + '</td></tr>';
+        }).join('');
+        const hoursRows = Object.entries(client.workingHours || {}).filter(function (entry) { return entry[1]; }).map(function (entry) {
+          return '<tr><td style="padding:8px;border:1px solid #ccc;">' + entry[0] + '</td><td style="padding:8px;border:1px solid #ccc;">' + entry[1] + '</td></tr>';
+        }).join('');
+
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Client Info</title></head><body style="font-family:Arial,sans-serif;padding:24px;">'
+          + '<h1 style="margin-top:0;">' + (client.fullName || 'Client') + '</h1>'
+          + '<p><strong>Title:</strong> ' + (client.title || '') + '</p>'
+          + '<p><strong>Company:</strong> ' + (client.company || '') + '</p>'
+          + '<p><strong>Phone:</strong> ' + (client.phone1 || '') + '</p>'
+          + '<p><strong>Email:</strong> ' + (client.email1 || '') + '</p>'
+          + '<p><strong>Booking URL:</strong> ' + (client.appointmentUrl || '') + '</p>'
+          + '<p><strong>Address:</strong> ' + (client.address || '') + '</p>'
+          + '<p><strong>Bio:</strong><br>' + (client.bio || '') + '</p>'
+          + '<h3>Working Hours</h3><table style="border-collapse:collapse;width:100%;">' + hoursRows + '</table>'
+          + '<h3>Social Links</h3><table style="border-collapse:collapse;width:100%;">' + socialRows + '</table>'
+          + '</body></html>';
+      }
+
+      function handleViewPdfClick() {
+        const popup = window.open('', '_blank');
+        if (!popup) {
+          showToast('Popup blocked. Please allow popups for this page.', true);
+          return;
+        }
+        popup.document.open();
+        popup.document.write(buildPrintableHtml(collectPayload()));
+        popup.document.close();
+        popup.focus();
+        window.setTimeout(function () {
+          popup.print();
+        }, 350);
+      }
+
+      async function handleCreateVcardClick() {
+        const id = clientIdInput.value.trim();
+        if (!id) {
+          showToast('Please save client info first.', true);
+          return;
+        }
+
+        setBusy(createVcardBtn, 'Creating', 'Create vCard', true);
+        try {
+          const response = await fetch(API_URL + '/clients/' + encodeURIComponent(id) + '/vcard', {
+            method: 'POST'
+          });
+          const json = await response.json();
+          if (!response.ok) {
+            throw new Error(json.message || 'vCard generation failed');
+          }
+          const data = json.data || {};
+          setVcardState(data);
+          setFieldValue('appointmentUrl', data.appointmentUrl || document.getElementById('appointmentUrl').value);
+          showToast('vCard generated successfully.', false);
+        } catch (error) {
+          console.error(error);
+          showToast(error.message || 'vCard generation failed', true);
+        } finally {
+          setBusy(createVcardBtn, '', 'Create vCard', false);
+        }
+      }
+
+      async function handleCopyVcardUrl() {
+        const url = vcardUrlDisplay.value.trim();
+        if (!url) {
+          showToast('No vCard URL available yet.', true);
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(url);
+          copyVcardUrlBtn.textContent = 'Copied';
+          showToast('vCard URL copied.', false);
+        } catch (error) {
+          console.error(error);
+          showToast('Copy failed. Please copy manually.', true);
+        }
+      }
+
+      function handleViewQr() {
+        if (!currentQrCodeUrl) {
+          showToast('QR code not available yet. Create vCard first.', true);
+          return;
+        }
+        const popup = window.open('', '_blank');
+        if (!popup) {
+          showToast('Popup blocked. Please allow popups for this page.', true);
+          return;
+        }
+        popup.document.open();
+        popup.document.write('<!DOCTYPE html><html><head><title>QR Code</title></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#111;"><img src="' + currentQrCodeUrl + '" alt="QR Code" style="max-width:90vw;max-height:90vh;"></body></html>');
+        popup.document.close();
+      }
+
+      function handleViewVcard() {
+        const url = vcardUrlDisplay.value.trim();
+        if (!url) {
+          showToast('No vCard URL available yet.', true);
+          return;
+        }
+        window.open(url, '_blank', 'noopener');
+      }
+
+      function handleEmailClient() {
+        const clientEmail = safeValue(document.getElementById('email1').value).trim();
+        const clientName = safeValue(document.getElementById('fullName').value).trim() || 'Client';
+        const vcardUrl = vcardUrlDisplay.value.trim();
+        if (!clientEmail || !vcardUrl) {
+          showToast('Primary email and vCard URL are required.', true);
+          return;
+        }
+
+        const subject = encodeURIComponent('Thank you for choosing SmartCardLink vCard Services');
+        const body = encodeURIComponent('Hello ' + clientName + ',\n\nThank you for choosing SmartCardLink vCard services.\n\nYour live vCard URL is:\n' + vcardUrl + '\n\nBest regards,\nSmartCardLink');
+        const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(clientEmail) + '&su=' + subject + '&body=' + body;
+        window.open(gmailUrl, '_blank', 'noopener');
+        emailClientBtn.textContent = 'Gmail Opened';
+        showToast('Gmail compose opened for the client.', false);
+      }
+
+      function handleRefreshForm() {
+        form.reset();
+        clientIdInput.value = '';
+        photoUrlInput.value = '';
+        photoPreview.src = '#';
+        photoPreviewContainer.style.display = 'none';
+        photoUploadLabel.textContent = 'Photo Upload';
+        photoUploadLabel.style.backgroundColor = '#ef4444';
+        currentQrCodeUrl = '';
+        setVcardState({ vcardUrl: '', qrCodeUrl: '' });
+        updateThemePreview('#FFD700');
+        themeColorInput.value = '#FFD700';
+        const url = new URL(window.location.href);
+        url.searchParams.delete('id');
+        window.history.replaceState({}, '', url.toString());
+        showToast('Admin form refreshed for the next client.', false);
+      }
+
+      function handleProcessTheme() {
+        const hex = safeValue(themeColorInput.value).trim().toUpperCase();
+        if (!/^#[0-9A-F]{6}$/.test(hex)) {
+          showToast('Invalid hex code. Example: #50C878', true);
+          return;
+        }
+        updateThemePreview(hex);
+        processThemeBtn.textContent = 'Theme Ready';
+        processThemeBtn.style.borderColor = '#22c55e';
+        processThemeBtn.style.color = '#22c55e';
+        showToast('Theme preview applied. Click Save Info to persist.', false);
+      }
+
+      photoUploadInput.addEventListener('change', function (event) {
+        const file = event.target.files && event.target.files[0];
+        if (file) {
+          uploadPhoto(file);
+        }
       });
-    };
 
-    const handleViewQr = () => {
-      const url = vcardUrlDisplay.value;
-      if (!url) return;
-      window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`, '_blank');
-    };
+      themeColorInput.addEventListener('input', function (event) {
+        updateThemePreview(event.target.value);
+        processThemeBtn.textContent = 'Process Theme';
+        processThemeBtn.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color');
+        processThemeBtn.style.color = 'white';
+      });
 
-    const handleViewVcard = () => {
-      const url = vcardUrlDisplay.value;
-      if (url) window.open(url, '_blank');
-    };
+      document.getElementById('email1').addEventListener('blur', function () {
+        const appointmentField = document.getElementById('appointmentUrl');
+        if (!appointmentField.value.trim()) {
+          appointmentField.value = autoBookingUrl(this.value, '');
+        }
+      });
 
-    const handleEmailClient = async () => {
-      const clientEmail = document.getElementById('email1').value;
-      const clientName = document.getElementById('fullName').value.trim() || "Client";
-      const vcardUrl = vcardUrlDisplay.value;
-      const adminCC = "allanmujera91@icloud.com";
+      form.addEventListener('submit', handleFormSubmission);
+      viewPdfBtn.addEventListener('click', handleViewPdfClick);
+      createVcardBtn.addEventListener('click', handleCreateVcardClick);
+      copyVcardUrlBtn.addEventListener('click', handleCopyVcardUrl);
+      viewQrBtn.addEventListener('click', handleViewQr);
+      viewVcardBtn.addEventListener('click', handleViewVcard);
+      emailClientBtn.addEventListener('click', handleEmailClient);
+      resetCopyStateBtn.addEventListener('click', handleRefreshForm);
+      processThemeBtn.addEventListener('click', handleProcessTheme);
 
-      if (!clientEmail || !vcardUrl) {
-        showToast('Email and vCard URL required', true);
-        return;
-      }
-
-      emailClientBtn.innerHTML = 'Sending... <span class="spinner"></span>';
-      emailClientBtn.disabled = true;
-
-      try {
-        const subject = encodeURIComponent('Your SmartCardLink vCard');
-        const body = encodeURIComponent(`Hi ${clientName},Here is your vCard URL: ${vcardUrl}Your physical card will be delivered after printing. Thank you for choosing our vCard services.Best regards,SmartCardLink Admin`);
-        
-        // Final mailto logic including CC for admin
-        window.location.href = `mailto:${clientEmail}?cc=${adminCC}&subject=${subject}&body=${body}`;
-        
-        setTimeout(() => {
-          emailClientBtn.textContent = 'Email sent successfully';
-          showToast('Mail client opened');
-        }, 1000);
-      } catch (e) {
-        showToast('Failed to open email', true);
-      } finally {
-        setTimeout(() => {
-          emailClientBtn.disabled = false;
-        }, 3000);
-      }
-    };
-
-    const handleResetCopyState = () => {
-      copyVcardUrlBtn.textContent = 'Copy URL';
-      emailClientBtn.textContent = 'Email Client';
-    };
-
-            document.addEventListener('DOMContentLoaded', () => {
+      updateThemePreview('#FFD700');
       const urlParams = new URLSearchParams(window.location.search);
       const id = urlParams.get('id');
       if (id) {
         clientIdInput.value = id;
         fetchClientData(id);
       }
-    });
-    
-// PROCESS THEME BUTTON LOGIC
-    const themeColorInput = document.getElementById('themeColor');
-    const colorPreview = document.getElementById('colorPreview');
-    const processThemeBtn = document.getElementById('processThemeBtn');
-
-    themeColorInput.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if(/^#[0-9A-F]{6}$/i.test(val)) {
-        colorPreview.style.backgroundColor = val;
-      }
-    });
-
-    processThemeBtn.addEventListener('click', () => {
-      const hex = themeColorInput.value;
-      if(/^#[0-9A-F]{6}$/i.test(hex)) {
-        showToast(`Theme ${hex} applied! Click 'Save Info' to finish.`);
-        processThemeBtn.style.borderColor = "#22c55e";
-        processThemeBtn.style.color = "#22c55e";
-        processThemeBtn.textContent = "Ready ?";
-        colorPreview.style.backgroundColor = hex;
-      } else {
-        showToast("Invalid Hex Code (e.g., #50c878)", true);
-      }
-    });
-
-    photoUploadInput.addEventListener('change', (e) => { if (e.target.files[0]) uploadPhoto(e.target.files[0]); });
-    form.addEventListener('submit', handleFormSubmission);
-    viewPdfBtn.addEventListener('click', handleViewPdfClick);
-    createVcardBtn.addEventListener('click', handleCreateVcardClick);
-    copyVcardUrlBtn.addEventListener('click', handleCopyVcardUrl);
-    viewQrBtn.addEventListener('click', handleViewQr);
-    viewVcardBtn.addEventListener('click', handleViewVcard);
-    emailClientBtn.addEventListener('click', handleEmailClient);
-    resetCopyStateBtn.addEventListener('click', handleResetCopyState);
-
-  })();
-</script>
+    })();
+  </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
