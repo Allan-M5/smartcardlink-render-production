@@ -1,474 +1,286 @@
 (function () {
-    'use strict';
-
-    const API_ROOT = (window.SCL_CONFIG && window.SCL_CONFIG.API_ROOT) || 'https://smartcardlink-api.onrender.com/api';
-    const ADMIN_FORM_URL = (window.SCL_CONFIG && window.SCL_CONFIG.ADMIN_FORM_URL) || 'admin-form.html';
-
-    const dashboardContainer = document.getElementById('dashboardContainer');
-    const clientTableBody = document.getElementById('clientTableBody');
-    const filterInput = document.getElementById('filterInput');
-    const statusFilter = document.getElementById('statusFilter');
-    const exportBtn = document.getElementById('exportBtn');
-    const noResultsDiv = document.getElementById('noResults');
-    const totalsDiv = document.getElementById('totals');
-    const searchBtn = document.getElementById('searchBtn');
-    const refreshBtn = document.getElementById('refreshBtn');
-
-    const notesModal = document.getElementById('notesModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalTextarea = document.getElementById('modalTextarea');
-    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
-    const modalCloseBtn = document.querySelector('.modal-content .close-btn');
-    const toastContainer = document.getElementById('toast-container');
-
-    let allClientData = [];
-    let filteredClientData = [];
-    let activeModalAction = null;
-    let currentFetchController = null;
-    let isBusy = false;
-
-    function escapeHtml(value) {
-        return String(value == null ? '' : value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+  const API_BASE = (() => {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || window.location.protocol === 'file:') {
+      return 'http://localhost:8080';
     }
+    return 'https://smartcardlink-api.onrender.com';
+  })();
 
-    function showToast(message, type) {
-        if (!toastContainer) return;
-        const toast = document.createElement('div');
-        toast.className = 'toast ' + (type || 'success');
-        toast.innerHTML = '<span>' + escapeHtml(message) + '</span><button class="toast-close-btn" type="button" style="background:none;border:none;color:white;margin-left:10px;cursor:pointer;">&times;</button>';
-        const closeBtn = toast.querySelector('.toast-close-btn');
+  const STATUS_ORDER = ['Pending', 'Processed', 'Active', 'Disabled', 'Suspended', 'Deleted'];
+  const DEFAULT_VISIBLE_STATUSES = ['Pending', 'Processed', 'Active', 'Disabled', 'Suspended'];
 
-        function removeToast() {
-            toast.classList.remove('show');
-            window.setTimeout(function () {
-                if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 250);
-        }
+  const els = {
+    tableBody: document.getElementById('clientsTableBody') || document.getElementById('tableBody') || document.querySelector('tbody'),
+    searchInput: document.getElementById('searchInput') || document.getElementById('searchBox') || document.querySelector('input[type="search"]'),
+    statusFilter: document.getElementById('statusFilter') || document.getElementById('filterStatus'),
+    refreshBtn: document.getElementById('refreshBtn') || document.getElementById('reloadBtn'),
+    exportBtn: document.getElementById('exportBtn') || document.getElementById('downloadCsvBtn'),
+    totalCount: document.getElementById('totalCount'),
+    emptyState: document.getElementById('emptyState') || document.getElementById('noDataMessage'),
+    loadingState: document.getElementById('loadingState'),
+  };
 
-        closeBtn.addEventListener('click', removeToast);
-        toastContainer.appendChild(toast);
-        window.setTimeout(function () {
-            toast.classList.add('show');
-        }, 10);
-        window.setTimeout(removeToast, 4500);
+  let allClients = [];
+  let renderedClients = [];
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function normalizeStatus(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    const match = STATUS_ORDER.find((status) => status.toLowerCase() === raw);
+    return match || 'Pending';
+  }
+
+  function badgeClass(status) {
+    switch (status) {
+      case 'Pending': return 'status-badge pending';
+      case 'Processed': return 'status-badge processed';
+      case 'Active': return 'status-badge active';
+      case 'Disabled':
+      case 'Suspended': return 'status-badge suspended';
+      case 'Deleted': return 'status-badge deleted';
+      default: return 'status-badge';
     }
+  }
 
-    function setLoadingState(message) {
-        if (!clientTableBody) return;
-        clientTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">' + escapeHtml(message || 'Loading client data...') + '</td></tr>';
+  function updateCounters() {
+    if (els.totalCount) {
+      els.totalCount.textContent = String(renderedClients.length);
     }
-
-    function showTableError(message) {
-        if (!clientTableBody) return;
-        clientTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#ef4444; padding:20px;">' + escapeHtml(message) + '</td></tr>';
-        showToast(message, 'error');
+    if (els.emptyState) {
+      els.emptyState.style.display = renderedClients.length ? 'none' : 'block';
     }
+  }
 
-    function normalizeStatus(value) {
-        const raw = String(value || 'Pending').trim().toLowerCase();
-        if (raw === 'disabled') return 'Disabled';
-        if (raw === 'suspended') return 'Suspended';
-        if (raw === 'processed') return 'Processed';
-        if (raw === 'active') return 'Active';
-        if (raw === 'deleted') return 'Deleted';
-        return 'Pending';
+  function openAdminForm(clientId) {
+    window.location.href = 'admin-form.html?id=' + encodeURIComponent(clientId);
+  }
+
+  async function callApi(url, options) {
+    const response = await fetch(API_BASE + url, options || {});
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(json.message || 'Request failed');
     }
+    return json;
+  }
 
-    function getStatusBadge(status) {
-        const clean = normalizeStatus(status);
-        const cssClass = clean === 'Suspended' ? 'Disabled' : clean;
-        return '<span class="status-badge status-' + cssClass + '">' + clean + '</span>';
-    }
+  async function updateStatus(clientId, nextStatus, notes) {
+    return callApi('/api/clients/' + encodeURIComponent(clientId) + '/status/' + encodeURIComponent(nextStatus), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notes || 'Updated from dashboard' }),
+    });
+  }
 
-    function updateTotals(data) {
-        if (!totalsDiv) return;
-        const source = Array.isArray(data) ? data : [];
-        const counts = {
-            Pending: 0,
-            Processed: 0,
-            Active: 0,
-            Disabled: 0,
-            Deleted: 0
-        };
+  async function deleteClient(clientId, notes) {
+    return callApi('/api/clients/' + encodeURIComponent(clientId), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notes }),
+    });
+  }
 
-        source.forEach(function (client) {
-            const status = normalizeStatus(client.status);
-            if (status === 'Suspended') {
-                counts.Disabled += 1;
-                return;
-            }
-            if (counts[status] !== undefined) {
-                counts[status] += 1;
-            }
-        });
+  function clientMatchesSearch(client, searchTerm) {
+    if (!searchTerm) return true;
+    const haystack = [
+      client.fullName,
+      client.company,
+      client.email1,
+      client.phone1,
+      client.slug,
+      client.status,
+    ].join(' ').toLowerCase();
+    return haystack.includes(searchTerm);
+  }
 
-        totalsDiv.style.display = 'block';
-        totalsDiv.textContent = 'Total: ' + source.length + ' | Pending: ' + counts.Pending + ' | Processed: ' + counts.Processed + ' | Active: ' + counts.Active + ' | Disabled: ' + counts.Disabled + ' | Deleted: ' + counts.Deleted;
-    }
+  function getSelectedStatus() {
+    if (!els.statusFilter) return 'all';
+    return String(els.statusFilter.value || 'all');
+  }
 
-    function buildActions(client) {
-        const id = escapeHtml(client._id || client.id || '');
-        const status = normalizeStatus(client.status);
-        const parts = [];
+  function applyFilters() {
+    const statusValue = getSelectedStatus();
+    const searchTerm = (els.searchInput ? els.searchInput.value : '').trim().toLowerCase();
 
-        parts.push('<button type="button" class="action-btn btn-process" data-action="process" data-id="' + id + '">' + (status === 'Pending' ? 'Process' : 'View') + '</button>');
+    renderedClients = allClients.filter((client) => {
+      const status = normalizeStatus(client.status);
+      const statusAllowed = statusValue === 'all'
+        ? DEFAULT_VISIBLE_STATUSES.includes(status)
+        : status === normalizeStatus(statusValue);
+      return statusAllowed && clientMatchesSearch(client, searchTerm);
+    });
 
-        if (status === 'Active') {
-            parts.push('<button type="button" class="action-btn btn-disable" data-action="status" data-id="' + id + '" data-status="Disabled">Disable</button>');
-        }
+    renderTable();
+    updateCounters();
+  }
 
-        if (status === 'Disabled' || status === 'Suspended') {
-            parts.push('<button type="button" class="action-btn btn-enable" data-action="status" data-id="' + id + '" data-status="Active">Enable</button>');
-        }
+  function renderTable() {
+    if (!els.tableBody) return;
+    els.tableBody.innerHTML = '';
 
-        if (client.vcardUrl) {
-            parts.push('<button type="button" class="action-btn btn-view" data-action="public" data-url="' + escapeHtml(client.vcardUrl) + '">Public</button>');
-        }
+    renderedClients.forEach((client, index) => {
+      const status = normalizeStatus(client.status);
+      const clientId = client._id || client.id || '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = ''
+        + '<td>' + (index + 1) + '</td>'
+        + '<td>' + escapeHtml(client.fullName || '') + '</td>'
+        + '<td>' + escapeHtml(client.company || '') + '</td>'
+        + '<td>' + escapeHtml(client.email1 || '') + '</td>'
+        + '<td>' + escapeHtml(client.phone1 || '') + '</td>'
+        + '<td><span class="' + badgeClass(status) + '">' + escapeHtml(status) + '</span></td>'
+        + '<td>'
+        +   '<button type="button" class="process-btn" data-id="' + escapeHtml(clientId) + '">Process</button> '
+        +   (status === 'Active'
+              ? '<button type="button" class="disable-btn" data-id="' + escapeHtml(clientId) + '">Disable</button> '
+              : (status === 'Disabled' || status === 'Suspended')
+                ? '<button type="button" class="enable-btn" data-id="' + escapeHtml(clientId) + '">Enable</button> '
+                : '')
+        +   '<button type="button" class="delete-btn" data-id="' + escapeHtml(clientId) + '">Delete</button>'
+        + '</td>';
+      els.tableBody.appendChild(tr);
+    });
 
-        if (client.qrCodeUrl) {
-            parts.push('<button type="button" class="action-btn btn-view" data-action="qr" data-url="' + escapeHtml(client.qrCodeUrl) + '">QR</button>');
-        }
+    els.tableBody.querySelectorAll('.process-btn').forEach((btn) => {
+      btn.addEventListener('click', () => openAdminForm(btn.dataset.id));
+    });
 
-        if (status !== 'Deleted') {
-            parts.push('<button type="button" class="action-btn btn-delete" data-action="delete" data-id="' + id + '">Delete</button>');
-        }
-
-        return parts.join('');
-    }
-
-    function renderTable(data) {
-        if (!clientTableBody) return;
-
-        const source = Array.isArray(data) ? data : [];
-        filteredClientData = source.slice();
-        clientTableBody.innerHTML = '';
-
-        if (source.length === 0) {
-            if (noResultsDiv) noResultsDiv.style.display = 'block';
-            clientTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No clients found.</td></tr>';
-            updateTotals([]);
-            return;
-        }
-
-        if (noResultsDiv) noResultsDiv.style.display = 'none';
-        updateTotals(source);
-
-        source.forEach(function (client) {
-            const tr = document.createElement('tr');
-            tr.setAttribute('data-client-id', client._id || client.id || '');
-            tr.innerHTML = '' +
-                '<td><img src="' + escapeHtml(client.photoUrl || 'https://placehold.co/50x50?text=No+Photo') + '" alt="Client Photo" class="client-photo" onerror="this.onerror=null;this.src=\'https://placehold.co/50x50/111/fff?text=No+Photo\';" /></td>' +
-                '<td>' + escapeHtml(client.fullName || 'N/A') + '</td>' +
-                '<td>' + escapeHtml(client.company || client.companyName || 'N/A') + '</td>' +
-                '<td>' + escapeHtml(client.email1 || 'N/A') + '</td>' +
-                '<td>' + escapeHtml(client.phone1 || 'N/A') + '</td>' +
-                '<td>' + getStatusBadge(client.status) + '</td>' +
-                '<td class="actions-cell">' + buildActions(client) + '</td>';
-            clientTableBody.appendChild(tr);
-        });
-    }
-
-    function applyFilters() {
-        const searchValue = String(filterInput && filterInput.value || '').trim().toLowerCase();
-        const statusValue = normalizeStatus(statusFilter && statusFilter.value || '');
-        const useStatusFilter = !!(statusFilter && statusFilter.value);
-
-        const results = allClientData.filter(function (client) {
-            const haystack = [
-                client.fullName,
-                client.company,
-                client.companyName,
-                client.email1,
-                client.phone1,
-                client.slug,
-                client._id,
-                client.id
-            ].join(' ').toLowerCase();
-
-            const searchPass = !searchValue || haystack.indexOf(searchValue) !== -1;
-            const statusPass = !useStatusFilter || normalizeStatus(client.status) === statusValue;
-            return searchPass && statusPass;
-        });
-
-        renderTable(results);
-    }
-
-    function exportToCsv() {
-        const source = filteredClientData.length ? filteredClientData : allClientData;
-        if (!source.length) {
-            showToast('No client data available for export.', 'error');
-            return;
-        }
-
-        const headers = ['ID', 'Name', 'Company', 'Email', 'Phone', 'Status', 'Slug', 'Public URL'];
-        const rows = source.map(function (client) {
-            return [
-                client._id || client.id || '',
-                client.fullName || '',
-                client.company || client.companyName || '',
-                client.email1 || '',
-                client.phone1 || '',
-                normalizeStatus(client.status),
-                client.slug || '',
-                client.vcardUrl || ''
-            ];
-        });
-
-        const csv = [headers].concat(rows).map(function (row) {
-            return row.map(function (field) {
-                return '"' + String(field).replace(/"/g, '""') + '"';
-            }).join(',');
-        }).join('\n');
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'smartcardlink_clients_' + new Date().toISOString().slice(0, 10) + '.csv';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        showToast('CSV exported successfully.', 'success');
-    }
-
-    function openModal(config) {
-        activeModalAction = config || null;
-        if (!notesModal || !modalTitle || !modalTextarea || !modalConfirmBtn) return;
-
-        modalTitle.textContent = config.title;
-        modalTextarea.value = '';
-        modalTextarea.placeholder = config.placeholder || 'Enter reason';
-        notesModal.style.display = 'block';
-        window.setTimeout(function () {
-            modalTextarea.focus();
-        }, 20);
-    }
-
-    function closeModal() {
-        activeModalAction = null;
-        if (!notesModal || !modalTextarea) return;
-        notesModal.style.display = 'none';
-        modalTextarea.value = '';
-    }
-
-    async function requestJson(url, options) {
-        const response = await fetch(url, options || {});
-        let payload = null;
+    els.tableBody.querySelectorAll('.disable-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const reason = window.prompt('Enter reason for disabling this client:');
+        if (!reason || !reason.trim()) return;
         try {
-            payload = await response.json();
+          await updateStatus(btn.dataset.id, 'Disabled', reason.trim());
+          await fetchClients();
         } catch (error) {
-            payload = null;
+          window.alert(error.message);
         }
+      });
+    });
 
-        if (!response.ok) {
-            const message = payload && payload.message ? payload.message : 'Request failed with status ' + response.status;
-            throw new Error(message);
-        }
-
-        return payload;
-    }
-
-    async function fetchAllClients(forceStatus) {
-        if (!API_ROOT || isBusy) return;
-
-        isBusy = true;
-        if (refreshBtn) refreshBtn.disabled = true;
-        if (searchBtn) searchBtn.disabled = true;
-        setLoadingState('Loading client data...');
-
-        if (currentFetchController) {
-            currentFetchController.abort();
-        }
-        currentFetchController = new AbortController();
-
+    els.tableBody.querySelectorAll('.enable-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const reason = window.prompt('Enter reason for enabling this client:');
+        if (!reason || !reason.trim()) return;
         try {
-            const selectedStatus = typeof forceStatus === 'string' ? forceStatus : String(statusFilter && statusFilter.value || '').trim();
-            const query = selectedStatus
-                ? '?status=' + encodeURIComponent(selectedStatus)
-                : '?includeDeleted=true';
-
-            const payload = await requestJson(API_ROOT + '/admin/clients' + query, {
-                method: 'GET',
-                signal: currentFetchController.signal,
-                cache: 'no-store'
-            });
-
-            allClientData = Array.isArray(payload && payload.data) ? payload.data : [];
-            applyFilters();
+          await updateStatus(btn.dataset.id, 'Active', reason.trim());
+          await fetchClients();
         } catch (error) {
-            if (error.name === 'AbortError') {
-                return;
-            }
-            showTableError(error.message || 'Failed to load clients.');
-        } finally {
-            isBusy = false;
-            if (refreshBtn) refreshBtn.disabled = false;
-            if (searchBtn) searchBtn.disabled = false;
+          window.alert(error.message);
         }
-    }
+      });
+    });
 
-    function openAdminForm(clientId) {
-        const target = new URL(ADMIN_FORM_URL, window.location.href);
-        target.searchParams.set('id', clientId);
-        window.open(target.toString(), '_blank');
-    }
-
-    async function updateStatus(clientId, newStatus, notes) {
-        await requestJson(API_ROOT + '/clients/' + encodeURIComponent(clientId) + '/status/' + encodeURIComponent(newStatus), {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ notes: notes })
-        });
-    }
-
-    async function deleteClient(clientId, notes) {
-        await requestJson(API_ROOT + '/clients/' + encodeURIComponent(clientId), {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ notes: notes })
-        });
-    }
-
-    async function handleActionClick(event) {
-        const button = event.target.closest('button[data-action]');
-        if (!button) return;
-
-        const action = button.getAttribute('data-action');
-        const clientId = button.getAttribute('data-id') || '';
-        const url = button.getAttribute('data-url') || '';
-        const status = button.getAttribute('data-status') || '';
-
-        if (action === 'process') {
-            openAdminForm(clientId);
-            return;
+    els.tableBody.querySelectorAll('.delete-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const reason = window.prompt('Enter delete reason:');
+        if (!reason || !reason.trim()) {
+          window.alert('Delete reason is required.');
+          return;
         }
-
-        if (action === 'public' || action === 'qr') {
-            window.open(url, '_blank');
-            return;
-        }
-
-        if (action === 'status') {
-            openModal({
-                type: 'status',
-                title: 'Reason for ' + status,
-                placeholder: 'Enter the reason for changing this client to ' + status + '.',
-                clientId: clientId,
-                status: status
-            });
-            return;
-        }
-
-        if (action === 'delete') {
-            openModal({
-                type: 'delete',
-                title: 'Reason for Delete',
-                placeholder: 'Enter the mandatory reason for deleting this client.',
-                clientId: clientId
-            });
-        }
-    }
-
-    async function confirmModalAction() {
-        if (!activeModalAction) return;
-        const notes = String(modalTextarea && modalTextarea.value || '').trim();
-        if (!notes) {
-            showToast('A reason is required to proceed.', 'error');
-            return;
-        }
-
-        modalConfirmBtn.disabled = true;
-
+        const ok = window.confirm('Delete this client?');
+        if (!ok) return;
         try {
-            if (activeModalAction.type === 'status') {
-                await updateStatus(activeModalAction.clientId, activeModalAction.status, notes);
-                showToast('Status updated successfully.', 'success');
-            }
-
-            if (activeModalAction.type === 'delete') {
-                await deleteClient(activeModalAction.clientId, notes);
-                showToast('Client deleted successfully.', 'success');
-            }
-
-            closeModal();
-            await fetchAllClients();
+          await deleteClient(btn.dataset.id, reason.trim());
+          await fetchClients();
         } catch (error) {
-            showToast(error.message || 'Action failed.', 'error');
-        } finally {
-            modalConfirmBtn.disabled = false;
+          window.alert(error.message);
         }
+      });
+    });
+  }
+
+  async function fetchClients() {
+    try {
+      if (els.loadingState) els.loadingState.style.display = 'block';
+      const json = await callApi('/api/admin/clients');
+      allClients = Array.isArray(json.data) ? json.data : [];
+      applyFilters();
+    } catch (error) {
+      window.alert(error.message);
+    } finally {
+      if (els.loadingState) els.loadingState.style.display = 'none';
+    }
+  }
+
+  function exportCsv() {
+    const rows = [
+      ['Full Name', 'Company', 'Email', 'Phone', 'Status', 'Slug'],
+      ...renderedClients.map((client) => [
+        client.fullName || '',
+        client.company || '',
+        client.email1 || '',
+        client.phone1 || '',
+        normalizeStatus(client.status),
+        client.slug || '',
+      ]),
+    ];
+
+    const csv = rows.map((row) => row.map((cell) => {
+      const value = String(cell == null ? '' : cell);
+      return '"' + value.replace(/"/g, '""') + '"';
+    }).join(',')).join('\r\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'smartcardlink-clients.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function initStatusFilter() {
+    if (!els.statusFilter) return;
+    if (!els.statusFilter.options.length) {
+      ['all', ...STATUS_ORDER].forEach((status) => {
+        const option = document.createElement('option');
+        option.value = status === 'all' ? 'all' : status;
+        option.textContent = status === 'all' ? 'All Open Clients' : status;
+        els.statusFilter.appendChild(option);
+      });
     }
 
-    function attachEvents() {
-        if (searchBtn) {
-            searchBtn.addEventListener('click', applyFilters);
-        }
-
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', function () {
-                fetchAllClients();
-            });
-        }
-
-        if (filterInput) {
-            filterInput.addEventListener('input', applyFilters);
-        }
-
-        if (statusFilter) {
-            statusFilter.addEventListener('change', function () {
-                fetchAllClients(statusFilter.value);
-            });
-        }
-
-        if (exportBtn) {
-            exportBtn.addEventListener('click', exportToCsv);
-        }
-
-        if (clientTableBody) {
-            clientTableBody.addEventListener('click', handleActionClick);
-        }
-
-        if (modalConfirmBtn) {
-            modalConfirmBtn.addEventListener('click', confirmModalAction);
-        }
-
-        if (modalCloseBtn) {
-            modalCloseBtn.addEventListener('click', closeModal);
-        }
-
-        if (notesModal) {
-            notesModal.addEventListener('click', function (event) {
-                if (event.target === notesModal) {
-                    closeModal();
-                }
-            });
-        }
+    const currentValues = Array.from(els.statusFilter.options).map((option) => String(option.value || '').toLowerCase());
+    if (!currentValues.includes('processed')) {
+      const option = document.createElement('option');
+      option.value = 'Processed';
+      option.textContent = 'Processed';
+      els.statusFilter.appendChild(option);
     }
 
-    function init() {
-        if (!API_ROOT) {
-            showTableError('API root is not configured.');
-            return;
-        }
-
-        if (dashboardContainer) {
-            dashboardContainer.style.display = 'block';
-        }
-
-        attachEvents();
-        fetchAllClients(String(statusFilter && statusFilter.value || ''));
+    if (!els.statusFilter.value) {
+      els.statusFilter.value = 'all';
     }
+  }
 
-    window.fetchAllClients = fetchAllClients;
-    window.exportToCsv = exportToCsv;
+  function wireEvents() {
+    if (els.searchInput) {
+      els.searchInput.addEventListener('input', applyFilters);
+    }
+    if (els.statusFilter) {
+      els.statusFilter.addEventListener('change', applyFilters);
+    }
+    if (els.refreshBtn) {
+      els.refreshBtn.addEventListener('click', fetchClients);
+    }
+    if (els.exportBtn) {
+      els.exportBtn.addEventListener('click', exportCsv);
+    }
+  }
 
-    document.addEventListener('DOMContentLoaded', init);
+  initStatusFilter();
+  wireEvents();
+  fetchClients();
 })();
