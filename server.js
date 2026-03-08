@@ -274,6 +274,32 @@ const applyPayloadToClient = async (client, payload, actor, notes) => {
     client.themeName = String(incoming.themeName || client.themeName || 'Default Gold').trim() || 'Default Gold';
     client.appointmentUrl = buildAppointmentUrl(client.email1, incoming.appointmentUrl || incoming.bookingLink || client.appointmentUrl);
 
+    if (!client.socialLinks || typeof client.socialLinks !== 'object') {
+        client.socialLinks = {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            linkedin: '',
+            tiktok: '',
+            youtube: ''
+        };
+    }
+
+    if (!client.workingHours || typeof client.workingHours !== 'object') {
+        client.workingHours = {
+            monFriStart: '',
+            monFriEnd: '',
+            satStart: '',
+            satEnd: '',
+            sunStart: '',
+            sunEnd: ''
+        };
+    }
+
+    if (!Array.isArray(client.history)) {
+        client.history = [];
+    }
+
     const socialLinks = incoming.socialLinks || {};
     client.socialLinks.facebook = sanitizeUrl(socialLinks.facebook || incoming.facebook || '');
     client.socialLinks.instagram = sanitizeUrl(socialLinks.instagram || incoming.instagram || '');
