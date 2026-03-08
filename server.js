@@ -242,8 +242,13 @@ const mapClientForResponse = (clientDoc) => {
 const applyPayloadToClient = async (client, payload, actor, notes) => {
     const incoming = payload || {};
     const newFullName = String(incoming.fullName || client.fullName || '').trim();
+
     if (!newFullName) {
         throw new Error('Full name is required.');
+    }
+
+    if (!Array.isArray(client.history)) {
+        client.history = [];
     }
 
     if (newFullName !== client.fullName) {
@@ -294,10 +299,6 @@ const applyPayloadToClient = async (client, payload, actor, notes) => {
             sunStart: '',
             sunEnd: ''
         };
-    }
-
-    if (!Array.isArray(client.history)) {
-        client.history = [];
     }
 
     const socialLinks = incoming.socialLinks || {};
