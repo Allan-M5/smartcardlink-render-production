@@ -548,9 +548,110 @@
                 0 24px 60px rgba(0,0,0,0.55) !important;
         }
 
+
+        .access-modal {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(0,0,0,0.62);
+            backdrop-filter: blur(10px);
+            z-index: 99999;
+        }
+
+        .access-box {
+            width: 100%;
+            max-width: 390px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 26px;
+            padding: 24px 20px 20px;
+            backdrop-filter: blur(18px);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 24px rgba(255,215,0,0.08);
+            text-align: center;
+        }
+
+        .access-title {
+            margin: 0 0 16px;
+            font-size: 1.12rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .access-error {
+            min-height: 20px;
+            margin: 0 0 12px;
+            font-size: 0.86rem;
+            color: #fca5a5;
+        }
+
+        .access-input {
+            width: 100%;
+            height: 52px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            padding: 0 16px;
+            font-size: 0.98rem;
+            outline: none;
+            margin-bottom: 16px;
+        }
+
+        .access-input:focus {
+            border-color: rgba(255,215,0,0.55);
+            box-shadow: 0 0 0 4px rgba(255,215,0,0.08);
+        }
+
+        .access-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .access-btn {
+            min-width: 120px;
+            height: 46px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.22s ease;
+        }
+
+        .access-btn:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,0.09);
+        }
+
+        .access-btn.primary {
+            border-color: rgba(255,215,0,0.34);
+            background: rgba(255,215,0,0.10);
+            color: #ffd700;
+        }
+
+        body.access-locked {
+            overflow: hidden;
+        }
 </style>
 </head>
-<body>
+<body class="access-locked">
+    <div class="access-modal" id="accessModal">
+        <div class="access-box">
+            <h3 class="access-title">Enter Password</h3>
+            <div class="access-error" id="accessError"></div>
+            <input type="password" id="accessPasswordInput" class="access-input" placeholder="Password" />
+            <div class="access-actions">
+                <button type="button" id="accessCancelBtn" class="access-btn">Cancel</button>
+                <button type="button" id="accessEnterBtn" class="access-btn primary">Enter</button>
+            </div>
+        </div>
+    </div>
+
     <video autoplay muted loop playsinline webkit-playsinline preload="auto" id="bg-video" poster="https://res.cloudinary.com/dicvwaud3/video/upload/so_0/oyvgam7oizwizgwxaxge.jpg" aria-hidden="true">
         <source src="https://res.cloudinary.com/dicvwaud3/video/upload/f_mp4,q_auto:good,vc_auto/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
     </video>
@@ -1112,11 +1213,57 @@
             playVideo();
         }
 
-        fetchClients(true);
-        startAutoRefresh();
+        const CLIENTS_DASHBOARD_PASSWORD = "500smart";
+        const accessModal = document.getElementById("accessModal");
+        const accessPasswordInput = document.getElementById("accessPasswordInput");
+        const accessError = document.getElementById("accessError");
+        const accessCancelBtn = document.getElementById("accessCancelBtn");
+        const accessEnterBtn = document.getElementById("accessEnterBtn");
+
+        function unlockDashboard() {
+            accessModal.style.display = "none";
+            document.body.classList.remove("access-locked");
+            fetchClients(true);
+            startAutoRefresh();
+        }
+
+        function denyAndReturn() {
+            window.location.href = "https://smartcardlink-dashboard-frontend.onrender.com/smartcardlink-hub.html";
+        }
+
+        function submitDashboardPassword() {
+            const entered = accessPasswordInput.value.trim();
+
+            if (!entered) {
+                accessError.textContent = "Password is required.";
+                accessPasswordInput.focus();
+                return;
+            }
+
+            if (entered !== CLIENTS_DASHBOARD_PASSWORD) {
+                accessError.textContent = "Incorrect password.";
+                accessPasswordInput.focus();
+                accessPasswordInput.select();
+                return;
+            }
+
+            unlockDashboard();
+        }
+
+        accessEnterBtn.addEventListener("click", submitDashboardPassword);
+        accessCancelBtn.addEventListener("click", denyAndReturn);
+
+        accessPasswordInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") submitDashboardPassword();
+            if (event.key === "Escape") denyAndReturn();
+        });
+
+        setTimeout(() => accessPasswordInput.focus(), 50);
     </script>
 </body>
 </html>
+
+
 
 
 
