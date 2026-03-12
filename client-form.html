@@ -1,5 +1,4 @@
-﻿
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -69,7 +68,7 @@
   }
 
   button:disabled {
-    opacity: 0.75;
+    opacity: 0.78;
     cursor: not-allowed;
   }
 
@@ -146,21 +145,6 @@
     }
   }
 
-  .result {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 0.5rem;
-    color: #e2e8f0;
-    display: none;
-  }
-
-  .result a {
-    color: #FFD700;
-    word-break: break-all;
-  }
-
   .form-message {
     text-align: center;
     padding: 1rem;
@@ -195,9 +179,9 @@
     align-items: center;
     justify-content: center;
     padding: 1.2rem;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(10px);
+    background: rgba(0,0,0,0.08);
     z-index: 99999;
+    pointer-events: none;
   }
 
   .submission-overlay.show {
@@ -206,67 +190,116 @@
 
   .submission-status-card {
     width: 100%;
-    max-width: 520px;
-    border-radius: 1.4rem;
-    padding: 1.6rem 1.4rem;
+    max-width: 540px;
+    border-radius: 1.2rem;
+    padding: 1.35rem 1.2rem;
     color: white;
     text-align: center;
-    border: 1px solid rgba(255,255,255,0.14);
-    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
-    backdrop-filter: blur(18px);
-    transition: 0.35s ease;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.26);
+    background: rgba(15,15,15,0.82);
+    transition: opacity 0.45s ease, transform 0.45s ease, background 0.35s ease, border-color 0.35s ease;
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    pointer-events: auto;
+    backdrop-filter: blur(12px);
+  }
+
+  .submission-overlay.show .submission-status-card {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 
   .submission-status-card.success-state {
-    background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(6,95,70,0.72));
-    border-color: rgba(52,211,153,0.35);
+    background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(10,25,19,0.92));
+    border-color: rgba(52,211,153,0.34);
   }
 
   .submission-status-card.processing-state {
-    background: linear-gradient(135deg, rgba(249,115,22,0.22), rgba(154,52,18,0.72));
-    border-color: rgba(251,146,60,0.38);
+    background: linear-gradient(135deg, rgba(249,115,22,0.22), rgba(35,18,9,0.92));
+    border-color: rgba(251,146,60,0.34);
+  }
+
+  .submission-status-card.choice-state {
+    background: linear-gradient(135deg, rgba(255,215,0,0.14), rgba(15,15,15,0.92));
+    border-color: rgba(255,215,0,0.30);
   }
 
   .submission-emoji {
-    font-size: 3rem;
+    font-size: 2.7rem;
     line-height: 1;
-    margin-bottom: 0.7rem;
+    margin-bottom: 0.55rem;
   }
 
   .submission-title {
-    font-size: 1.45rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    margin: 0 0 0.55rem;
+    margin: 0 0 0.45rem;
     letter-spacing: -0.02em;
   }
 
   .submission-id {
     display: inline-block;
-    margin: 0.35rem 0 0.8rem;
-    padding: 0.55rem 0.9rem;
+    margin: 0.3rem 0 0.7rem;
+    padding: 0.5rem 0.85rem;
     border-radius: 999px;
     background: rgba(255,255,255,0.10);
     border: 1px solid rgba(255,255,255,0.12);
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     font-weight: 700;
     word-break: break-all;
   }
 
   .submission-text {
     margin: 0;
-    font-size: 0.98rem;
-    line-height: 1.6;
+    font-size: 0.96rem;
+    line-height: 1.55;
     color: rgba(255,255,255,0.92);
   }
 
   .submission-spinner {
-    width: 42px;
-    height: 42px;
-    margin: 0 auto 0.8rem;
+    width: 38px;
+    height: 38px;
+    margin: 0 auto 0.75rem;
     border-radius: 50%;
     border: 3px solid rgba(255,255,255,0.18);
     border-top-color: rgba(255,255,255,0.95);
-    animation: submissionSpin 0.9s linear infinite;
+    animation: submissionSpin 0.85s linear infinite;
+  }
+
+  .submission-actions {
+    display: none;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .submission-actions.show {
+    display: flex;
+  }
+
+  .submission-action-btn {
+    min-width: 180px;
+    padding: 0.8rem 1rem;
+    border-radius: 0.8rem;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.25s ease;
+  }
+
+  .submission-action-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.14);
+  }
+
+  .submission-action-btn.primary {
+    border-color: rgba(255,215,0,0.32);
+    color: #FFD700;
+    background: rgba(255,215,0,0.08);
   }
 
   @keyframes submissionSpin {
@@ -401,6 +434,11 @@
     <h2 class="submission-title" id="submissionTitle">Details Successfully Submitted</h2>
     <div class="submission-id" id="submissionRecordId">ID: --</div>
     <p class="submission-text" id="submissionText">Your information has been received successfully.</p>
+
+    <div class="submission-actions" id="submissionActions">
+      <button type="button" class="submission-action-btn" id="stayOnPageBtn">Remain on This Page</button>
+      <button type="button" class="submission-action-btn primary" id="visitWebsiteBtn">Visit vCard Website</button>
+    </div>
   </div>
 </div>
 
@@ -414,6 +452,9 @@
   const submissionTitle = document.getElementById("submissionTitle");
   const submissionRecordId = document.getElementById("submissionRecordId");
   const submissionText = document.getElementById("submissionText");
+  const submissionActions = document.getElementById("submissionActions");
+  const stayOnPageBtn = document.getElementById("stayOnPageBtn");
+  const visitWebsiteBtn = document.getElementById("visitWebsiteBtn");
 
   ["sunStart","sunEnd"].forEach(id => {
     const el = document.getElementById(id);
@@ -428,27 +469,47 @@
     formMessage.scrollIntoView({ behavior: "auto", block: "center" });
   }
 
-  function showSuccessProcessingSequence(recordId) {
+  function showSuccessProcessingSequence(recordId, btn) {
+    submissionActions.classList.remove("show");
     submissionOverlay.classList.add("show");
+
     submissionStatusCard.className = "submission-status-card success-state";
     submissionEmoji.textContent = "😎👍";
     submissionTitle.textContent = "Details Successfully Submitted";
     submissionRecordId.textContent = "ID: " + recordId;
     submissionRecordId.style.display = "inline-block";
-    submissionText.textContent = "Your details have been received successfully.";
+    submissionText.textContent = "Your information has been received successfully and recorded properly.";
 
     setTimeout(() => {
       submissionStatusCard.className = "submission-status-card processing-state";
       submissionEmoji.innerHTML = '<div class="submission-spinner"></div>';
       submissionTitle.textContent = "vCard Processing Shortly";
       submissionRecordId.style.display = "none";
-      submissionText.textContent = "Please hold on as we begin the next process.";
-    }, 1800);
+      submissionText.textContent = "The next process is now beginning. Please choose what you would like to do next.";
+    }, 2800);
 
     setTimeout(() => {
-      window.location.href = "https://smartcardlink-landing.onrender.com/";
-    }, 3600);
+      submissionStatusCard.className = "submission-status-card choice-state";
+      submissionEmoji.textContent = "✅";
+      submissionTitle.textContent = "Next Step";
+      submissionRecordId.style.display = "none";
+      submissionText.textContent = "You may remain on this page to submit another application or visit the vCard website.";
+      submissionActions.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = "Submit Form";
+    }, 4700);
   }
+
+  stayOnPageBtn.addEventListener("click", () => {
+    submissionOverlay.classList.remove("show");
+    submissionActions.classList.remove("show");
+    formMessage.style.display = "none";
+    document.getElementById("fullName")?.focus();
+  });
+
+  visitWebsiteBtn.addEventListener("click", () => {
+    window.open("https://smartcardlink-landing.onrender.com/", "_blank");
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -505,8 +566,7 @@
 
       const recordId = result.data?._id || result.data?.id || result.recordId || "Success";
       form.reset();
-      btn.textContent = "Saved Successfully";
-      showSuccessProcessingSequence(recordId);
+      showSuccessProcessingSequence(recordId, btn);
 
     } catch (err) {
       showMessage("Error: " + err.message, "error");
