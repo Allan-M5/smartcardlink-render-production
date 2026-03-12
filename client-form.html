@@ -1,12 +1,12 @@
+﻿
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SmartCardLink Client Form</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* All CSS syntax has been hardened with semicolons to eliminate previous parser errors */
   body {
     font-family: 'Inter', sans-serif;
     display: flex;
@@ -19,6 +19,7 @@
     position: relative;
     color: white;
   }
+
   #bg-video {
     position: fixed;
     right: 0;
@@ -29,6 +30,7 @@
     filter: brightness(0.4) saturate(1.2);
     object-fit: cover;
   }
+
   .form-card {
     background-color: #111;
     border-radius: 1rem;
@@ -39,6 +41,7 @@
     box-shadow: 0 0 20px rgba(0,0,0,0.4);
     overflow-y: auto;
   }
+
   h1.title {
     color: #FFD700;
     text-align: center;
@@ -46,6 +49,7 @@
     font-weight: 700;
     margin-bottom: 1rem;
   }
+
   button {
     transition: background-color 0.3s, color 0.3s;
     font-weight: 600;
@@ -58,10 +62,17 @@
     width: 100%;
     margin-top: 1rem;
   }
+
   button:hover {
     background-color: #FFD700;
     color: black;
   }
+
+  button:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+
   .section-header {
     background-color: #1f2937;
     color: #FFD700;
@@ -72,12 +83,14 @@
     margin-bottom: 0.5rem;
     font-weight: 600;
   }
+
   label {
     color: white;
     font-size: 0.9rem;
     margin-bottom: 0.25rem;
     display: block;
   }
+
   input, textarea {
     width: 100%;
     padding: 0.5rem;
@@ -88,11 +101,13 @@
     background-color: white;
     color: black;
   }
+
   .grid-2col {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
   }
+
   .payment-info, .disclaimer {
     margin-top: 1rem;
     padding: 1rem;
@@ -101,30 +116,36 @@
     background-color: #1a1a1a;
     text-align: center;
   }
+
   .payment-info p {
     margin: 0.25rem 0;
     color: #f0f0f0;
     font-size: 0.9rem;
   }
+
   .disclaimer h3 {
     margin: 0;
     color: #FFD700;
   }
+
   .disclaimer ul {
     list-style-type: disc;
     padding-left: 20px;
     text-align: left;
     margin-top: 0.5rem;
   }
+
   .disclaimer li {
     margin-bottom: 0.25rem;
     font-size: 0.9rem;
   }
+
   @media (max-width: 768px) {
     .grid-2col {
       grid-template-columns: 1fr;
     }
   }
+
   .result {
     margin-top: 1rem;
     padding: 1rem;
@@ -134,7 +155,12 @@
     color: #e2e8f0;
     display: none;
   }
-  .result a { color: #FFD700; word-break: break-all; }
+
+  .result a {
+    color: #FFD700;
+    word-break: break-all;
+  }
+
   .form-message {
     text-align: center;
     padding: 1rem;
@@ -143,8 +169,110 @@
     font-weight: bold;
     display: none;
   }
-  .form-message.success { background-color: #d1e7dd; color: #0f5132; display: block; }
-  .form-message.error { background-color: #f8d7da; color: #842029; display: block; }
+
+  .form-message.success {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    display: block;
+  }
+
+  .form-message.error {
+    background-color: #f8d7da;
+    color: #842029;
+    display: block;
+  }
+
+  .form-message.info {
+    background-color: #cff4fc;
+    color: #055160;
+    display: block;
+  }
+
+  .submission-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.2rem;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(10px);
+    z-index: 99999;
+  }
+
+  .submission-overlay.show {
+    display: flex;
+  }
+
+  .submission-status-card {
+    width: 100%;
+    max-width: 520px;
+    border-radius: 1.4rem;
+    padding: 1.6rem 1.4rem;
+    color: white;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+    backdrop-filter: blur(18px);
+    transition: 0.35s ease;
+  }
+
+  .submission-status-card.success-state {
+    background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(6,95,70,0.72));
+    border-color: rgba(52,211,153,0.35);
+  }
+
+  .submission-status-card.processing-state {
+    background: linear-gradient(135deg, rgba(249,115,22,0.22), rgba(154,52,18,0.72));
+    border-color: rgba(251,146,60,0.38);
+  }
+
+  .submission-emoji {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 0.7rem;
+  }
+
+  .submission-title {
+    font-size: 1.45rem;
+    font-weight: 800;
+    margin: 0 0 0.55rem;
+    letter-spacing: -0.02em;
+  }
+
+  .submission-id {
+    display: inline-block;
+    margin: 0.35rem 0 0.8rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 0.92rem;
+    font-weight: 700;
+    word-break: break-all;
+  }
+
+  .submission-text {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.92);
+  }
+
+  .submission-spinner {
+    width: 42px;
+    height: 42px;
+    margin: 0 auto 0.8rem;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.18);
+    border-top-color: rgba(255,255,255,0.95);
+    animation: submissionSpin 0.9s linear infinite;
+  }
+
+  @keyframes submissionSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 </style>
 </head>
 <body>
@@ -206,7 +334,7 @@
       <div>
         <label for="businessWebsite">Business Website</label>
         <input type="url" name="businessWebsite" id="businessWebsite" autocomplete="url" />
-       </div>
+      </div>
     </div>
     <div class="grid-2col">
       <div>
@@ -267,19 +395,32 @@
   <div class="form-message" id="formMessage"></div>
 </div>
 
+<div class="submission-overlay" id="submissionOverlay">
+  <div class="submission-status-card success-state" id="submissionStatusCard">
+    <div class="submission-emoji" id="submissionEmoji">😎👍</div>
+    <h2 class="submission-title" id="submissionTitle">Details Successfully Submitted</h2>
+    <div class="submission-id" id="submissionRecordId">ID: --</div>
+    <p class="submission-text" id="submissionText">Your information has been received successfully.</p>
+  </div>
+</div>
+
 <script>
   const MAIN_API = "https://smartcardlink-api.onrender.com";
   const form = document.getElementById("clientForm");
   const formMessage = document.getElementById("formMessage");
+  const submissionOverlay = document.getElementById("submissionOverlay");
+  const submissionStatusCard = document.getElementById("submissionStatusCard");
+  const submissionEmoji = document.getElementById("submissionEmoji");
+  const submissionTitle = document.getElementById("submissionTitle");
+  const submissionRecordId = document.getElementById("submissionRecordId");
+  const submissionText = document.getElementById("submissionText");
 
-  // Enable Sunday fields immediately
   ["sunStart","sunEnd"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = false;
   });
 
   function showMessage(message, type) {
-    // Remove any special characters to ensure clean display
     const cleanMessage = message.replace(/[^\x00-\x7F]/g, "");
     formMessage.innerHTML = cleanMessage;
     formMessage.className = "form-message " + type;
@@ -287,12 +428,33 @@
     formMessage.scrollIntoView({ behavior: "auto", block: "center" });
   }
 
+  function showSuccessProcessingSequence(recordId) {
+    submissionOverlay.classList.add("show");
+    submissionStatusCard.className = "submission-status-card success-state";
+    submissionEmoji.textContent = "😎👍";
+    submissionTitle.textContent = "Details Successfully Submitted";
+    submissionRecordId.textContent = "ID: " + recordId;
+    submissionRecordId.style.display = "inline-block";
+    submissionText.textContent = "Your details have been received successfully.";
+
+    setTimeout(() => {
+      submissionStatusCard.className = "submission-status-card processing-state";
+      submissionEmoji.innerHTML = '<div class="submission-spinner"></div>';
+      submissionTitle.textContent = "vCard Processing Shortly";
+      submissionRecordId.style.display = "none";
+      submissionText.textContent = "Please hold on as we begin the next process.";
+    }, 1800);
+
+    setTimeout(() => {
+      window.location.href = "https://smartcardlink-landing.onrender.com/";
+    }, 3600);
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = form.querySelector("button[type=submit]");
     formMessage.style.display = "none";
-    
-    // 1. Lock UI and show "Processing"
+
     btn.disabled = true;
     const originalText = "Submit Form";
     btn.textContent = "Processing... Please wait";
@@ -320,13 +482,15 @@
       };
 
       ["facebook","instagram","twitter","linkedin","tiktok","youtube"].forEach(k => {
-        const v = formData.get(k); if(v) payload.socialLinks[k] = v;
-      });
-      ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
-        const v = formData.get(k); if(v) payload.workingHours[k] = v;
+        const v = formData.get(k);
+        if (v) payload.socialLinks[k] = v;
       });
 
-      // 2. Execute Data Submission
+      ["monFriStart","monFriEnd","satStart","satEnd","sunStart","sunEnd"].forEach(k => {
+        const v = formData.get(k);
+        if (v) payload.workingHours[k] = v;
+      });
+
       const response = await fetch(MAIN_API + "/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -339,14 +503,12 @@
         throw new Error(result.message || "Server rejected submission");
       }
 
-      // 3. Handle Success: Show Record ID then reset
       const recordId = result.data?._id || result.data?.id || result.recordId || "Success";
-      showMessage("Success! Your Record ID: " + recordId, "success");
       form.reset();
       btn.textContent = "Saved Successfully";
+      showSuccessProcessingSequence(recordId);
 
     } catch (err) {
-      // 4. Handle Error: Restore button and show message
       showMessage("Error: " + err.message, "error");
       btn.disabled = false;
       btn.textContent = originalText;
@@ -355,6 +517,3 @@
 </script>
 </body>
 </html>
-
-
-
