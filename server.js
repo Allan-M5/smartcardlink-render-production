@@ -32,6 +32,11 @@ const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER || '';
+const PAYMENT_POCHI_NUMBER = String(process.env.PAYMENT_POCHI_NUMBER || '0702444552').trim();
+const PACKAGE_PRICES = {
+    standard: 1500,
+    pro: 2500,
+};
 
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || '';
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '';
@@ -92,6 +97,7 @@ const ClientSchema = new mongoose.Schema({
     appointmentUrl: { type: String, trim: true, default: '' },
 
     themeColor: { type: String, default: '#FFD700' },
+    packageType: { type: String, enum: ['standard', 'pro'], default: 'standard' },
     themeName: { type: String, default: 'Default Gold' },
 
     status: {
@@ -228,6 +234,7 @@ const mapClientForResponse = (clientDoc) => {
         photoUrl: client.photoUrl || '',
         appointmentUrl: client.appointmentUrl || '',
         bookingLink: client.appointmentUrl || '',
+        packageType: client.packageType || 'standard',
         themeColor: client.themeColor || '#FFD700',
         themeName: client.themeName || 'Default Gold',
         status: client.status || 'Pending',
@@ -482,6 +489,17 @@ app.get('/health', (req, res) => {
     });
 });
 
+app.get('/api/payment-config', publicLimiter, (req, res) => {
+    try {
+        return respSuccess(res, {
+            pochiNumber: PAYMENT_POCHI_NUMBER,
+            prices: PACKAGE_PRICES,
+        }, 'Payment config loaded successfully.');
+    } catch (error) {
+        return respError(res, 'Failed to load payment config.', 500, null, error);
+    }
+});
+
 app.get('/api/admin/clients', publicLimiter, async (req, res) => {
     try {
         const search = String(req.query.q || '').trim();
@@ -550,6 +568,7 @@ app.post('/api/clients', publicLimiter, async (req, res) => {
             address: String(payload.address || '').trim(),
             bio: String(payload.bio || '').trim(),
             appointmentUrl: buildAppointmentUrl(email1, payload.appointmentUrl || payload.bookingLink),
+            packageType: String(payload.packageType || 'standard').trim().toLowerCase() === 'pro' ? 'pro' : 'standard',
             themeColor: ensureColor(payload.themeColor || '#FFD700'),
             themeName: String(payload.themeName || 'Default Gold').trim() || 'Default Gold',
             socialLinks: {
