@@ -550,6 +550,42 @@
     color: rgba(255,255,255,0.92);
   }
 
+    .payment-summary-card {
+    margin-top: 1rem;
+    padding: 0.95rem 1rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    text-align: left;
+  }
+
+  .payment-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.42rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .payment-summary-row:last-child {
+    border-bottom: none;
+  }
+
+  .payment-summary-label {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.72);
+    font-weight: 600;
+  }
+
+  .payment-summary-value {
+    font-size: 0.95rem;
+    color: #fff;
+    font-weight: 800;
+    text-align: right;
+    word-break: break-word;
+  }
+
   .submission-spinner {
     width: 38px;
     height: 38px;
@@ -775,11 +811,28 @@
   <div class="submission-status-card success-state" id="submissionStatusCard">
     <div class="submission-emoji" id="submissionEmoji">😎👍</div>
     <h2 class="submission-title" id="submissionTitle">Details Successfully Submitted</h2>
-    <div class="submission-id" id="submissionRecordId">ID: --</div>
-    <p class="submission-text" id="submissionText">Your information has been received successfully.</p>
+<div class="submission-id" id="submissionRecordId">ID: --</div>
+<p class="submission-text" id="submissionText">Your information has been received successfully.</p>
+
+<div class="payment-summary-card" id="paymentSummaryCard">
+  <div class="payment-summary-row">
+    <span class="payment-summary-label">Package</span>
+    <span class="payment-summary-value" id="paymentSummaryPackage">--</span>
+  </div>
+  <div class="payment-summary-row">
+    <span class="payment-summary-label">Amount</span>
+    <span class="payment-summary-value" id="paymentSummaryAmount">--</span>
+  </div>
+  <div class="payment-summary-row">
+    <span class="payment-summary-label">Pochi</span>
+    <span class="payment-summary-value" id="paymentSummaryPochi">0702444552</span>
+  </div>
+</div>
 
 <div class="submission-actions" id="submissionActions">
   <button type="button" class="submission-action-btn primary" id="payNowBtn">Pay Now</button>
+  <button type="button" class="submission-action-btn" id="copyPochiBtn">Copy Pochi Number</button>
+  <button type="button" class="submission-action-btn" id="copyAmountBtn">Copy Amount</button>
   <button type="button" class="submission-action-btn" id="payLaterBtn">Pay Later on Activation</button>
   <button type="button" class="submission-action-btn" id="stayOnPageBtn">Remain on This Page</button>
   <button type="button" class="submission-action-btn primary" id="visitWebsiteBtn">Visit vCard Website</button>
@@ -788,6 +841,7 @@
 </div>
 
 <script>
+
   const MAIN_API = "https://smartcardlink-api.onrender.com";
   const form = document.getElementById("clientForm");
   const formMessage = document.getElementById("formMessage");
@@ -797,13 +851,19 @@
   const submissionTitle = document.getElementById("submissionTitle");
   const submissionRecordId = document.getElementById("submissionRecordId");
   const submissionText = document.getElementById("submissionText");
-  const submissionActions = document.getElementById("submissionActions");
-  const stayOnPageBtn = document.getElementById("stayOnPageBtn");
-  const visitWebsiteBtn = document.getElementById("visitWebsiteBtn");
+const submissionActions = document.getElementById("submissionActions");
+const stayOnPageBtn = document.getElementById("stayOnPageBtn");
+const visitWebsiteBtn = document.getElementById("visitWebsiteBtn");
 const packageTypeInput = document.getElementById("packageType");
 const packageCards = document.querySelectorAll(".pricing-option");
 const payNowBtn = document.getElementById("payNowBtn");
 const payLaterBtn = document.getElementById("payLaterBtn");
+const copyPochiBtn = document.getElementById("copyPochiBtn");
+const copyAmountBtn = document.getElementById("copyAmountBtn");
+const paymentSummaryPackage = document.getElementById("paymentSummaryPackage");
+const paymentSummaryAmount = document.getElementById("paymentSummaryAmount");
+const paymentSummaryPochi = document.getElementById("paymentSummaryPochi");
+
 
 const paymentConfig = {
   pochiNumber: "0702444552",
@@ -834,6 +894,7 @@ function clearPackageVisualState() {
     card.classList.remove("selected");
     card.classList.remove("expanded");
   });
+  updatePaymentSummary("");
 }
 
   function clearExpandedOnly() {
@@ -846,12 +907,13 @@ function selectPackage(card) {
   packageCards.forEach(item => item.classList.remove("selected"));
   card.classList.add("selected");
   packageTypeInput.value = card.dataset.package || "";
+  updatePaymentSummary(packageTypeInput.value);
 }
 
-  function expandCard(card) {
-    clearExpandedOnly();
-    card.classList.add("expanded");
-  }
+function expandCard(card) {
+  clearExpandedOnly();
+  card.classList.add("expanded");
+}
 
   function collapseCard(card) {
     card.classList.remove("expanded");
@@ -905,11 +967,34 @@ function getPackageAmount(packageType) {
   const key = String(packageType || "").trim().toLowerCase();
   return paymentConfig.prices[key] || 0;
 }
+function getPackageLabel(packageType) {
+  const key = String(packageType || "").trim().toLowerCase();
+  if (key === "pro") return "PRO vCard";
+  if (key === "standard") return "Standard vCard";
+  return "--";
+}
+
+function updatePaymentSummary(packageType) {
+  const amount = getPackageAmount(packageType);
+  const packageLabel = getPackageLabel(packageType);
+
+  if (paymentSummaryPackage) {
+    paymentSummaryPackage.textContent = packageLabel;
+  }
+
+  if (paymentSummaryAmount) {
+    paymentSummaryAmount.textContent = amount ? "Ksh " + amount : "--";
+  }
+
+  if (paymentSummaryPochi) {
+    paymentSummaryPochi.textContent = paymentConfig.pochiNumber;
+  }
+}
 
 function buildMpesaUssdLink(packageType) {
   const amount = getPackageAmount(packageType);
   if (!amount) return "";
-  return "tel:*334*1*" + paymentConfig.pochiNumber + "*" + amount + "#";
+  return "tel:*334*1*" + paymentConfig.pochiNumber + "*" + amount + "%23";
 }
 
 if (payNowBtn) {
@@ -925,15 +1010,54 @@ if (payNowBtn) {
     const amount = getPackageAmount(selectedPackage);
     const ussdLink = buildMpesaUssdLink(selectedPackage);
 
-    showMessage("Opening M-PESA for Ksh " + amount + " to " + paymentConfig.pochiNumber + "...", "info");
+    showMessage(
+      "Attempting to open M-PESA. If it does not open correctly, use Pochi " +
+      paymentConfig.pochiNumber +
+      " and amount Ksh " +
+      amount +
+      ". Your application has already been saved.",
+      "info"
+    );
 
-    window.location.href = ussdLink;
+setTimeout(() => {
+  window.location.assign(ussdLink);
+}, 250);
   });
 }
 
 if (payLaterBtn) {
   payLaterBtn.addEventListener("click", () => {
     showMessage("Payment can be completed later during activation. Your request will remain pending until payment is confirmed.", "info");
+  });
+}
+
+if (copyPochiBtn) {
+  copyPochiBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(paymentConfig.pochiNumber);
+      showMessage("Pochi number copied: " + paymentConfig.pochiNumber, "success");
+    } catch (error) {
+      showMessage("Could not copy Pochi number automatically. Use: " + paymentConfig.pochiNumber, "info");
+    }
+  });
+}
+
+if (copyAmountBtn) {
+  copyAmountBtn.addEventListener("click", async () => {
+    const selectedPackage = packageTypeInput.value;
+    const amount = getPackageAmount(selectedPackage);
+
+    if (!amount) {
+      showMessage("Please select a package first so the correct amount can be copied.", "error");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(String(amount));
+      showMessage("Amount copied: Ksh " + amount, "success");
+    } catch (error) {
+      showMessage("Could not copy amount automatically. Use: Ksh " + amount, "info");
+    }
   });
 }
 
@@ -1010,9 +1134,9 @@ stayOnPageBtn.addEventListener("click", () => {
   form.reset();
   packageTypeInput.value = "";
   clearPackageVisualState();
+  updatePaymentSummary("");
   document.getElementById("fullName")?.focus();
 });
-
 
   visitWebsiteBtn.addEventListener("click", () => {
     window.open("https://smartcardlink-landing.onrender.com/", "_blank");
@@ -1085,8 +1209,10 @@ const submittedPackageType = packageTypeInput.value;
 form.reset();
 clearPackageVisualState();
 packageTypeInput.value = submittedPackageType;
+updatePaymentSummary(submittedPackageType);
 
 showSuccessProcessingSequence(recordId, btn);
+
     } catch (err) {
       showMessage("Error: " + err.message, "error");
       btn.disabled = false;
