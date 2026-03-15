@@ -873,16 +873,52 @@ const paymentConfig = {
   }
 };
 
+let apiWarmedUp = false;
+let apiWarmupStarted = false;
+
+async function warmUpApi() {
+  if (apiWarmedUp || apiWarmupStarted) return;
+
+  apiWarmupStarted = true;
+
+  try {
+    const response = await fetch(MAIN_API + "/health", {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (response.ok) {
+      apiWarmedUp = true;
+    } else {
+      apiWarmupStarted = false;
+    }
+  } catch (error) {
+    apiWarmupStarted = false;
+  }
+}
+
   let holdTimer = null;
   let suppressClick = false;
 
-  ["sunStart","sunEnd"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = false;
-  });
+["sunStart","sunEnd"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = false;
+});
+
+setTimeout(() => {
+  warmUpApi();
+}, 700);
+
+form.addEventListener("focusin", () => {
+  warmUpApi();
+}, { once: true });
+
+form.addEventListener("pointerdown", () => {
+  warmUpApi();
+}, { once: true });
 
 function showMessage(message, type) {
-  const cleanMessage = String(message || "").replace(/[^\x00-\x7F]/g, "");
+const cleanMessage = String(message || "");
   formMessage.innerHTML = cleanMessage;
   formMessage.className = "form-message " + type;
   formMessage.style.display = "block";
@@ -1177,11 +1213,12 @@ submissionText.textContent = "Please wait a moment while your application is bei
         if (v) payload.workingHours[k] = v;
       });
 
-      const response = await fetch(MAIN_API + "/api/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+const response = await fetch(MAIN_API + "/api/clients", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  cache: "no-store",
+  body: JSON.stringify(payload)
+});
 
       const result = await response.json();
 

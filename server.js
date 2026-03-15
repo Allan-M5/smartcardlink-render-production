@@ -597,27 +597,31 @@ app.post('/api/clients', publicLimiter, async (req, res) => {
 
         await client.save();
 
-        const responsePayload = {
+        res.status(201).json({
             status: 'success',
             message: 'Successful. Record created.',
             recordId: String(client._id),
-            data: mapClientForResponse(client),
-        };
+            data: {
+                _id: String(client._id),
+                id: String(client._id)
+            }
+        });
 
-        res.status(201).json(responsePayload);
-
-        if (ADMIN_EMAIL) {
-            sendEmail(
-                ADMIN_EMAIL,
-                'New SmartCardLink lead received',
-                'A new lead has been submitted for ' + client.fullName + '. Record ID: ' + client._id,
-                '<div style=""font-family:Arial,sans-serif;""><h3>New SmartCardLink lead received</h3><p><strong>Name:</strong> ' + client.fullName + '</p><p><strong>Record ID:</strong> ' + client._id + '</p><p><strong>Status:</strong> Pending</p></div>'
-            ).catch((emailError) => {
-                logger.error({ err: emailError, recordId: String(client._id) }, 'Background lead email failed');
-            });
-        }
+        setImmediate(() => {
+            if (ADMIN_EMAIL) {
+                sendEmail(
+                    ADMIN_EMAIL,
+                    'New SmartCardLink lead received',
+                    'A new lead has been submitted for ' + client.fullName + '. Record ID: ' + client._id,
+                    '<div style="font-family:Arial,sans-serif;"><h3>New SmartCardLink lead received</h3><p><strong>Name:</strong> ' + client.fullName + '</p><p><strong>Record ID:</strong> ' + client._id + '</p><p><strong>Status:</strong> Pending</p></div>'
+                ).catch((emailError) => {
+                    logger.error({ err: emailError, recordId: String(client._id) }, 'Background lead email failed');
+                });
+            }
+        });
 
         return;
+
     } catch (error) {
         return respError(res, 'Failed to create client record.', 500, null, error);
     }
