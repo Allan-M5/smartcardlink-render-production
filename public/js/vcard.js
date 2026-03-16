@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     'use strict';
     // SPEED FIX: Prefetch data immediately
     const params = new URLSearchParams(window.location.search);
@@ -14,16 +14,7 @@
     const popup1 = el('popup1');
     const popup2 = el('popup2');
     const photoArea = el('photoArea');
-    // QR REVEAL: Horizontal slide on tap
-    const track = document.querySelector('.photo-swipe-track');
-    if (track) {
-        let showingQR = false;
-        track.style.cursor = 'pointer';
-        track.onclick = () => {
-            showingQR = !showingQR;
-            track.style.transform = showingQR ? 'translateX(-50%)' : 'translateX(0)';
-        };
-    }
+
     const fullName = el('fullName');
     const jobName = el('jobName');
     const titlePosition = el('titlePosition');
@@ -52,11 +43,26 @@
     const hoursTable = document.querySelector('#hoursTable tbody');
 
     // --- HELPER FUNCTIONS ---
-    function setHidden(node, hidden) {
-        if (!node) return;
-        node.style.display = hidden ? "none" : "block";
-        node.setAttribute("aria-hidden", hidden);
+function setHidden(node, hidden) {
+    if (!node) return;
+
+    if (hidden) {
+        node.style.display = "none";
+        node.setAttribute("aria-hidden", "true");
+
+        if (node === popup2) {
+            node.setAttribute("inert", "");
+        }
+        return;
     }
+
+    node.style.display = node === popup2 ? "flex" : "block";
+    node.setAttribute("aria-hidden", "false");
+
+    if (node === popup2) {
+        node.removeAttribute("inert");
+    }
+}
 
     function alertMsg(msg) {
         if (typeof Swal !== 'undefined') {
@@ -119,14 +125,88 @@
     }
 
     // --- UI RENDERING ---
-    function renderPhoto(url) {
-        if (!photoArea) return;
-        const img = new Image();
-        img.src = url || '/public/images/default-photo.png';
-        img.alt = "Profile";
-        img.onload = () => { photoArea.innerHTML = ''; photoArea.appendChild(img); };
-        img.onerror = () => { photoArea.innerHTML = `<img src="/public/images/default-photo.png">`; };
+function renderPhoto(url, qrUrl = '') {
+    if (!photoArea) return;
+
+    const photoSrc = url || '/public/images/default-photo.png';
+    const qrSrc = qrUrl || '';
+
+    if (!qrSrc) {
+        photoArea.innerHTML = `<img src="${photoSrc}" alt="Profile">`;
+        return;
     }
+
+    photoArea.innerHTML = `
+        <div class="photo-swipe-container">
+            <div class="photo-swipe-track">
+                <div class="photo-panel">
+                    <img src="${photoSrc}" alt="Profile">
+                </div>
+                <div class="qr-panel">
+                    <img src="${qrSrc}" alt="QR Code">
+                </div>
+            </div>
+            <div class="swipe-hint">Swipe to view QR</div>
+        </div>
+    `;
+
+    const track = photoArea.querySelector('.photo-swipe-track');
+    const panels = photoArea.querySelectorAll('img');
+
+    let startX = 0;
+    let showingQR = false;
+    let pressTimer;
+
+    function updateView() {
+        track.style.transform = showingQR
+            ? 'translateX(-50%)'
+            : 'translateX(0)';
+    }
+
+    function openFullscreen(src) {
+        const overlay = document.createElement('div');
+        overlay.className = 'photo-fullscreen';
+        overlay.innerHTML = `<img src="${src}">`;
+        document.body.appendChild(overlay);
+    }
+
+    function startPress(src) {
+        clearTimeout(pressTimer);
+        pressTimer = setTimeout(() => openFullscreen(src), 600);
+    }
+
+    function cancelPress() {
+        clearTimeout(pressTimer);
+    }
+
+    track.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+    }, { passive:true });
+
+    track.addEventListener('touchend', e => {
+        const endX = e.changedTouches[0].clientX;
+        const diff = startX - endX;
+
+        if (diff > 60) showingQR = true;
+        if (diff < -60) showingQR = false;
+
+        updateView();
+    }, { passive:true });
+
+    track.addEventListener('click', () => {
+        showingQR = !showingQR;
+        updateView();
+    });
+
+    panels.forEach(img => {
+        img.addEventListener('mousedown', () => startPress(img.src));
+        img.addEventListener('mouseup', cancelPress);
+        img.addEventListener('mouseleave', cancelPress);
+
+        img.addEventListener('touchstart', () => startPress(img.src), { passive:true });
+        img.addEventListener('touchend', cancelPress, { passive:true });
+    });
+}
 
     function setupActions(client) {
         const phone = client.phone1;
@@ -170,7 +250,7 @@ END:VCARD`;
         if (!client) return;
 
         applyTheme(client.themeColor || "#FFD700");
-        renderPhoto(client.photoUrl);
+        renderPhoto(client.photoUrl, client.qrCodeUrl);
         
         fullName.textContent = client.fullName || '';
         jobName.textContent = client.company || '';
@@ -180,47 +260,61 @@ END:VCARD`;
 
         bioText.textContent = client.bio || 'Professional Profile';
         
-        setupActions(client);
-        setHidden(popup1, false);
+setupActions(client);
 
-        // Standard Navigation
-        if (buttons.moreInfo) buttons.moreInfo.onclick = () => { setHidden(popup1, true); setHidden(popup2, false); };
-        if (buttons.back) buttons.back.onclick = () => { setHidden(popup2, true); setHidden(popup1, false); };
+/* POPUP2 BUTTON BINDING */
+function bindLinkButton(btn, value, mode = 'url', emptyMessage = 'Not Provided') {
+    if (!btn) return;
+
+    const finalValue = String(value || '').trim();
+
+    btn.style.display = 'flex';
+    btn.classList.remove('disabled');
+
+    if (!finalValue) {
+        btn.onclick = () => alertMsg(emptyMessage);
+        btn.classList.add('disabled');
+        return;
     }
 
+    if (mode === 'address') {
+        btn.onclick = () => alertMsg(finalValue);
+        return;
+    }
+
+    btn.onclick = () => window.open(finalValue, '_blank', 'noopener,noreferrer');
+}
+
+const socials = client.socialLinks || {};
+
+bindLinkButton(buttons.business, client.businessWebsite, 'url', 'Business URL not provided');
+bindLinkButton(buttons.portfolio, client.portfolioWebsite, 'url', 'Portfolio URL not provided');
+bindLinkButton(buttons.location, client.locationMap || client.locationMapUrl, 'url', 'Location map not provided');
+bindLinkButton(buttons.physical, client.address, 'address', 'Physical address not provided');
+bindLinkButton(buttons.book, client.appointmentUrl || client.bookingLink, 'url', 'Appointment link not provided');
+
+bindLinkButton(buttons.facebook, socials.facebook || client.facebook, 'url', 'Facebook link not provided');
+bindLinkButton(buttons.instagram, socials.instagram || client.instagram, 'url', 'Instagram link not provided');
+bindLinkButton(buttons.x, socials.twitter || socials.x || client.twitter || client.x, 'url', 'X link not provided');
+bindLinkButton(buttons.linkedin, socials.linkedin || client.linkedin, 'url', 'LinkedIn link not provided');
+bindLinkButton(buttons.tiktok, socials.tiktok || client.tiktok, 'url', 'TikTok link not provided');
+bindLinkButton(buttons.youtube, socials.youtube || client.youtube, 'url', 'YouTube link not provided');
+
+setHidden(popup1, false);
+
+// Standard Navigation
+if (buttons.moreInfo) buttons.moreInfo.onclick = () => { setHidden(popup1, true); setHidden(popup2, false); };
+if (buttons.back) buttons.back.onclick = () => { setHidden(popup2, true); setHidden(popup1, false); };
+    }
     
-document.addEventListener('click',function(e){
- const fs=document.querySelector('.photo-fullscreen');
- if(!fs) return;
- fs.remove();
+document.addEventListener('click', function (e) {
+    const fs = document.querySelector('.photo-fullscreen');
+    if (!fs) return;
+    if (e.target === fs) {
+        fs.remove();
+    }
 });
+
 document.addEventListener('DOMContentLoaded', init);
 })();
-
-function showPopup(show) { popup2.hidden = !show; if(show){ popup2.removeAttribute('inert'); } else { popup2.setAttribute('inert', ''); } }
-
-
-let startX=0;
-
-const photo=document.getElementById('photoArea');
-
-if(photo){
-
-photo.addEventListener('touchstart',e=>{
-startX=e.touches[0].clientX;
-});
-
-photo.addEventListener('touchend',e=>{
-
-const endX=e.changedTouches[0].clientX;
-
-if(startX-endX>60)
- document.getElementById('photoArea').style.display='block';
-
-if(endX-startX>60)
- document.getElementById('photoArea').style.display='none';
-
-});
-
-}
 

@@ -1,4 +1,4 @@
-/* style.css - FULL PRODUCTION VERSION */
+﻿/* style.css - FULL PRODUCTION VERSION */
 
 /* 1. Variables & Resets */
 :root {
@@ -853,12 +853,17 @@ body {
  color:#fff !important;
 }
 
-
 .popup{
- background:var(--theme-color);
- color:#fff;
+  background: rgba(10, 10, 10, 0.92);
+  color: #fff;
+  border-radius: var(--card-radius);
+  overflow: hidden;
 }
 
+#popup2 .card-scroll{
+  border-radius: 0 0 var(--card-radius) var(--card-radius);
+  min-height: 0;
+}
 
 .bio-label{
  color:var(--theme-color);
