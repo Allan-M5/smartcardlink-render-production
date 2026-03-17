@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -157,7 +157,8 @@
       background-color: #3b82f6;
       color: white;
     }
-    #photoFile {
+       #photoFile,
+    #resumeFile {
       display: none;
     }
     .btn-save-info {
@@ -298,25 +299,66 @@
       <div class="section-header">Bio</div>
       <textarea id="bio" name="bio" rows="4"></textarea>
 
-      <div class="section-header">Professional Customization & Address</div>
-      <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem;">
+      <div style="margin-top: 1rem;">
+        <label for="address">Physical Address</label>
+        <input type="text" id="address" name="address" placeholder="e.g. Nairobi, Kenya" />
+      </div>
+
+      <div class="section-header">Professional Customization, Package & Resume</div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr 170px; gap:1rem; align-items:end; margin-bottom:1rem;">
         <div>
-          <label for="address">Physical Address</label>
-          <input type="text" id="address" name="address" placeholder="e.g. Nairobi, Kenya" />
+          <label for="packageType">Package Type</label>
+          <select id="packageType" name="packageType" style="width:100%; min-height:44px; border-radius:0.375rem; border:1px solid #444; background:#0f0f0f; color:#FFD700; font-weight:700; padding:0 0.75rem;">
+            <option value="standard">Standard vCard</option>
+            <option value="pro">PRO vCard</option>
+          </select>
         </div>
 
         <div>
           <label for="themeColor">Theme Hex Code</label>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="themeColor" name="themeColor" value="#FFD700" placeholder="#50c878" style="text-transform: uppercase;" />
-            <div id="colorPreview" style="width: 40px; height: 38px; border-radius: 4px; border: 1px solid #444; background: #FFD700; flex-shrink: 0; transition: background 0.3s;"></div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="themeColor" name="themeColor" value="#FFD700" placeholder="#50C878" style="text-transform:uppercase; min-height:44px;" />
+            <div id="colorPreview" style="width:44px; height:44px; border-radius:4px; border:1px solid #444; background:#FFD700; flex-shrink:0; transition:background 0.3s;"></div>
           </div>
         </div>
 
         <div>
-          <button type="button" id="processThemeBtn" class="action-button" style="margin-top:0; height: 38px; background-color: #111; border: 1px solid #FFD700; color: white;">Process Theme</button>
+          <button type="button" id="processThemeBtn" class="action-button" style="margin-top:0; width:100%; min-height:44px; background:#111; border:1px solid #FFD700; color:#fff;">
+            Process Theme
+          </button>
         </div>
       </div>
+
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: end; margin-bottom: 1.5rem;">
+  
+  <div style="display: flex; flex-direction: column;">
+    <span style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #ccc; white-space: nowrap;">Resume PDF Upload (PRO)</span>
+    <label for="resumeFile" id="resume-upload-label" 
+      style="display: flex; align-items: center; justify-content: center; width: 100%; height: 44px; margin: 0; background: #7c3aed; border: 1px solid #7c3aed; border-radius: 0.375rem; cursor: pointer; color: white; box-sizing: border-box; font-size: 0.9rem; text-align: center;">
+      Upload Resume PDF
+    </label>
+    <input type="file" id="resumeFile" accept="application/pdf" style="display: none;" />
+  </div>
+
+  <div style="display: flex; flex-direction: column;">
+    <span style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #ccc; white-space: nowrap;">Resume Password (PRO)</span>
+    <div id="resumePasswordDisplay" 
+      style="width: 100%; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 0.375rem; border: 1px solid #444; background: #0f0f0f; color: #22c55e; font-weight: 800; letter-spacing: 0.06em; box-sizing: border-box; font-size: 0.9rem;">
+      Not generated yet
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column;">
+    <span style="margin-bottom: 0.5rem; font-size: 0.875rem; visibility: hidden;">Action</span>
+    <button type="button" id="regenerateResumePasswordBtn" 
+      style="width: 100%; height: 44px; margin: 0; background: #111; border: 1px solid #22c55e; color: #22c55e; border-radius: 0.375rem; cursor: pointer; box-sizing: border-box; font-size: 0.9rem; font-weight: 600;">
+      Regenerate Password
+    </button>
+  </div>
+
+</div>
+
       <button type="submit" id="save-btn" class="btn-save-info">Save Info</button>
     </form>
 
@@ -354,6 +396,12 @@
       const processThemeBtn = document.getElementById('processThemeBtn');
       const titleEl = document.querySelector('h1.title');
       const sectionHeaders = Array.from(document.querySelectorAll('.section-header'));
+      const packageTypeInput = document.getElementById('packageType');
+      const resumeFileInput = document.getElementById('resumeFile');
+      const resumeUploadLabel = document.getElementById('resume-upload-label');
+      const resumeFileName = null;
+      const resumePasswordDisplay = document.getElementById('resumePasswordDisplay');
+      const regenerateResumePasswordBtn = document.getElementById('regenerateResumePasswordBtn');
 
       let isSaving = false;
       let currentQrCodeUrl = '';
@@ -439,7 +487,7 @@
         el.value = safeValue(value);
       }
 
-      function updateThemePreview(hex) {
+        function updateThemePreview(hex) {
         const theme = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex.toUpperCase() : '#FFD700';
         document.documentElement.style.setProperty('--theme-color', theme);
         colorPreview.style.backgroundColor = theme;
@@ -452,6 +500,38 @@
         createVcardBtn.style.borderColor = theme;
         viewPdfBtn.style.borderColor = theme;
         photoPreview.style.borderColor = theme;
+      }
+
+      function updatePackageDisplay(packageType) {
+        const normalized = String(packageType || 'standard').trim().toLowerCase() === 'pro' ? 'pro' : 'standard';
+        packageTypeInput.value = normalized;
+
+        if (normalized !== 'pro') {
+          resumeUploadLabel.style.opacity = '0.6';
+          regenerateResumePasswordBtn.style.opacity = '0.6';
+          resumeUploadLabel.style.pointerEvents = 'none';
+          regenerateResumePasswordBtn.style.pointerEvents = 'none';
+        } else {
+          resumeUploadLabel.style.opacity = '1';
+          regenerateResumePasswordBtn.style.opacity = '1';
+          resumeUploadLabel.style.pointerEvents = 'auto';
+          regenerateResumePasswordBtn.style.pointerEvents = 'auto';
+        }
+      }
+
+      function updateResumeDisplay(resume) {
+        const payload = resume || {};
+        resumePasswordDisplay.textContent = payload.passwordLastGeneratedAt ? 'Generated and active' : 'Not generated yet';
+
+        if (payload.fileName) {
+          resumeUploadLabel.textContent = 'Resume Uploaded ✓';
+          resumeUploadLabel.style.backgroundColor = '#22c55e';
+          resumeUploadLabel.style.borderColor = '#22c55e';
+        } else {
+          resumeUploadLabel.textContent = 'Upload Resume PDF';
+          resumeUploadLabel.style.backgroundColor = '#7c3aed';
+          resumeUploadLabel.style.borderColor = '#7c3aed';
+        }
       }
 
       function resetActionLabels() {
@@ -487,6 +567,7 @@
         setFieldValue('address', client.address);
         setFieldValue('appointmentUrl', client.appointmentUrl || client.bookingLink || autoBookingUrl(client.email1, ''));
         setFieldValue('themeColor', client.themeColor || '#FFD700');
+        setFieldValue('packageType', client.packageType || 'standard');
 
         const workingHours = client.workingHours || {};
         ['monFriStart', 'monFriEnd', 'satStart', 'satEnd', 'sunStart', 'sunEnd'].forEach(function (key) {
@@ -513,6 +594,8 @@
         }
 
         updateThemePreview(document.getElementById('themeColor').value);
+        updatePackageDisplay(client.packageType || 'standard');
+        updateResumeDisplay(client.resume || {});
         setVcardState({
           vcardUrl: client.vcardUrl || '',
           qrCodeUrl: client.qrCodeUrl || ''
@@ -576,6 +659,48 @@
         }
       }
 
+            async function uploadResume(file) {
+        const clientId = clientIdInput.value.trim();
+        if (!clientId) {
+          showToast('Save client info first before uploading resume.', true);
+          return;
+        }
+
+        if (String(packageTypeInput.value || '').toLowerCase() !== 'pro') {
+          showToast('Resume upload is available on PRO vCard only.', true);
+          return;
+        }
+
+        const body = new FormData();
+        body.append('resume', file);
+
+        try {
+resumeUploadLabel.innerHTML = 'Uploading <span class="spinner"></span>';
+resumeUploadLabel.style.backgroundColor = '#111827';
+resumeUploadLabel.style.borderColor = '#111827';
+
+          const response = await fetch(API_URL + '/clients/' + encodeURIComponent(clientId) + '/resume-upload', {
+            method: 'POST',
+            body: body
+          });
+
+          const json = await response.json();
+          if (!response.ok) {
+            throw new Error(json.message || 'Resume upload failed');
+          }
+
+          updateResumeDisplay(json.data && json.data.resume ? json.data.resume : {});
+          resumeUploadLabel.textContent = 'Resume Uploaded ✓';
+          resumeUploadLabel.style.backgroundColor = '#22c55e';
+          showToast('Resume uploaded successfully', false);
+        } catch (error) {
+          console.error(error);
+          resumeUploadLabel.textContent = 'Upload Resume PDF';
+          resumeUploadLabel.style.backgroundColor = '#7c3aed';
+          showToast(error.message || 'Resume upload failed', true);
+        }
+      }
+
       function collectPayload() {
         const payload = {
           fullName: safeValue(document.getElementById('fullName').value).trim(),
@@ -594,6 +719,7 @@
           bio: safeValue(document.getElementById('bio').value).trim(),
           photoUrl: safeValue(photoUrlInput.value).trim(),
           themeColor: safeValue(themeColorInput.value).trim().toUpperCase(),
+          packageType: safeValue(packageTypeInput.value).trim().toLowerCase() === 'pro' ? 'pro' : 'standard',
           status: 'Processed',
           appointmentUrl: autoBookingUrl(document.getElementById('email1').value, document.getElementById('appointmentUrl').value),
           socialLinks: {},
@@ -780,17 +906,63 @@
         const clientEmail = safeValue(document.getElementById('email1').value).trim();
         const clientName = safeValue(document.getElementById('fullName').value).trim() || 'Client';
         const vcardUrl = vcardUrlDisplay.value.trim();
+        const packageType = String(packageTypeInput.value || 'standard').trim().toLowerCase();
+        const resumePassword = safeValue(resumePasswordDisplay.textContent).trim();
+        const analyticsToken = vcardUrl;
+
         if (!clientEmail || !vcardUrl) {
           showToast('Primary email and vCard URL are required.', true);
           return;
         }
 
-        const subject = encodeURIComponent('Thank you for choosing SmartCardLink vCard Services');
-        const body = encodeURIComponent('Hello ' + clientName + ',\n\nThank you for choosing SmartCardLink vCard services.\n\nYour live vCard URL is:\n' + vcardUrl + '\n\nBest regards,\nSmartCardLink');
+        let emailBody = '';
+        if (packageType === 'pro') {
+          emailBody =
+`Hello ${clientName},
+
+Thank you for choosing SmartCardLink services.
+
+Your live vCard URL:
+${vcardUrl}
+
+Your PRO access details:
+CV Password: ${resumePassword}
+Analytics Access Token: ${analyticsToken}
+
+Use the CV password to control who can view or download your resume.
+Use your exact vCard URL as the analytics access token when prompted inside your profile.
+
+Best regards,
+SmartCardLink`;
+        } else {
+          emailBody =
+`Hello ${clientName},
+
+Thank you for choosing SmartCardLink services.
+
+Your live vCard URL:
+${vcardUrl}
+
+You can also upgrade to PRO vCard to unlock:
+- Custom theme color
+- Professional Resume section
+- Resume protection with access password
+- Profile analytics
+- Smart contact reminder tools
+
+PRO gives your profile stronger presentation and better control.
+
+Best regards,
+SmartCardLink`;
+        }
+
+        const subject = encodeURIComponent('Your SmartCardLink vCard is Ready');
+        const body = encodeURIComponent(emailBody);
         const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(clientEmail) + '&su=' + subject + '&body=' + body;
+
         window.open(gmailUrl, '_blank', 'noopener');
         emailClientBtn.textContent = 'Gmail Opened';
-        showToast('Gmail compose opened for the client.', false);
+        showToast('Gmail compose opened with full client delivery message.', false);
       }
 
       function handleRefreshForm() {
@@ -801,10 +973,16 @@
         photoPreviewContainer.style.display = 'none';
         photoUploadLabel.textContent = 'Photo Upload';
         photoUploadLabel.style.backgroundColor = '#ef4444';
+        resumeUploadLabel.textContent = 'Upload Resume PDF';
+        resumeUploadLabel.style.backgroundColor = '#7c3aed';
+        resumePasswordDisplay.textContent = 'Not generated yet';
+
         currentQrCodeUrl = '';
         setVcardState({ vcardUrl: '', qrCodeUrl: '' });
         updateThemePreview('#FFD700');
+        updatePackageDisplay('standard');
         themeColorInput.value = '#FFD700';
+
         const url = new URL(window.location.href);
         url.searchParams.delete('id');
         window.history.replaceState({}, '', url.toString());
@@ -824,6 +1002,43 @@
         showToast('Theme preview applied. Click Save Info to persist.', false);
       }
 
+            async function handleRegenerateResumePassword() {
+        const clientId = clientIdInput.value.trim();
+        if (!clientId) {
+          showToast('Save client info first.', true);
+          return;
+        }
+
+        if (String(packageTypeInput.value || '').toLowerCase() !== 'pro') {
+          showToast('Resume password regeneration is available on PRO vCard only.', true);
+          return;
+        }
+
+        try {
+          regenerateResumePasswordBtn.disabled = true;
+          regenerateResumePasswordBtn.textContent = 'Generating...';
+
+          const response = await fetch(API_URL + '/clients/' + encodeURIComponent(clientId) + '/resume-regenerate-password', {
+            method: 'POST'
+          });
+
+          const json = await response.json();
+          if (!response.ok) {
+            throw new Error(json.message || 'Password regeneration failed');
+          }
+
+          const generated = json.data && json.data.generatedPassword ? json.data.generatedPassword : '';
+          resumePasswordDisplay.textContent = generated || 'Generated';
+          showToast('Resume password regenerated: ' + generated, false);
+        } catch (error) {
+          console.error(error);
+          showToast(error.message || 'Password regeneration failed', true);
+        } finally {
+          regenerateResumePasswordBtn.disabled = false;
+          regenerateResumePasswordBtn.textContent = 'Regenerate Password';
+        }
+      }
+
       photoUploadInput.addEventListener('change', function (event) {
         const file = event.target.files && event.target.files[0];
         if (file) {
@@ -831,11 +1046,22 @@
         }
       });
 
+      resumeFileInput.addEventListener('change', function (event) {
+        const file = event.target.files && event.target.files[0];
+        if (file) {
+          uploadResume(file);
+        }
+      });
+      
       themeColorInput.addEventListener('input', function (event) {
         updateThemePreview(event.target.value);
         processThemeBtn.textContent = 'Process Theme';
         processThemeBtn.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color');
         processThemeBtn.style.color = 'white';
+      });
+
+      packageTypeInput.addEventListener('change', function (event) {
+        updatePackageDisplay(event.target.value);
       });
 
       document.getElementById('email1').addEventListener('blur', function () {
@@ -854,6 +1080,7 @@
       emailClientBtn.addEventListener('click', handleEmailClient);
       resetCopyStateBtn.addEventListener('click', handleRefreshForm);
       processThemeBtn.addEventListener('click', handleProcessTheme);
+      regenerateResumePasswordBtn.addEventListener('click', handleRegenerateResumePassword);
 
       updateThemePreview('#FFD700');
       const urlParams = new URLSearchParams(window.location.search);
