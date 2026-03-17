@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -68,57 +68,151 @@
 
       <section id="popup2" class="popup" hidden inert aria-hidden="true">
         <div class="brand-header">SMARTCARDLINK</div>
-        <div class="card-inner card-scroll">
-          
-          <div class="about-header">
-            <div class="about-title">More About Me</div>
-            <div class="about-bio-box">
-              <div class="bio-label">Bio</div>
-              <div id="bioText" class="bio-text"></div>
+
+        <div class="popup-surface">
+          <div class="card-inner card-scroll">
+
+            <div class="about-header">
+              <div class="about-title">More About Me</div>
+              <div class="about-bio-box">
+                <div class="bio-label">Bio</div>
+                <div id="bioText" class="bio-text"></div>
+              </div>
+            </div>
+
+            <section id="resumeSection" class="resume-section" hidden>
+              <div class="resume-title-row">
+                <div class="resume-title-wrap">
+                  <div class="resume-title">
+                    Professional Resume
+                    <span id="resumeLockBadge" class="pro-lock-badge" hidden>
+                      <i class="fa fa-lock"></i> PRO
+                    </span>
+                  </div>
+                  <div class="resume-subtitle">Secure employer-ready CV access</div>
+                </div>
+              </div>
+
+              <div class="resume-actions">
+                <button id="viewResumeBtn" class="resume-btn">
+                  <i class="fa fa-file-lines"></i> View Resume
+                </button>
+                <button id="downloadResumeBtn" class="resume-btn secondary">
+                  <i class="fa fa-download"></i> Download Resume
+                </button>
+              </div>
+            </section>
+
+            <section id="resumeLockedSection" class="resume-section locked" hidden>
+              <div class="resume-title-row">
+                <div class="resume-title-wrap">
+                  <div class="resume-title">
+                    Professional Resume
+                    <span class="pro-lock-badge">
+                      <i class="fa fa-lock"></i> PRO
+                    </span>
+                  </div>
+                  <div class="resume-subtitle">Available on PRO vCard</div>
+                </div>
+              </div>
+
+              <div class="resume-actions">
+                <button id="viewResumeLockedBtn" class="resume-btn locked-btn">
+                  <i class="fa fa-file-lines"></i> View Resume
+                </button>
+                <button id="downloadResumeLockedBtn" class="resume-btn secondary locked-btn">
+                  <i class="fa fa-download"></i> Download Resume
+                </button>
+              </div>
+            </section>
+
+            <div class="links-grid-4">
+              <div class="links-col">
+                <button id="businessWebsite" class="link-btn">Business URL</button>
+                <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+              </div>
+              <div class="links-col">
+                <button id="locationMap" class="link-btn">Location Map</button>
+                <button id="physicalAddress" class="link-btn">Physical Address</button>
+              </div>
+            </div>
+
+            <div class="hours-section">
+              <table class="hours-table" id="hoursTable">
+                <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
+
+            <div id="contactReminderWrap" class="reminder-wrap" hidden>
+              <button id="contactReminderBtn" class="reminder-btn">
+                <i class="fa fa-bell"></i> <span id="contactReminderText">Remind me to contact</span>
+              </button>
+            </div>
+
+            <div id="contactReminderLockedWrap" class="reminder-wrap" hidden>
+              <button id="contactReminderLockedBtn" class="reminder-btn locked-btn">
+                <i class="fa fa-lock"></i> <span id="contactReminderLockedText">Remind me to contact</span> <span class="inline-pro-tag">PRO</span>
+              </button>
+            </div>
+
+            <div class="social-grid">
+              <div class="col">
+                <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
+                <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
+                <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
+              </div>
+              <div class="col">
+                <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
+                <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
+                <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
+              </div>
+            </div>
+
+            <div class="nav-row">
+              <button id="backBtn" class="back-btn">Back</button>
             </div>
           </div>
 
-          <div class="links-grid-4">
-            <div class="links-col">
-              <button id="businessWebsite" class="link-btn">Business URL</button>
-              <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+          <footer class="popup-footer popup-footer-actions">
+            <div class="footer-action-row">
+              <a
+                id="applyVcardLink"
+                class="footer-action-btn"
+                href="https://smartcardlink-dashboard-frontend.onrender.com/client-form.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i class="fa fa-id-card"></i> Apply vCard
+              </a>
+
+              <button id="shareApplyBtn" class="footer-action-btn" type="button">
+                <i class="fa fa-share-nodes"></i> Share
+              </button>
+
+              <button id="analyticsBtn" class="footer-action-btn" type="button">
+                <i class="fa fa-chart-column"></i> View Analytics
+              </button>
             </div>
-            <div class="links-col">
-              <button id="locationMap" class="link-btn">Location Map</button>
-              <button id="physicalAddress" class="link-btn">Physical Address</button>
+
+            <div id="analyticsPanel" class="analytics-panel" hidden>
+              <div class="analytics-item">
+                <span class="analytics-label">Profile Accessed</span>
+                <span id="profileAccessCount" class="analytics-value">0</span>
+              </div>
+              <div class="analytics-item">
+                <span class="analytics-label">Resume Viewed</span>
+                <span id="resumeViewedCount" class="analytics-value">0</span>
+              </div>
+              <div class="analytics-item">
+                <span class="analytics-label">Resume Downloaded</span>
+                <span id="resumeDownloadedCount" class="analytics-value">0</span>
+              </div>
             </div>
-          </div>
 
-          <div class="hours-section">
-            <table class="hours-table" id="hoursTable">
-              <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-
-          <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
-
-          <div class="social-grid">
-            <div class="col">
-              <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
-              <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
-              <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
-            </div>
-            <div class="col">
-              <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
-              <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
-              <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
-            </div>
-          </div>
-
-          <div class="nav-row">
-            <button id="backBtn" class="back-btn">Back</button>
-          </div>
-
-          <footer class="popup-footer">
-            <div class="powered">Powered by</div>
-            <div class="store">Perfect Parcels Store</div>
-            <div class="location-time">Nairobi, KENYA ? <span id="liveTime"></span></div>
+            <div class="location-time">Nairobi, KENYA — <span id="liveTime"></span></div>
           </footer>
         </div>
       </section>
@@ -127,7 +221,6 @@
   </div>
 
   <script src="/js/vcard.js" defer></script>
-<script src="/js/book-appointment.js" defer></script>
 </body>
 </html>
 
