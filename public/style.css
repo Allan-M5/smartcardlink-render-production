@@ -104,17 +104,42 @@ body {
 /* 4. Card Surfaces */
 .card-surface,
 .popup {
+  width: 100%;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  position: relative;
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.card-surface {
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(12px);
+  z-index: 1;
+}
+
+.popup {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-surface {
+  width: 100%;
+  height: 100%;
+  min-height: 600px;
   background: rgba(10, 10, 10, 0.92);
   backdrop-filter: blur(12px);
   border-radius: var(--card-radius);
   overflow: hidden;
-  width: 100%;
-  position: relative;
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease;
-  opacity: 1;
-  transform: scale(1);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Visibility logic */
@@ -123,19 +148,7 @@ body {
   display: none !important;
   opacity: 0;
   pointer-events: none;
-}
-
-/* Popup2 specifics */
-.popup {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 100%; /* Forces it to fill the parent .vcard exactly */
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
+  transform: translateY(8px) scale(0.992);
 }
 
 /* Card inner */
@@ -144,8 +157,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 100%;
   min-height: 600px;
+}
+
+.card-surface > .card-inner {
+  height: 100%;
+}
+
+.popup-surface > .card-inner {
+  flex: 1;
+  min-height: 0;
 }
 
 /* Header */
@@ -439,7 +460,8 @@ body {
 .card-scroll {
   overflow-y: auto;
   padding-bottom: 20px;
-  flex: 1; /* Fill vertical space above footer */
+  flex: 1;
+  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: var(--theme-color) transparent;
 }
@@ -853,15 +875,16 @@ body {
  color:#fff !important;
 }
 
-.popup{
-  background: rgba(10, 10, 10, 0.92);
+.popup {
   color: #fff;
-  border-radius: var(--card-radius);
-  overflow: hidden;
 }
 
-#popup2 .card-scroll{
-  border-radius: 0 0 var(--card-radius) var(--card-radius);
+#popup2 .popup-surface {
+  border-radius: var(--card-radius);
+}
+
+#popup2 .card-scroll {
+  border-radius: 0;
   min-height: 0;
 }
 
@@ -891,3 +914,174 @@ body {
  color:#fff;
 }
 
+/* =========================
+   POPUP2 PRO MODULES
+   ========================= */
+
+.resume-section {
+  margin-top: 4px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.resume-section.locked {
+  opacity: 0.92;
+}
+
+.resume-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.resume-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resume-title {
+  color: var(--theme-color);
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resume-subtitle {
+  color: #cfcfcf;
+  font-size: 12px;
+}
+
+.pro-lock-badge,
+.inline-pro-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  background: rgba(255, 215, 0, 0.08);
+  color: #ffd700;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.resume-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.resume-btn,
+.reminder-btn,
+.footer-action-btn {
+  flex: 1;
+  min-height: 46px;
+  border-radius: 10px;
+  border: 1px solid var(--theme-color);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.resume-btn:hover,
+.reminder-btn:hover,
+.footer-action-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 215, 0, 0.12);
+}
+
+.resume-btn.secondary {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.locked-btn {
+  position: relative;
+}
+
+.locked-btn::after {
+  content: "PRO";
+  position: absolute;
+  top: -7px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #ffd700;
+  background: #111;
+  border: 1px solid rgba(255, 215, 0, 0.35);
+}
+
+.reminder-wrap {
+  margin-bottom: 18px;
+}
+
+.popup-footer-actions {
+  padding: 12px var(--card-padding) 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.footer-action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.analytics-panel {
+  margin-top: 2px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.analytics-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.analytics-item:last-child {
+  border-bottom: none;
+}
+
+.analytics-label {
+  color: #d8d8d8;
+  font-size: 13px;
+}
+
+.analytics-value {
+  color: var(--theme-color);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .resume-actions,
+  .footer-action-row {
+    flex-direction: column;
+  }
+}
