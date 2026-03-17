@@ -9,6 +9,7 @@ const multer = require('multer');
 const qrcode = require('qrcode');
 const vCardJS = require('vcards-js');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
 require('dotenv').config();
@@ -73,6 +74,20 @@ const workingHoursSchema = new mongoose.Schema({
     sunEnd: { type: String, default: '' },
 }, { _id: false });
 
+const resumeSchema = new mongoose.Schema({
+    enabled: { type: Boolean, default: false },
+    fileUrl: { type: String, trim: true, default: '' },
+    fileName: { type: String, trim: true, default: '' },
+    passwordHash: { type: String, trim: true, default: '' },
+    passwordLastGeneratedAt: { type: Date, default: null },
+}, { _id: false });
+
+const analyticsSchema = new mongoose.Schema({
+    profileViews: { type: Number, default: 0 },
+    resumeViews: { type: Number, default: 0 },
+    resumeDownloads: { type: Number, default: 0 },
+}, { _id: false });
+
 const ClientSchema = new mongoose.Schema({
     fullName: { type: String, required: true, trim: true },
     title: { type: String, trim: true, default: '' },
@@ -112,6 +127,9 @@ const ClientSchema = new mongoose.Schema({
     vcardCreatedDate: { type: Date, default: null },
     subscriptionLastPaidDate: { type: Date, default: null },
     subscriptionRenewalNote: { type: String, trim: true, default: '' },
+
+    resume: { type: resumeSchema, default: () => ({}) },
+    analytics: { type: analyticsSchema, default: () => ({}) },
 
     socialLinks: { type: socialLinksSchema, default: () => ({}) },
     workingHours: { type: workingHoursSchema, default: () => ({}) },
@@ -196,6 +214,179 @@ const buildAppointmentUrl = (email, overrideValue) => {
     return 'mailto:' + cleanEmail + '?subject=' + subject + '&body=' + body;
 };
 
+const generateFourDigitPassword = () => String(Math.floor(1000 + Math.random() * 9000));
+
+const hashSecret = (value) => {
+    return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+};
+
+const verifySecret = (plainValue, hashedValue) => {
+    if (!plainValue || !hashedValue) return false;
+    return hashSecret(plainValue) === String(hashedValue);
+};
+
+const isValidHttpUrl = (value) => {
+    try {
+        const parsed = new URL(String(value || '').trim());
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (error) {
+        return false;
+    }
+};
+
+const getSlugFromUrl = (value) => {
+    try {
+        const parsed = new URL(String(value || '').trim());
+        return String(parsed.searchParams.get('slug') || '').trim();
+    } catch (error) {
+        return '';
+    }
+};
+
+const ensureResumeDefaults = (client) => {
+    if (!client.resume || typeof client.resume !== 'object') {
+        client.resume = {
+            enabled: false,
+            fileUrl: '',
+            fileName: '',
+            passwordHash: '',
+            passwordLastGeneratedAt: null,
+        };
+    }
+
+    if (!client.analytics || typeof client.analytics !== 'object') {
+        client.analytics = {
+            profileViews: 0,
+            resumeViews: 0,
+            resumeDownloads: 0,
+        };
+    }
+};
+
+const incrementClientAnalytics = async (clientId, fieldName) => {
+    if (!clientId || !fieldName) return;
+    try {
+        await Client.updateOne(
+            { _id: clientId },
+            { $inc: { [`analytics.${fieldName}`]: 1 } }
+        );
+    } catch (error) {
+        logger.error({ err: error, clientId, fieldName }, 'Analytics increment failed');
+    }
+};
+
+const uploadResumePdfToCloudinary = async (slug, file) => {
+    if (!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET)) {
+        throw new Error('Cloudinary is not configured.');
+    }
+
+    const originalName = String(file.originalname || 'resume.pdf').trim() || 'resume.pdf';
+    const safeBaseName = originalName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]+/g, '-').toLowerCase() || 'resume';
+
+    const result = await cloudinary.uploader.upload(
+        'data:' + file.mimetype + ';base64,' + file.buffer.toString('base64'),
+        {
+            folder: 'smartcardlink_resumes',
+            resource_type: 'raw',
+            public_id: `${slug}_${safeBaseName}`,
+            format: 'pdf',
+            overwrite: true,
+        }
+    );
+
+    return {
+        fileUrl: result.secure_url,
+        fileName: originalName.endsWith('.pdf') ? originalName : (originalName + '.pdf'),
+    };
+};
+
+const buildClientDeliveryEmail = (client, options = {}) => {
+    const safeClient = client || {};
+    const packageType = String(safeClient.packageType || 'standard').toLowerCase();
+    const isPro = packageType === 'pro';
+
+    const vcardUrl = safeClient.vcardUrl || '';
+    const cvPassword = options.cvPassword || '';
+    const analyticsAccessToken = safeClient.vcardUrl || '';
+
+    const subject = 'Your SmartCardLink vCard is Ready';
+
+    const lines = [
+        `Hello ${safeClient.fullName || 'Client'},`,
+        '',
+        'Thank you for choosing SmartCardLink services.',
+        '',
+        'Your live vCard URL:',
+        vcardUrl || 'Not available',
+        '',
+    ];
+
+    if (isPro) {
+        lines.push(
+            'Your PRO access details:',
+            `CV Password: ${cvPassword || 'Not available'}`,
+            `Analytics Access Token: ${analyticsAccessToken || 'Not available'}`,
+            '',
+            'Use the CV password to control who can view or download your resume.',
+            'Use your exact vCard URL as the analytics access token when prompted inside your profile.',
+            ''
+        );
+    } else {
+        lines.push(
+            'Upgrade to PRO vCard to unlock premium tools such as:',
+            '- Custom theme color',
+            '- Professional Resume section',
+            '- Resume protection with access password',
+            '- Profile analytics',
+            '- Smart contact reminder tools',
+            '',
+            'PRO gives your profile stronger presentation and better control.',
+            ''
+        );
+    }
+
+    lines.push(
+        'We appreciate your trust in SmartCardLink.',
+        '',
+        'Best regards,',
+        'SmartCardLink'
+    );
+
+    const html = `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;">
+            <h2 style="margin-bottom:12px;">Your SmartCardLink vCard is Ready</h2>
+            <p>Hello ${safeClient.fullName || 'Client'},</p>
+            <p>Thank you for choosing <strong>SmartCardLink</strong> services.</p>
+
+            <p><strong>Your live vCard URL:</strong><br>${vcardUrl || 'Not available'}</p>
+
+            ${isPro ? `
+                <div style="margin:16px 0;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa;">
+                    <p style="margin:0 0 8px;"><strong>Your PRO access details</strong></p>
+                    <p style="margin:0 0 6px;">CV Password: <strong>${cvPassword || 'Not available'}</strong></p>
+                    <p style="margin:0;">Analytics Access Token: <strong>${analyticsAccessToken || 'Not available'}</strong></p>
+                </div>
+                <p>Use the CV password to control who can view or download your resume.</p>
+                <p>Use your exact vCard URL as the analytics access token when prompted inside your profile.</p>
+            ` : `
+                <div style="margin:16px 0;padding:14px;border:1px solid #f59e0b;border-radius:10px;background:#fff8e1;">
+                    <p style="margin:0 0 8px;"><strong>Upgrade to PRO vCard</strong></p>
+                    <p style="margin:0;">Unlock custom theme color, Professional Resume, protected CV access, profile analytics, and smart reminder tools for a stronger professional profile.</p>
+                </div>
+            `}
+
+            <p>We appreciate your trust in SmartCardLink.</p>
+            <p>Best regards,<br><strong>SmartCardLink</strong></p>
+        </div>
+    `;
+
+    return {
+        subject,
+        text: lines.join('\n'),
+        html,
+    };
+};
+
 const respSuccess = (res, data = null, message = 'Operation successful', statusCode = 200, meta = null) => {
     return res.status(statusCode).json({ status: 'success', message, data, meta });
 };
@@ -244,6 +435,18 @@ const mapClientForResponse = (clientDoc) => {
         vcardCreatedDate: client.vcardCreatedDate || null,
         subscriptionLastPaidDate: client.subscriptionLastPaidDate || null,
         subscriptionRenewalNote: client.subscriptionRenewalNote || '',
+        resume: client.resume || {
+            enabled: false,
+            fileUrl: '',
+            fileName: '',
+            passwordHash: '',
+            passwordLastGeneratedAt: null,
+        },
+        analytics: client.analytics || {
+            profileViews: 0,
+            resumeViews: 0,
+            resumeDownloads: 0,
+        },
         socialLinks: client.socialLinks || {},
         workingHours: client.workingHours || {},
         history: Array.isArray(client.history) ? client.history : [],
@@ -263,6 +466,8 @@ const applyPayloadToClient = async (client, payload, actor, notes) => {
     if (!Array.isArray(client.history)) {
         client.history = [];
     }
+
+    ensureResumeDefaults(client);
 
     if (newFullName !== client.fullName) {
         const oldSlug = client.slug;
@@ -539,6 +744,77 @@ app.get('/api/clients/:id', publicLimiter, async (req, res) => {
     }
 });
 
+app.post('/api/vcard/:slug/analytics-access', publicLimiter, async (req, res) => {
+    try {
+        const slug = String(req.params.slug || '').trim();
+        const accessToken = String(req.body && req.body.accessToken || '').trim();
+
+        if (!accessToken) {
+            return respError(res, 'Access token is required.', 400);
+        }
+
+        if (!isValidHttpUrl(accessToken)) {
+            return respError(res, 'Access token format is invalid.', 400);
+        }
+
+        const tokenSlug = getSlugFromUrl(accessToken);
+        if (!tokenSlug || tokenSlug !== slug) {
+            return respError(res, 'Access token is invalid for this profile.', 403);
+        }
+
+        const client = await Client.findOne({ slug, status: 'Active' });
+        if (!client) return respError(res, 'Client not found.', 404);
+
+        const expectedUrl = String(client.vcardUrl || '').trim();
+        if (!expectedUrl || accessToken !== expectedUrl) {
+            return respError(res, 'Access token does not match this profile.', 403);
+        }
+
+        ensureResumeDefaults(client);
+
+        return respSuccess(res, {
+            analytics: client.analytics,
+        }, 'Analytics access granted.');
+    } catch (error) {
+        return respError(res, 'Failed to verify analytics access.', 500, null, error);
+    }
+});
+
+app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'), async (req, res) => {
+    try {
+        const client = await Client.findById(req.params.id);
+        if (!client) return respError(res, 'Client not found.', 404);
+        if (!req.file) return respError(res, 'No resume PDF provided.', 400);
+
+        const mimeType = String(req.file.mimetype || '').toLowerCase();
+        if (mimeType !== 'application/pdf') {
+            return respError(res, 'Only PDF resume files are allowed.', 400);
+        }
+
+        ensureResumeDefaults(client);
+
+        const uploaded = await uploadResumePdfToCloudinary(client.slug, req.file);
+
+        client.resume.enabled = true;
+        client.resume.fileUrl = uploaded.fileUrl;
+        client.resume.fileName = uploaded.fileName;
+
+        client.history.push({
+            action: 'RESUME_UPLOAD',
+            actor: 'admin',
+            notes: 'Resume PDF uploaded for client profile',
+        });
+
+        await client.save();
+
+        return respSuccess(res, {
+            resume: client.resume,
+        }, 'Resume uploaded successfully.');
+    } catch (error) {
+        return respError(res, 'Failed to upload resume.', 500, null, error);
+    }
+});
+
 app.post('/api/clients', publicLimiter, async (req, res) => {
     try {
         const payload = req.body || {};
@@ -624,28 +900,6 @@ app.post('/api/clients', publicLimiter, async (req, res) => {
 
     } catch (error) {
         return respError(res, 'Failed to create client record.', 500, null, error);
-    }
-});
-
-app.post('/api/upload-photo', publicLimiter, upload.single('photo'), async (req, res) => {
-    try {
-        if (!req.file) return respError(res, 'No file provided.', 400);
-        if (!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET)) {
-            return respError(res, 'Cloudinary is not configured.', 500);
-        }
-
-        const result = await cloudinary.uploader.upload(
-            'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64'),
-            {
-                folder: 'smartcardlink_photos',
-                resource_type: 'image',
-                overwrite: true,
-            }
-        );
-
-        return respSuccess(res, { photoUrl: result.secure_url }, 'Photo uploaded successfully.');
-    } catch (error) {
-        return respError(res, 'Photo upload failed.', 500, null, error);
     }
 });
 
@@ -751,6 +1005,17 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
         if (!client) return respError(res, 'Client not found.', 404);
         if (!client.email1) return respError(res, 'Primary client email is required before deployment.', 400);
 
+        ensureResumeDefaults(client);
+
+        const isPro = String(client.packageType || 'standard').toLowerCase() === 'pro';
+        let generatedResumePassword = '';
+
+        if (isPro && client.resume && client.resume.enabled) {
+            generatedResumePassword = generateFourDigitPassword();
+            client.resume.passwordHash = hashSecret(generatedResumePassword);
+            client.resume.passwordLastGeneratedAt = new Date();
+        }
+
         const vcfContent = generateVcardContent(client);
         const vcardAssetUrl = await uploadVcfToCloudinary(client.slug, vcfContent);
         const publicUrl = VCARD_BASE_URL.replace(/\/$/, '') + '/?slug=' + client.slug;
@@ -764,6 +1029,7 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
         client.vcardUrl = publicUrl;
         client.qrCodeUrl = qrCodeData;
         client.status = 'Active';
+
         if (!client.vcardCreatedDate) {
             client.vcardCreatedDate = new Date();
         }
@@ -773,13 +1039,30 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
         if (!client.subscriptionRenewalNote) {
             client.subscriptionRenewalNote = 'Initial vCard activation';
         }
+
         client.appointmentUrl = buildAppointmentUrl(client.email1, client.appointmentUrl);
         client.history.push({
             action: 'VCARD_DEPLOYMENT',
             actor: 'admin',
             notes: 'vCard deployed to ' + publicUrl,
         });
+
         await client.save();
+
+        if (client.email1) {
+            const deliveryEmail = buildClientDeliveryEmail(client, {
+                cvPassword: generatedResumePassword,
+            });
+
+            sendEmail(
+                client.email1,
+                deliveryEmail.subject,
+                deliveryEmail.text,
+                deliveryEmail.html
+            ).catch((emailError) => {
+                logger.error({ err: emailError, clientId: String(client._id) }, 'Client delivery email failed');
+            });
+        }
 
         return respSuccess(res, {
             recordId: String(client._id),
@@ -789,6 +1072,8 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
             qrCodeUrl: qrCodeData,
             appointmentUrl: client.appointmentUrl,
             email1: client.email1,
+            analyticsAccessToken: publicUrl,
+            resumePasswordGenerated: generatedResumePassword ? true : false,
         }, 'vCard created successfully.');
     } catch (error) {
         return respError(res, 'Failed to create vCard.', 500, null, error);
@@ -798,11 +1083,89 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
 app.get('/api/vcard/:slug', publicLimiter, async (req, res) => {
     try {
         const slug = String(req.params.slug || '').trim();
-        const client = await Client.findOne({ slug, status: 'Active' }).lean();
+        const client = await Client.findOne({ slug, status: 'Active' });
         if (!client) return respError(res, 'Card profile is currently inactive or missing.', 404);
+
+        ensureResumeDefaults(client);
+        await incrementClientAnalytics(client._id, 'profileViews');
+
         return respSuccess(res, mapClientForResponse(client), 'Profile loaded successfully.');
     } catch (error) {
         return respError(res, 'Failed to load public vCard.', 500, null, error);
+    }
+});
+
+app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
+    try {
+        const slug = String(req.params.slug || '').trim();
+        const password = String(req.body && req.body.password || '').trim();
+        const mode = String(req.body && req.body.mode || 'view').trim().toLowerCase();
+
+        if (!password) return respError(res, 'Resume password is required.', 400);
+        if (!['view', 'download'].includes(mode)) return respError(res, 'Invalid resume access mode.', 400);
+
+        const client = await Client.findOne({ slug, status: 'Active' });
+        if (!client) return respError(res, 'Client not found.', 404);
+
+        ensureResumeDefaults(client);
+
+        if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
+            return respError(res, 'Resume access is available on PRO profiles only.', 403);
+        }
+
+        if (!client.resume.enabled || !client.resume.fileUrl || !client.resume.passwordHash) {
+            return respError(res, 'Resume is not configured for this profile.', 404);
+        }
+
+        if (!verifySecret(password, client.resume.passwordHash)) {
+            return respError(res, 'Incorrect resume password.', 403);
+        }
+
+        await incrementClientAnalytics(client._id, mode === 'download' ? 'resumeDownloads' : 'resumeViews');
+
+        return respSuccess(res, {
+            fileUrl: client.resume.fileUrl,
+            fileName: client.resume.fileName || 'resume.pdf',
+            mode,
+        }, 'Resume access granted.');
+    } catch (error) {
+        return respError(res, 'Failed to verify resume access.', 500, null, error);
+    }
+});
+
+app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (req, res) => {
+    try {
+        const client = await Client.findById(req.params.id);
+        if (!client) return respError(res, 'Client not found.', 404);
+
+        ensureResumeDefaults(client);
+
+        if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
+            return respError(res, 'Resume password regeneration is available on PRO profiles only.', 403);
+        }
+
+        if (!client.resume.enabled || !client.resume.fileUrl) {
+            return respError(res, 'Resume is not configured for this profile.', 400);
+        }
+
+        const generatedResumePassword = generateFourDigitPassword();
+        client.resume.passwordHash = hashSecret(generatedResumePassword);
+        client.resume.passwordLastGeneratedAt = new Date();
+
+        client.history.push({
+            action: 'RESUME_PASSWORD_REGENERATED',
+            actor: 'admin',
+            notes: 'Resume password regenerated',
+        });
+
+        await client.save();
+
+        return respSuccess(res, {
+            generatedPassword: generatedResumePassword,
+            passwordLastGeneratedAt: client.resume.passwordLastGeneratedAt,
+        }, 'Resume password regenerated successfully.');
+    } catch (error) {
+        return respError(res, 'Failed to regenerate resume password.', 500, null, error);
     }
 });
 
