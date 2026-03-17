@@ -218,6 +218,32 @@
       </section>
 
     </main>
+
+    <div id="resumeAccessModal" class="access-modal" hidden>
+      <div class="access-card">
+        <div class="access-title">Resume Access</div>
+        <div class="access-subtitle">Enter access password</div>
+        <input id="resumeAccessInput" class="access-input" type="password" inputmode="numeric" maxlength="4" placeholder="4-digit password" />
+        <div id="resumeAccessError" class="access-error" hidden></div>
+        <div class="access-actions">
+          <button id="resumeAccessCancelBtn" class="access-btn secondary" type="button">Cancel</button>
+          <button id="resumeAccessConfirmBtn" class="access-btn" type="button">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="analyticsAccessModal" class="access-modal" hidden>
+      <div class="access-card">
+        <div class="access-title">Access Token</div>
+        <div class="access-subtitle">Enter token to continue</div>
+        <input id="analyticsAccessInput" class="access-input" type="text" placeholder="Paste access token" />
+        <div id="analyticsAccessError" class="access-error" hidden></div>
+        <div class="access-actions">
+          <button id="analyticsAccessCancelBtn" class="access-btn secondary" type="button">Cancel</button>
+          <button id="analyticsAccessConfirmBtn" class="access-btn" type="button">Continue</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/js/vcard.js" defer></script>

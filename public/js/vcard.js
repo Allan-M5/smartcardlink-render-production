@@ -48,7 +48,11 @@
         viewResume: el('viewResumeBtn'),
         downloadResume: el('downloadResumeBtn'),
         viewResumeLocked: el('viewResumeLockedBtn'),
-        downloadResumeLocked: el('downloadResumeLockedBtn')
+        downloadResumeLocked: el('downloadResumeLockedBtn'),
+        resumeAccessCancel: el('resumeAccessCancelBtn'),
+        resumeAccessConfirm: el('resumeAccessConfirmBtn'),
+        analyticsAccessCancel: el('analyticsAccessCancelBtn'),
+        analyticsAccessConfirm: el('analyticsAccessConfirmBtn')
     };
 
     const sections = {
@@ -56,7 +60,19 @@
         resumeLocked: el('resumeLockedSection'),
         analyticsPanel: el('analyticsPanel'),
         reminderWrap: el('contactReminderWrap'),
-        reminderLockedWrap: el('contactReminderLockedWrap')
+        reminderLockedWrap: el('contactReminderLockedWrap'),
+        resumeAccessModal: el('resumeAccessModal'),
+        analyticsAccessModal: el('analyticsAccessModal')
+    };
+
+    const inputs = {
+        resumeAccess: el('resumeAccessInput'),
+        analyticsAccess: el('analyticsAccessInput')
+    };
+
+    const errors = {
+        resumeAccess: el('resumeAccessError'),
+        analyticsAccess: el('analyticsAccessError')
     };
 
     const counts = {
@@ -73,6 +89,7 @@
     };
 
     let currentClient = null;
+    let pendingResumeMode = 'view';
 
     function setHidden(node, hidden) {
         if (!node) return;
@@ -101,6 +118,26 @@
         } else {
             window.alert(msg);
         }
+    }
+
+    function showError(node, message) {
+        if (!node) return;
+        node.textContent = message || '';
+        node.hidden = !message;
+    }
+
+    function openModal(modal, input, errorNode) {
+        if (errorNode) showError(errorNode, '');
+        if (input) input.value = '';
+        setHidden(modal, false);
+        window.setTimeout(() => {
+            if (input) input.focus();
+        }, 30);
+    }
+
+    function closeModal(modal, errorNode) {
+        if (errorNode) showError(errorNode, '');
+        setHidden(modal, true);
     }
 
     function showMessage(msg, isError = false) {
@@ -143,7 +180,6 @@
 
         style.innerHTML = `
             .btn-primary, .action-button, .save-contact-btn { background-color: ${theme} !important; border-color: ${theme} !important; }
-            .social-icon, .info-icon, i { color: inherit; }
             .profile-header { border-bottom: 3px solid ${theme}; }
         `;
     }
@@ -323,12 +359,13 @@ END:VCARD`;
     function renderResumeAndReminder(client) {
         const isPro = String(client.packageType || 'standard').toLowerCase() === 'pro';
         const name = client.fullName || 'this profile owner';
+        const resumeEnabled = !!(client.resume && client.resume.enabled && client.resume.fileUrl);
 
         if (labels.reminderText) labels.reminderText.textContent = `Remind me to contact ${name}`;
         if (labels.reminderLockedText) labels.reminderLockedText.textContent = `Remind me to contact ${name}`;
 
-        setHidden(sections.resume, !isPro);
-        setHidden(sections.resumeLocked, isPro);
+        setHidden(sections.resume, !(isPro && resumeEnabled));
+        setHidden(sections.resumeLocked, isPro && resumeEnabled);
         setHidden(sections.reminderWrap, !isPro);
         setHidden(sections.reminderLockedWrap, isPro);
     }
@@ -383,6 +420,98 @@ END:VCALENDAR`;
         a.click();
     }
 
+    async function requestAnalyticsAccess() {
+        if (!currentClient) return;
+
+        const slug = currentClient.slug || '';
+        const accessToken = String(inputs.analyticsAccess && inputs.analyticsAccess.value || '').trim();
+
+        if (!accessToken) {
+            showError(errors.analyticsAccess, 'Access token is required.');
+            return;
+        }
+
+        try {
+            showError(errors.analyticsAccess, '');
+
+            const res = await fetch(`${API_ROOT}/api/vcard/${encodeURIComponent(slug)}/analytics-access`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accessToken })
+            });
+
+            const json = await res.json();
+            if (!res.ok || json.status !== 'success') {
+                throw new Error(json.message || 'Access denied.');
+            }
+
+            setAnalyticsCounts(json.data && json.data.analytics ? json.data.analytics : {});
+            closeModal(sections.analyticsAccessModal, errors.analyticsAccess);
+            if (sections.analyticsPanel) sections.analyticsPanel.hidden = false;
+        } catch (error) {
+            showError(errors.analyticsAccess, error.message || 'Access denied.');
+        }
+    }
+
+    async function requestResumeAccess(mode) {
+        if (!currentClient) return;
+
+        const slug = currentClient.slug || '';
+        const password = String(inputs.resumeAccess && inputs.resumeAccess.value || '').trim();
+
+        if (!password) {
+            showError(errors.resumeAccess, 'Password is required.');
+            return;
+        }
+
+        try {
+            showError(errors.resumeAccess, '');
+
+            const res = await fetch(`${API_ROOT}/api/vcard/${encodeURIComponent(slug)}/resume-access`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, mode })
+            });
+
+            const json = await res.json();
+            if (!res.ok || json.status !== 'success') {
+                throw new Error(json.message || 'Resume access denied.');
+            }
+
+            const payload = json.data || {};
+            closeModal(sections.resumeAccessModal, errors.resumeAccess);
+
+            if (mode === 'download') {
+                const a = document.createElement('a');
+                a.href = payload.fileUrl;
+                a.download = payload.fileName || 'resume.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                window.open(payload.fileUrl, '_blank', 'noopener,noreferrer');
+            }
+
+            if (sections.analyticsPanel && !sections.analyticsPanel.hidden) {
+                const next = {
+                    profileViews: Number(counts.profileAccessed ? counts.profileAccessed.textContent : 0) || 0,
+                    resumeViews: Number(counts.resumeViewed ? counts.resumeViewed.textContent : 0) || 0,
+                    resumeDownloads: Number(counts.resumeDownloaded ? counts.resumeDownloaded.textContent : 0) || 0
+                };
+
+                if (mode === 'download') {
+                    next.resumeDownloads += 1;
+                } else {
+                    next.resumeViews += 1;
+                }
+
+                setAnalyticsCounts(next);
+            }
+        } catch (error) {
+            showError(errors.resumeAccess, error.message || 'Resume access denied.');
+        }
+    }
+
     function wireFooterActions(client) {
         if (buttons.apply) {
             buttons.apply.href = APPLY_VCARD_URL;
@@ -421,15 +550,14 @@ END:VCALENDAR`;
                     return;
                 }
 
-                if (sections.analyticsPanel) {
-                    sections.analyticsPanel.hidden = !sections.analyticsPanel.hidden;
-                }
+                openModal(sections.analyticsAccessModal, inputs.analyticsAccess, errors.analyticsAccess);
             };
         }
     }
 
     function wireResumeButtons(client) {
         const isPro = String(client.packageType || 'standard').toLowerCase() === 'pro';
+        const resumeEnabled = !!(client.resume && client.resume.enabled && client.resume.fileUrl);
 
         if (buttons.viewResumeLocked) {
             buttons.viewResumeLocked.onclick = () => alertMsg('This feature is available on PRO vCard.');
@@ -443,21 +571,29 @@ END:VCALENDAR`;
 
         if (!isPro) return;
 
+        if (buttons.reminder) {
+            buttons.reminder.onclick = () => {
+                downloadReminder(client);
+            };
+        }
+
+        if (!resumeEnabled) {
+            if (buttons.viewResume) buttons.viewResume.onclick = () => alertMsg('Resume is not available on this profile.');
+            if (buttons.downloadResume) buttons.downloadResume.onclick = () => alertMsg('Resume is not available on this profile.');
+            return;
+        }
+
         if (buttons.viewResume) {
             buttons.viewResume.onclick = () => {
-                alertMsg('Resume secure access will be activated in the backend batch.');
+                pendingResumeMode = 'view';
+                openModal(sections.resumeAccessModal, inputs.resumeAccess, errors.resumeAccess);
             };
         }
 
         if (buttons.downloadResume) {
             buttons.downloadResume.onclick = () => {
-                alertMsg('Resume secure access will be activated in the backend batch.');
-            };
-        }
-
-        if (buttons.reminder) {
-            buttons.reminder.onclick = () => {
-                downloadReminder(client);
+                pendingResumeMode = 'download';
+                openModal(sections.resumeAccessModal, inputs.resumeAccess, errors.resumeAccess);
             };
         }
     }
@@ -485,6 +621,35 @@ END:VCALENDAR`;
         labels.liveTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
+    function wireModalButtons() {
+        if (buttons.resumeAccessCancel) {
+            buttons.resumeAccessCancel.onclick = () => closeModal(sections.resumeAccessModal, errors.resumeAccess);
+        }
+        if (buttons.resumeAccessConfirm) {
+            buttons.resumeAccessConfirm.onclick = () => requestResumeAccess(pendingResumeMode);
+        }
+        if (buttons.analyticsAccessCancel) {
+            buttons.analyticsAccessCancel.onclick = () => closeModal(sections.analyticsAccessModal, errors.analyticsAccess);
+        }
+        if (buttons.analyticsAccessConfirm) {
+            buttons.analyticsAccessConfirm.onclick = () => requestAnalyticsAccess();
+        }
+
+        if (inputs.resumeAccess) {
+            inputs.resumeAccess.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') requestResumeAccess(pendingResumeMode);
+                if (e.key === 'Escape') closeModal(sections.resumeAccessModal, errors.resumeAccess);
+            });
+        }
+
+        if (inputs.analyticsAccess) {
+            inputs.analyticsAccess.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') requestAnalyticsAccess();
+                if (e.key === 'Escape') closeModal(sections.analyticsAccessModal, errors.analyticsAccess);
+            });
+        }
+    }
+
     async function init() {
         const client = await fetchProfileData();
         if (!client) return;
@@ -507,6 +672,9 @@ END:VCALENDAR`;
         setAnalyticsCounts(client.analytics || {});
         wireFooterActions(client);
         wireResumeButtons(client);
+        wireModalButtons();
+
+        if (sections.analyticsPanel) sections.analyticsPanel.hidden = true;
 
         setHidden(popup1, false);
         setHidden(popup2, true);
