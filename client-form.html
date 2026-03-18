@@ -1179,22 +1179,22 @@ if (copyAmountBtn) {
   }
 
 function showSuccessProcessingSequence(recordId, btn) {
-  submissionActions.classList.remove("show");
-  document.body.classList.add("overlay-active");
   submissionOverlay.classList.add("show");
-
-  submissionStatusCard.className = "submission-status-card success-state";
-  submissionEmoji.textContent = "✅";
-  submissionTitle.textContent = "Details Successfully Submitted";
-  submissionRecordId.textContent = "ID: " + recordId;
-  submissionRecordId.style.display = "inline-block";
+  document.body.classList.add("overlay-active");
+  submissionStatus.className = "submission-status success";
+  submissionTitle.textContent = "Saved Successfully";
   submissionText.textContent = "Your information has been saved successfully. You can now complete payment or choose to pay later on activation.";
+  submissionRecord.textContent = `Success! Your Record ID: ${recordId}`;
 
-  showMessage("✅ Successful! ID: " + recordId, "success");
-
-  submissionActions.classList.add("show");
   btn.disabled = false;
-  btn.textContent = "Submit Form";
+  btn.textContent = originalSubmitText;
+
+  const paymentMode = (document.querySelector('input[name="paymentOption"]:checked') || {}).value || "";
+  if (paymentMode === "pay_later") {
+    setTimeout(() => {
+      window.location.href = "https://smartcardlink-public.onrender.com/";
+    }, 1800);
+  }
 }
 
 stayOnPageBtn.addEventListener("click", () => {

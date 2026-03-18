@@ -903,6 +903,33 @@ app.post('/api/clients', publicLimiter, async (req, res) => {
     }
 });
 
+app.post('/api/upload-photo', publicLimiter, upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return respError(res, 'No photo file provided.', 400);
+        }
+
+        if (!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET)) {
+            return respError(res, 'Cloudinary is not configured.', 500);
+        }
+
+        const uploaded = await cloudinary.uploader.upload(
+            'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64'),
+            {
+                folder: 'smartcardlink_photos',
+                resource_type: 'image',
+                overwrite: true,
+            }
+        );
+
+        return respSuccess(res, {
+            photoUrl: uploaded.secure_url,
+        }, 'Photo uploaded successfully.');
+    } catch (error) {
+        return respError(res, 'Failed to upload photo.', 500, null, error);
+    }
+});
+
 app.put('/api/clients/:id', publicLimiter, upload.single('photo'), async (req, res) => {
     try {
         const client = await Client.findById(req.params.id);

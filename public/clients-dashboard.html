@@ -719,6 +719,7 @@
                                     <th>Company</th>
                                     <th>Email</th>
                                     <th>Phone</th>
+                                    <th>Package</th>
                                     <th>Created Date</th>
                                     <th>Expiry Date</th>
                                     <th>Days Remaining</th>
@@ -989,51 +990,54 @@
                             ? "Record marked deleted"
                             : "Subscription valid";
 
-                return `
-                    <tr data-id="${escapeHtml(client.id || "")}">
-                        <td>
-                            <div class="client-cell">
-                                <img class="client-photo" src="${escapeHtml(client.photoUrl || "https://placehold.co/100x100/111111/ffffff?text=%3F")}" alt="${escapeHtml(client.fullName || "Client Photo")}" onerror="this.src='https://placehold.co/100x100/111111/ffffff?text=%3F'" />
-                                <div>
-                                    <div class="client-name">${escapeHtml(client.fullName || "-")}</div>
-                                    <div class="client-sub">${escapeHtml(client.slug || "No slug")}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>${escapeHtml(client.company || "-")}</td>
-                        <td>${escapeHtml(maskEmail(client.email1))}</td>
-                        <td>${escapeHtml(maskPhone(client.phone1))}</td>
-                        <td>${createdDateFormatted}</td>
-                        <td>${expiryDateFormatted}</td>
-                        <td><div class="${subscriptionState.cssClass}">${escapeHtml(subscriptionState.label)}</div></td>
-                        <td>${getStatusBadge(displayStatus)}</td>
-                        <td>
-                            <div>${escapeHtml(noteText)}</div>
-                            <div class="muted">${expiry.expiryDate ? `Expires ${expiryDateFormatted}` : "No vCard start date yet"}</div>
-                        </td>
-                        <td>
-                            <div class="menu-wrap">
-                                <button class="menu-btn" onclick="toggleMenu(event, '${escapeHtml(client.id || "")}')">
-                                    <i class="fas fa-ellipsis-vertical"></i>
-                                </button>
-                                <div class="action-menu" id="menu-${escapeHtml(client.id || "")}">
-                                    <button type="button" onclick="viewClientCard('${escapeHtml(publicUrl)}')">
-                                        <i class="fas fa-up-right-from-square"></i>
-                                        <span>Open Public vCard</span>
-                                    </button>
-                                    <button type="button" onclick="openActionModal('${escapeHtml(client.id || "")}', 'reactivate', '${escapeHtml(client.fullName || "Client")}')">
-                                        <i class="fas fa-circle-check"></i>
-                                        <span>Reactivate After KES 500 Payment</span>
-                                    </button>
-                                    <button type="button" onclick="openActionModal('${escapeHtml(client.id || "")}', 'suspend', '${escapeHtml(client.fullName || "Client")}')">
-                                        <i class="fas fa-ban"></i>
-                                        <span>Suspend Pending Payment</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+const packageLabel = String(client.packageType || 'standard').trim().toLowerCase() === 'pro' ? 'PRO' : 'Standard';
+
+return `
+    <tr data-id="${escapeHtml(client.id || "")}">
+        <td>
+            <div class="client-cell">
+                <img class="client-photo" src="${escapeHtml(client.photoUrl || "https://placehold.co/100x100/111111/ffffff?text=%3F")}" alt="${escapeHtml(client.fullName || "Client Photo")}" onerror="this.src='https://placehold.co/100x100/111111/ffffff?text=%3F'" />
+                <div>
+                    <div class="client-name">${escapeHtml(client.fullName || "-")}</div>
+                    <div class="client-sub">${escapeHtml(client.slug || "No slug")}</div>
+                </div>
+            </div>
+        </td>
+        <td>${escapeHtml(client.company || "-")}</td>
+        <td>${escapeHtml(maskEmail(client.email1))}</td>
+        <td>${escapeHtml(maskPhone(client.phone1))}</td>
+        <td>${escapeHtml(packageLabel)}</td>
+        <td>${createdDateFormatted}</td>
+        <td>${expiryDateFormatted}</td>
+        <td><div class="${subscriptionState.cssClass}">${escapeHtml(subscriptionState.label)}</div></td>
+        <td>${getStatusBadge(displayStatus)}</td>
+        <td>
+            <div>${escapeHtml(noteText)}</div>
+            <div class="muted">${expiry.expiryDate ? `Expires ${expiryDateFormatted}` : "No vCard start date yet"}</div>
+        </td>
+        <td>
+            <div class="menu-wrap">
+                <button class="menu-btn" onclick="toggleMenu(event, '${escapeHtml(client.id || "")}')">
+                    <i class="fas fa-ellipsis-vertical"></i>
+                </button>
+                <div class="action-menu" id="menu-${escapeHtml(client.id || "")}">
+                    <button type="button" onclick="viewClientCard('${escapeHtml(publicUrl)}')">
+                        <i class="fas fa-up-right-from-square"></i>
+                        <span>Open Public vCard</span>
+                    </button>
+                    <button type="button" onclick="openActionModal('${escapeHtml(client.id || "")}', 'reactivate', '${escapeHtml(client.fullName || "Client")}')">
+                        <i class="fas fa-circle-check"></i>
+                        <span>Reactivate After KES 500 Payment</span>
+                    </button>
+                    <button type="button" onclick="openActionModal('${escapeHtml(client.id || "")}', 'suspend', '${escapeHtml(client.fullName || "Client")}')">
+                        <i class="fas fa-ban"></i>
+                        <span>Suspend Pending Payment</span>
+                    </button>
+                </div>
+            </div>
+        </td>
+    </tr>
+`;
             }).join("");
         }
 

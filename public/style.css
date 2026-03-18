@@ -125,21 +125,38 @@ body {
   position: absolute;
   inset: 0;
   z-index: 20;
-  background: transparent;
+  background: transparent !important;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .popup-surface {
   width: 100%;
   height: 100%;
   min-height: 600px;
-  background: rgba(10, 10, 10, 0.92);
+  background: rgba(10, 10, 10, 0.96);
   backdrop-filter: blur(12px);
   border-radius: var(--card-radius);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: none !important;
+}
+
+#popup2,
+#popup2 .popup-surface,
+#popup2 .card-inner,
+#popup2 .card-scroll {
+  background-image: none !important;
+}
+
+#popup2 .popup-surface::before,
+#popup2 .popup-surface::after,
+#popup2::before,
+#popup2::after {
+  content: none !important;
+  display: none !important;
 }
 
 /* Visibility logic */
@@ -602,12 +619,16 @@ body {
 
 /* Social Grid */
 .social-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
+  width: 100%;
 }
+
 .social-btn {
   width: 100%;
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--theme-color);
   background: #080808;
@@ -621,6 +642,12 @@ body {
   justify-content: center;
   gap: 8px;
   transition: all 0.2s ease;
+}
+
+@media (max-width: 520px) {
+  .social-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .facebook-hover:hover {
   background: #1877f2;
@@ -881,11 +908,13 @@ body {
 
 #popup2 .popup-surface {
   border-radius: var(--card-radius);
+  background: rgba(10, 10, 10, 0.96) !important;
 }
 
 #popup2 .card-scroll {
   border-radius: 0;
   min-height: 0;
+  background: transparent !important;
 }
 
 .bio-label{

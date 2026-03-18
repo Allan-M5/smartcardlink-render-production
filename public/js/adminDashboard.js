@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const API_BASE = (() => {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1' || window.location.protocol === 'file:') {
@@ -131,22 +131,25 @@
       const status = normalizeStatus(client.status);
       const clientId = client._id || client.id || '';
       const tr = document.createElement('tr');
-      tr.innerHTML = ''
-        + '<td>' + (index + 1) + '</td>'
-        + '<td>' + escapeHtml(client.fullName || '') + '</td>'
-        + '<td>' + escapeHtml(client.company || '') + '</td>'
-        + '<td>' + escapeHtml(client.email1 || '') + '</td>'
-        + '<td>' + escapeHtml(client.phone1 || '') + '</td>'
-        + '<td><span class="' + badgeClass(status) + '">' + escapeHtml(status) + '</span></td>'
-        + '<td>'
-        +   '<button type="button" class="process-btn" data-id="' + escapeHtml(clientId) + '">Process</button> '
-        +   (status === 'Active'
-              ? '<button type="button" class="disable-btn" data-id="' + escapeHtml(clientId) + '">Disable</button> '
-              : (status === 'Disabled' || status === 'Suspended')
-                ? '<button type="button" class="enable-btn" data-id="' + escapeHtml(clientId) + '">Enable</button> '
-                : '')
-        +   '<button type="button" class="delete-btn" data-id="' + escapeHtml(clientId) + '">Delete</button>'
-        + '</td>';
+const packageType = String(client.packageType || 'standard').trim().toLowerCase() === 'pro' ? 'PRO' : 'Standard';
+
+tr.innerHTML = ''
+  + '<td>' + (index + 1) + '</td>'
+  + '<td>' + escapeHtml(client.fullName || '') + '</td>'
+  + '<td>' + escapeHtml(client.company || '') + '</td>'
+  + '<td>' + escapeHtml(client.email1 || '') + '</td>'
+  + '<td>' + escapeHtml(client.phone1 || '') + '</td>'
+  + '<td>' + escapeHtml(packageType) + '</td>'
+  + '<td><span class="' + badgeClass(status) + '">' + escapeHtml(status) + '</span></td>'
+  + '<td>'
+  +   '<button type="button" class="process-btn" data-id="' + escapeHtml(clientId) + '">Process</button> '
+  +   (status === 'Active'
+        ? '<button type="button" class="disable-btn" data-id="' + escapeHtml(clientId) + '">Disable</button> '
+        : (status === 'Disabled' || status === 'Suspended')
+          ? '<button type="button" class="enable-btn" data-id="' + escapeHtml(clientId) + '">Enable</button> '
+          : '')
+  +   '<button type="button" class="delete-btn" data-id="' + escapeHtml(clientId) + '">Delete</button>'
+  + '</td>';
       els.tableBody.appendChild(tr);
     });
 
@@ -213,17 +216,18 @@
   }
 
   function exportCsv() {
-    const rows = [
-      ['Full Name', 'Company', 'Email', 'Phone', 'Status', 'Slug'],
-      ...renderedClients.map((client) => [
-        client.fullName || '',
-        client.company || '',
-        client.email1 || '',
-        client.phone1 || '',
-        normalizeStatus(client.status),
-        client.slug || '',
-      ]),
-    ];
+const rows = [
+  ['Full Name', 'Company', 'Email', 'Phone', 'Package', 'Status', 'Slug'],
+  ...renderedClients.map((client) => [
+    client.fullName || '',
+    client.company || '',
+    client.email1 || '',
+    client.phone1 || '',
+    String(client.packageType || 'standard').trim().toLowerCase() === 'pro' ? 'PRO' : 'Standard',
+    normalizeStatus(client.status),
+    client.slug || '',
+  ]),
+];
 
     const csv = rows.map((row) => row.map((cell) => {
       const value = String(cell == null ? '' : cell);
