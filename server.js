@@ -624,6 +624,13 @@ const allowedOrigins = [APP_BASE_URL, FRONTEND_BASE_URL, VCARD_BASE_URL]
         }
     })
     .filter(Boolean);
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (allowedOrigins.includes(origin)) return true;
+    if (origin.includes('localhost')) return true;
+    if (origin.includes('127.0.0.1')) return true;
+    return false;
+};
 
 if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
     cloudinary.config({
@@ -661,22 +668,43 @@ const sendEmail = async (to, subject, text, html) => {
 };
 
 app.use(pinoHttp({ logger }));
+app.set('trust proxy', 1);
+
+// Hard CORS headers first, before other middleware/routes
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    if (isAllowedOrigin(origin)) {
+        res.header('Access-Control-Allow-Origin', origin || '*');
+    }
+
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+
+    next();
+});
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+}));
+
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-            return callback(null, true);
-        }
-        return callback(null, true);
-    },
-    credentials: true,
-}));
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-app.set('trust proxy', 1);
 
 mongoose.connect(MONGO_URI)
     .then(() => logger.info('DB Connected'))
@@ -1110,13 +1138,39 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
 app.get('/api/vcard/:slug', publicLimiter, async (req, res) => {
     try {
         const slug = String(req.params.slug || '').trim();
-        const client = await Client.findOne({ slug, status: 'Active' });
-        if (!client) return respError(res, 'Card profile is currently inactive or missing.', 404);
 
-        ensureResumeDefaults(client);
-        await incrementClientAnalytics(client._id, 'profileViews');
+        const client = await Client.findOne(
+            { slug, status: 'Active' }
+        ).lean();
 
-        return respSuccess(res, mapClientForResponse(client), 'Profile loaded successfully.');
+        if (!client) {
+            return respError(res, 'Card profile is currently inactive or missing.', 404);
+        }
+
+        if (!client.resume || typeof client.resume !== 'object') {
+            client.resume = {
+                enabled: false,
+                fileUrl: '',
+                fileName: '',
+                passwordHash: '',
+                passwordLastGeneratedAt: null,
+            };
+        }
+
+        if (!client.analytics || typeof client.analytics !== 'object') {
+            client.analytics = {
+                profileViews: 0,
+                resumeViews: 0,
+                resumeDownloads: 0,
+            };
+        }
+
+        // Respond first, then increment in background
+        respSuccess(res, mapClientForResponse(client), 'Profile loaded successfully.');
+
+        setImmediate(() => {
+            incrementClientAnalytics(client._id, 'profileViews');
+        });
     } catch (error) {
         return respError(res, 'Failed to load public vCard.', 500, null, error);
     }
@@ -1199,6 +1253,8 @@ app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (re
 Object.entries(rootStaticFiles).forEach(([route, filePath]) => {
     app.get(route, (req, res) => res.sendFile(filePath));
 });
+
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use(express.static(staticPath, {
     extensions: ['html'],
