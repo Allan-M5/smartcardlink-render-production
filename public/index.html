@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SmartCardLink ? vCard</title>
+  <title>SmartCardLink - vCard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./libs/fontawesome/all.min.css" />
   <link rel="stylesheet" href="./style.css" />
@@ -11,12 +11,11 @@
 <body>
   <div class="app-bg">
     <main class="vcard" id="vcard">
-
       <div class="card-surface" id="popup1">
-        <div class="brand-header">SMARTCARDLINK</div>
-        <div class="card-inner">
+        <div id="brandHeader" class="brand-header">SMARTCARDLINK</div>
+        <div class="card-inner popup1-inner">
           <div class="photo-area" id="photoArea"></div>
-          
+
           <div class="personal-info">
             <div id="fullName" class="full-name"></div>
             <div id="jobName" class="job-name"></div>
@@ -29,7 +28,9 @@
                 <div class="contact-label">Phone:</div>
                 <div class="contact-primary-wrap">
                   <span id="phoneMain" class="contact-primary"></span>
-                  <button id="phoneDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                  <button id="phoneDropdownBtn" class="dropdown-btn" type="button" aria-expanded="false" aria-controls="phoneList">
+                    <i class="fa fa-chevron-down"></i>
+                  </button>
                 </div>
               </div>
               <div id="phoneList" class="box-list" hidden></div>
@@ -40,7 +41,9 @@
                 <div class="contact-label">Email:</div>
                 <div class="contact-primary-wrap">
                   <span id="emailMain" class="contact-primary"></span>
-                  <button id="emailDropdownBtn" class="dropdown-btn"><i class="fa fa-chevron-down"></i></button>
+                  <button id="emailDropdownBtn" class="dropdown-btn" type="button" aria-expanded="false" aria-controls="emailList">
+                    <i class="fa fa-chevron-down"></i>
+                  </button>
                 </div>
               </div>
               <div id="emailList" class="box-list" hidden></div>
@@ -49,29 +52,26 @@
 
           <div class="actions-grid">
             <div class="col">
-              <button id="callBtn" class="action-btn"><i class="fa fa-phone"></i> Call</button>
-              <button id="smsBtn" class="action-btn"><i class="fa fa-comment"></i> Message</button>
-              <button id="waBtn" class="action-btn"><i class="fa-brands fa-whatsapp"></i> Whatsapp</button>
+              <button id="callBtn" class="action-btn" type="button"><i class="fa fa-phone"></i> Call</button>
+              <button id="smsBtn" class="action-btn" type="button"><i class="fa fa-comment"></i> Message</button>
+              <button id="waBtn" class="action-btn" type="button"><i class="fa-brands fa-whatsapp"></i> Whatsapp</button>
             </div>
             <div class="col">
-              <button id="mailBtn" class="action-btn"><i class="fa fa-envelope"></i> Email</button>
-              <button id="printBtn" class="action-btn"><i class="fa fa-print"></i> Print</button>
-              <button id="saveBtn" class="action-btn"><i class="fa fa-address-card"></i> Save</button>
+              <button id="mailBtn" class="action-btn" type="button"><i class="fa fa-envelope"></i> Email</button>
+              <button id="printBtn" class="action-btn" type="button"><i class="fa fa-print"></i> Print</button>
+              <button id="saveBtn" class="action-btn" type="button"><i class="fa fa-address-card"></i> Save</button>
             </div>
           </div>
 
           <div class="nav-row">
-            <button id="moreInfoBtn" class="more-info-btn">More Info</button>
+            <button id="moreInfoBtn" class="more-info-btn" type="button">More Info</button>
           </div>
         </div>
       </div>
 
       <section id="popup2" class="popup" hidden inert aria-hidden="true">
-        <div class="brand-header">SMARTCARDLINK</div>
-
-        <div class="popup-surface">
-          <div class="card-inner card-scroll">
-
+        <div class="popup-surface popup2-surface">
+          <div class="card-inner card-scroll popup2-inner">
             <div class="about-header">
               <div class="about-title">More About Me</div>
               <div class="about-bio-box">
@@ -83,22 +83,18 @@
             <section id="resumeSection" class="resume-section" hidden>
               <div class="resume-title-row">
                 <div class="resume-title-wrap">
-                  <div class="resume-title">
-                    Professional Resume
-                    <span id="resumeLockBadge" class="pro-lock-badge" hidden>
-                      <i class="fa fa-lock"></i> PRO
-                    </span>
-                  </div>
+                  <div class="resume-title">Professional Resume</div>
                   <div class="resume-subtitle">Secure employer-ready CV access</div>
                 </div>
               </div>
-
               <div class="resume-actions">
-                <button id="viewResumeBtn" class="resume-btn">
-                  <i class="fa fa-file-lines"></i> View Resume
+                <button id="viewResumeBtn" class="resume-btn" type="button">
+                  <i class="fa fa-lock lock-icon"></i>
+                  <span>View Resume</span>
                 </button>
-                <button id="downloadResumeBtn" class="resume-btn secondary">
-                  <i class="fa fa-download"></i> Download Resume
+                <button id="downloadResumeBtn" class="resume-btn secondary" type="button">
+                  <i class="fa fa-lock lock-icon"></i>
+                  <span>Download Resume</span>
                 </button>
               </div>
             </section>
@@ -109,31 +105,33 @@
                   <div class="resume-title">
                     Professional Resume
                     <span class="pro-lock-badge">
-                      <i class="fa fa-lock"></i> PRO
+                      <i class="fa fa-lock lock-icon"></i>
+                      <span>PRO</span>
                     </span>
                   </div>
                   <div class="resume-subtitle">Available on PRO vCard</div>
                 </div>
               </div>
-
               <div class="resume-actions">
-                <button id="viewResumeLockedBtn" class="resume-btn locked-btn">
-                  <i class="fa fa-file-lines"></i> View Resume
+                <button id="viewResumeLockedBtn" class="resume-btn resume-lock-btn" type="button">
+                  <i class="fa fa-lock lock-icon"></i>
+                  <span>View Resume</span>
                 </button>
-                <button id="downloadResumeLockedBtn" class="resume-btn secondary locked-btn">
-                  <i class="fa fa-download"></i> Download Resume
+                <button id="downloadResumeLockedBtn" class="resume-btn secondary resume-lock-btn" type="button">
+                  <i class="fa fa-lock lock-icon"></i>
+                  <span>Download Resume</span>
                 </button>
               </div>
             </section>
 
             <div class="links-grid-4">
               <div class="links-col">
-                <button id="businessWebsite" class="link-btn">Business URL</button>
-                <button id="portfolioWebsite" class="link-btn">Portfolio URL</button>
+                <button id="businessWebsite" class="link-btn" type="button">Business URL</button>
+                <button id="portfolioWebsite" class="link-btn" type="button">Portfolio URL</button>
               </div>
               <div class="links-col">
-                <button id="locationMap" class="link-btn">Location Map</button>
-                <button id="physicalAddress" class="link-btn">Physical Address</button>
+                <button id="locationMap" class="link-btn" type="button">Location Map</button>
+                <button id="physicalAddress" class="link-btn" type="button">Physical Address</button>
               </div>
             </div>
 
@@ -144,82 +142,75 @@
               </table>
             </div>
 
-            <button id="bookAppointmentBtn" class="book-btn"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
+            <button id="bookAppointmentBtn" class="book-btn" type="button"><i class="fa fa-calendar-alt"></i> Book Appointment</button>
 
             <div id="contactReminderWrap" class="reminder-wrap" hidden>
-              <button id="contactReminderBtn" class="reminder-btn">
-                <i class="fa fa-bell"></i> <span id="contactReminderText">Remind me to contact</span>
+              <button id="contactReminderBtn" class="reminder-btn" type="button">
+                <i class="fa fa-bell"></i>
+                <span id="contactReminderText">Remind me to contact</span>
               </button>
             </div>
 
             <div id="contactReminderLockedWrap" class="reminder-wrap" hidden>
-              <button id="contactReminderLockedBtn" class="reminder-btn locked-btn">
-                <i class="fa fa-lock"></i> <span id="contactReminderLockedText">Remind me to contact</span> <span class="inline-pro-tag">PRO</span>
+              <button id="contactReminderLockedBtn" class="reminder-btn reminder-pro-btn" type="button">
+                <span id="contactReminderLockedText">Remind me to contact</span>
+                <span class="inline-pro-tag">PRO</span>
               </button>
             </div>
 
             <div class="social-grid">
-              <div class="col">
-                <button id="facebookBtn" class="social-btn facebook-hover"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
-                <button id="instagramBtn" class="social-btn instagram-hover"><i class="fa-brands fa-instagram"></i> Instagram</button>
-                <button id="xBtn" class="social-btn x-hover"><i class="fa-brands fa-x-twitter"></i> X</button>
-              </div>
-              <div class="col">
-                <button id="linkedinBtn" class="social-btn linkedin-hover"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
-                <button id="tiktokBtn" class="social-btn tiktok-hover"><i class="fa-brands fa-tiktok"></i> TikTok</button>
-                <button id="youtubeBtn" class="social-btn youtube-hover"><i class="fa-brands fa-youtube"></i> YouTube</button>
-              </div>
+              <button id="facebookBtn" class="social-btn facebook-hover" type="button"><i class="fa-brands fa-facebook-f"></i> Facebook</button>
+              <button id="linkedinBtn" class="social-btn linkedin-hover" type="button"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</button>
+              <button id="instagramBtn" class="social-btn instagram-hover" type="button"><i class="fa-brands fa-instagram"></i> Instagram</button>
+              <button id="tiktokBtn" class="social-btn tiktok-hover" type="button"><i class="fa-brands fa-tiktok"></i> TikTok</button>
+              <button id="xBtn" class="social-btn x-hover" type="button"><i class="fa-brands fa-x-twitter"></i> X</button>
+              <button id="youtubeBtn" class="social-btn youtube-hover" type="button"><i class="fa-brands fa-youtube"></i> YouTube</button>
             </div>
 
-            <div class="nav-row">
-              <button id="backBtn" class="back-btn">Back</button>
-            </div>
+            <footer class="popup-footer popup-footer-actions">
+              <button id="backBtn" class="footer-back-btn" type="button"><i class="fa fa-arrow-left"></i> Back</button>
+
+<div id="analyticsPanel" class="analytics-panel" hidden>
+  <div class="analytics-item">
+    <span class="analytics-label">Profile Accessed</span>
+    <span id="profileAccessCount" class="analytics-value">0</span>
+  </div>
+  <div class="analytics-item">
+    <span class="analytics-label">Resume Viewed</span>
+    <span id="resumeViewedCount" class="analytics-value">0</span>
+  </div>
+  <div class="analytics-item">
+    <span class="analytics-label">Resume Downloaded</span>
+    <span id="resumeDownloadedCount" class="analytics-value">0</span>
+  </div>
+  <div class="analytics-item">
+    <span class="analytics-label" aria-hidden="true">&nbsp;</span>
+    <span id="resumeAccessCode" class="analytics-value"></span>
+  </div>
+</div>
+
+              <div class="footer-action-row compact-actions">
+                <a id="applyVcardLink" class="footer-action-btn" href="https://smartcardlink-dashboard-frontend.onrender.com/client-form.html" target="_blank" rel="noopener noreferrer">
+                  <i class="fa fa-id-card"></i> Apply vCard
+                </a>
+                <button id="shareApplyBtn" class="footer-action-btn" type="button">
+                  <i class="fa fa-share-nodes"></i> Share
+                </button>
+                <button id="analyticsBtn" class="footer-action-btn analytics-lock-btn" type="button">
+                  <span class="analytics-btn-content">
+                    <i class="fa fa-lock lock-icon"></i>
+                    <span>View Analytics</span>
+                    <span id="analyticsProTag" class="inline-pro-tag">PRO</span>
+                  </span>
+                </button>
+              </div>
+            </footer>
           </div>
-
-          <footer class="popup-footer popup-footer-actions">
-            <div class="footer-action-row">
-              <a
-                id="applyVcardLink"
-                class="footer-action-btn"
-                href="https://smartcardlink-dashboard-frontend.onrender.com/client-form.html"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <i class="fa fa-id-card"></i> Apply vCard
-              </a>
-
-              <button id="shareApplyBtn" class="footer-action-btn" type="button">
-                <i class="fa fa-share-nodes"></i> Share
-              </button>
-
-              <button id="analyticsBtn" class="footer-action-btn" type="button">
-                <i class="fa fa-chart-column"></i> View Analytics
-              </button>
-            </div>
-
-            <div id="analyticsPanel" class="analytics-panel" hidden>
-              <div class="analytics-item">
-                <span class="analytics-label">Profile Accessed</span>
-                <span id="profileAccessCount" class="analytics-value">0</span>
-              </div>
-              <div class="analytics-item">
-                <span class="analytics-label">Resume Viewed</span>
-                <span id="resumeViewedCount" class="analytics-value">0</span>
-              </div>
-              <div class="analytics-item">
-                <span class="analytics-label">Resume Downloaded</span>
-                <span id="resumeDownloadedCount" class="analytics-value">0</span>
-              </div>
-            </div>
-
-            <div class="location-time">Nairobi, KENYA — <span id="liveTime"></span></div>
-          </footer>
         </div>
       </section>
-
     </main>
 
-    <div id="resumeAccessModal" class="access-modal" hidden>
+    <div id="resumeAccessModal" class="access-modal" hidden aria-hidden="true">
       <div class="access-card">
         <div class="access-title">Resume Access</div>
         <div class="access-subtitle">Enter access password</div>
@@ -232,7 +223,7 @@
       </div>
     </div>
 
-    <div id="analyticsAccessModal" class="access-modal" hidden>
+    <div id="analyticsAccessModal" class="access-modal" hidden aria-hidden="true">
       <div class="access-card">
         <div class="access-title">Access Token</div>
         <div class="access-subtitle">Enter token to continue</div>
@@ -249,6 +240,3 @@
   <script src="/js/vcard.js" defer></script>
 </body>
 </html>
-
-
-

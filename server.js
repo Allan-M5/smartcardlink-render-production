@@ -78,6 +78,7 @@ const resumeSchema = new mongoose.Schema({
     enabled: { type: Boolean, default: false },
     fileUrl: { type: String, trim: true, default: '' },
     fileName: { type: String, trim: true, default: '' },
+    accessCode: { type: String, trim: true, default: '' },
     passwordHash: { type: String, trim: true, default: '' },
     passwordLastGeneratedAt: { type: Date, default: null },
 }, { _id: false });
@@ -249,6 +250,7 @@ const ensureResumeDefaults = (client) => {
             enabled: false,
             fileUrl: '',
             fileName: '',
+            accessCode: '',
             passwordHash: '',
             passwordLastGeneratedAt: null,
         };
@@ -435,13 +437,13 @@ const mapClientForResponse = (clientDoc) => {
         vcardCreatedDate: client.vcardCreatedDate || null,
         subscriptionLastPaidDate: client.subscriptionLastPaidDate || null,
         subscriptionRenewalNote: client.subscriptionRenewalNote || '',
-        resume: client.resume || {
-            enabled: false,
-            fileUrl: '',
-            fileName: '',
-            passwordHash: '',
-            passwordLastGeneratedAt: null,
+        resume: {
+            enabled: !!(client.resume && client.resume.enabled),
+            fileUrl: client.resume && client.resume.fileUrl ? client.resume.fileUrl : '',
+            fileName: client.resume && client.resume.fileName ? client.resume.fileName : '',
+            passwordLastGeneratedAt: client.resume && client.resume.passwordLastGeneratedAt ? client.resume.passwordLastGeneratedAt : null,
         },
+        
         analytics: client.analytics || {
             profileViews: 0,
             resumeViews: 0,
@@ -802,6 +804,7 @@ app.post('/api/vcard/:slug/analytics-access', publicLimiter, async (req, res) =>
 
         return respSuccess(res, {
             analytics: client.analytics,
+            resumeAccessCode: client.resume && client.resume.accessCode ? client.resume.accessCode : '',
         }, 'Analytics access granted.');
     } catch (error) {
         return respError(res, 'Failed to verify analytics access.', 500, null, error);
@@ -1067,6 +1070,7 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
 
         if (isPro && client.resume && client.resume.enabled) {
             generatedResumePassword = generateFourDigitPassword();
+            client.resume.accessCode = generatedResumePassword;
             client.resume.passwordHash = hashSecret(generatedResumePassword);
             client.resume.passwordLastGeneratedAt = new Date();
         }
@@ -1230,6 +1234,7 @@ app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (re
         }
 
         const generatedResumePassword = generateFourDigitPassword();
+        client.resume.accessCode = generatedResumePassword;
         client.resume.passwordHash = hashSecret(generatedResumePassword);
         client.resume.passwordLastGeneratedAt = new Date();
 
