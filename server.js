@@ -285,16 +285,15 @@ const uploadResumePdfToCloudinary = async (slug, file) => {
     const originalName = String(file.originalname || 'resume.pdf').trim() || 'resume.pdf';
     const safeBaseName = originalName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]+/g, '-').toLowerCase() || 'resume';
 
-    const result = await cloudinary.uploader.upload(
-        'data:' + file.mimetype + ';base64,' + file.buffer.toString('base64'),
-        {
-            folder: 'smartcardlink_resumes',
-            resource_type: 'raw',
-            public_id: `${slug}_${safeBaseName}`,
-            format: 'pdf',
-            overwrite: true,
-        }
-    );
+const result = await cloudinary.uploader.upload(
+    'data:' + file.mimetype + ';base64,' + file.buffer.toString('base64'),
+    {
+        folder: 'smartcardlink_resumes',
+        resource_type: 'auto',
+        public_id: `${slug}_${safeBaseName}`,
+        overwrite: true,
+    }
+);
 
     return {
         fileUrl: result.secure_url,
@@ -1152,13 +1151,14 @@ app.get('/api/vcard/:slug', publicLimiter, async (req, res) => {
         }
 
         if (!client.resume || typeof client.resume !== 'object') {
-            client.resume = {
-                enabled: false,
-                fileUrl: '',
-                fileName: '',
-                passwordHash: '',
-                passwordLastGeneratedAt: null,
-            };
+client.resume = {
+    enabled: false,
+    fileUrl: '',
+    fileName: '',
+    accessCode: '',
+    passwordHash: '',
+    passwordLastGeneratedAt: null,
+};
         }
 
         if (!client.analytics || typeof client.analytics !== 'object') {
