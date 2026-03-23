@@ -378,6 +378,133 @@
     text-align: center;
   }
 
+    .theme-config-wrap {
+    margin-top: 1rem;
+    display: none;
+    border: 1px solid rgba(216,180,254,0.28);
+    background: linear-gradient(135deg, rgba(216,180,254,0.08), rgba(17,17,17,0.96));
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.02),
+      0 12px 28px rgba(0,0,0,0.18);
+  }
+
+  .theme-config-wrap.show {
+    display: block;
+  }
+
+  .theme-config-title {
+    margin: 0 0 0.3rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #d8b4fe;
+    text-align: center;
+  }
+
+  .theme-config-subtext {
+    margin: 0 0 0.9rem;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.74);
+    text-align: center;
+  }
+
+  .theme-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 1rem;
+    align-items: end;
+  }
+
+  .theme-input-stack {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  .theme-field label {
+    margin-bottom: 0.35rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .theme-field select,
+  .theme-field input[type="text"],
+  .theme-field input[type="color"] {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .theme-field select,
+  .theme-field input[type="text"] {
+    background: #fff;
+    color: #000;
+    border: 1px solid #ccc;
+    border-radius: 0.45rem;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .theme-color-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 0.8rem;
+    align-items: end;
+  }
+
+  .theme-field input[type="color"] {
+    height: 48px;
+    padding: 0.2rem;
+    border-radius: 0.55rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: #111;
+    cursor: pointer;
+  }
+
+  .theme-preview-card {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 0.9rem;
+    background: rgba(255,255,255,0.05);
+    padding: 0.9rem;
+    min-height: 100%;
+  }
+
+  .theme-preview-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.68);
+    margin-bottom: 0.55rem;
+  }
+
+  .theme-preview-swatch {
+    width: 100%;
+    height: 78px;
+    border-radius: 0.8rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.04),
+      0 10px 18px rgba(0,0,0,0.16);
+    background: #FFD700;
+  }
+
+  .theme-preview-name {
+    margin-top: 0.7rem;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .theme-preview-hex {
+    margin-top: 0.18rem;
+    font-size: 0.84rem;
+    color: rgba(255,255,255,0.72);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
   @keyframes borderBreathGold {
     0%, 100% {
       opacity: 0.86;
@@ -423,7 +550,9 @@
   }
 @media (max-width: 768px) {
     .grid-2col,
-    .pricing-grid {
+    .pricing-grid,
+    .theme-grid,
+    .theme-color-row {
       grid-template-columns: 1fr;
     }
   }
@@ -858,6 +987,64 @@
 </div>
     <div class="pricing-note">Tap once to select your package. Press and hold to reveal full package features and pricing.</div>
 
+      <div class="theme-config-wrap" id="themeConfigWrap">
+      <h3 class="theme-config-title">PRO Theme Personalization</h3>
+      <p class="theme-config-subtext">
+        PRO clients can choose a luxury preset or set a custom brand color. Your selected theme color will be used as your vCard highlight color.
+      </p>
+
+      <input type="hidden" name="themeColor" id="themeColor" value="" />
+
+      <div class="theme-grid">
+        <div class="theme-input-stack">
+          <div class="theme-field">
+            <label for="themePreset">Luxury Theme Preset</label>
+            <select id="themePreset" autocomplete="off">
+              <option value="">Select a luxury theme</option>
+              <option value="#FFD700">Royal Gold — #FFD700</option>
+              <option value="#D4AF37">Champagne Gold — #D4AF37</option>
+              <option value="#C5A46D">Desert Gold — #C5A46D</option>
+              <option value="#B76E79">Rose Gold — #B76E79</option>
+              <option value="#C08081">Blush Copper — #C08081</option>
+              <option value="#CD7F32">Burnished Bronze — #CD7F32</option>
+              <option value="#8B4513">Saddle Bronze — #8B4513</option>
+              <option value="#7E4830">Espresso Copper — #7E4830</option>
+              <option value="#50C878">Emerald Green — #50C878</option>
+              <option value="#0F8B8D">Deep Teal Luxe — #0F8B8D</option>
+              <option value="#0047AB">Royal Blue — #0047AB</option>
+              <option value="#1338BE">Imperial Blue — #1338BE</option>
+              <option value="#1E3A8A">Midnight Sapphire — #1E3A8A</option>
+              <option value="#4B0082">Royal Indigo — #4B0082</option>
+              <option value="#6A0DAD">Majestic Purple — #6A0DAD</option>
+              <option value="#800020">Burgundy Velvet — #800020</option>
+              <option value="#8B0000">Crimson Elite — #8B0000</option>
+              <option value="#36454F">Charcoal Titanium — #36454F</option>
+              <option value="#2F4F4F">Graphite Slate — #2F4F4F</option>
+              <option value="#111827">Obsidian Black — #111827</option>
+            </select>
+          </div>
+
+          <div class="theme-color-row">
+            <div class="theme-field">
+              <label for="themePicker">Manual Color Picker</label>
+              <input type="color" id="themePicker" value="#FFD700" />
+            </div>
+
+            <div class="theme-field">
+              <label for="themeHex">Hex Input</label>
+              <input type="text" id="themeHex" value="#FFD700" maxlength="7" placeholder="#FFD700" autocomplete="off" />
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-preview-card">
+          <div class="theme-preview-label">Live Preview</div>
+          <div class="theme-preview-swatch" id="themePreviewSwatch"></div>
+          <div class="theme-preview-name" id="themePreviewName">Royal Gold</div>
+          <div class="theme-preview-hex" id="themePreviewHex">#FFD700</div>
+        </div>
+      </div>
+    </div>
 
     <div class="disclaimer">
       <h3 style="color:#FFD700;">Disclaimer</h3>
@@ -926,6 +1113,15 @@ const exitPageBtn = document.getElementById("exitPageBtn");
 const packageTypeInput = document.getElementById("packageType");
 const packageCards = document.querySelectorAll(".pricing-option");
 
+const themeConfigWrap = document.getElementById("themeConfigWrap");
+const themePreset = document.getElementById("themePreset");
+const themePicker = document.getElementById("themePicker");
+const themeHex = document.getElementById("themeHex");
+const themeColorInput = document.getElementById("themeColor");
+const themePreviewSwatch = document.getElementById("themePreviewSwatch");
+const themePreviewName = document.getElementById("themePreviewName");
+const themePreviewHex = document.getElementById("themePreviewHex");
+
 const copyMpesaBtn = document.getElementById("copyMpesaBtn");
 const copyAmountBtn = document.getElementById("copyAmountBtn");
 
@@ -985,6 +1181,76 @@ form.addEventListener("pointerdown", () => {
   warmUpApi();
 }, { once: true });
 
+const luxuryThemes = [
+  { name: "Royal Gold", hex: "#FFD700" },
+  { name: "Champagne Gold", hex: "#D4AF37" },
+  { name: "Desert Gold", hex: "#C5A46D" },
+  { name: "Rose Gold", hex: "#B76E79" },
+  { name: "Blush Copper", hex: "#C08081" },
+  { name: "Burnished Bronze", hex: "#CD7F32" },
+  { name: "Saddle Bronze", hex: "#8B4513" },
+  { name: "Espresso Copper", hex: "#7E4830" },
+  { name: "Emerald Green", hex: "#50C878" },
+  { name: "Deep Teal Luxe", hex: "#0F8B8D" },
+  { name: "Royal Blue", hex: "#0047AB" },
+  { name: "Imperial Blue", hex: "#1338BE" },
+  { name: "Midnight Sapphire", hex: "#1E3A8A" },
+  { name: "Royal Indigo", hex: "#4B0082" },
+  { name: "Majestic Purple", hex: "#6A0DAD" },
+  { name: "Burgundy Velvet", hex: "#800020" },
+  { name: "Crimson Elite", hex: "#8B0000" },
+  { name: "Charcoal Titanium", hex: "#36454F" },
+  { name: "Graphite Slate", hex: "#2F4F4F" },
+  { name: "Obsidian Black", hex: "#111827" }
+];
+
+function normalizeHex(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "";
+  const withHash = raw.startsWith("#") ? raw : "#" + raw;
+  return /^#[0-9A-F]{6}$/.test(withHash) ? withHash : "";
+}
+
+function findThemeNameByHex(hex) {
+  const found = luxuryThemes.find(theme => theme.hex === hex);
+  return found ? found.name : "Custom Theme";
+}
+
+function syncThemeUi(hexValue) {
+  const hex = normalizeHex(hexValue) || "#FFD700";
+  const matchedTheme = luxuryThemes.find(theme => theme.hex === hex);
+
+  if (themePicker) themePicker.value = hex;
+  if (themeHex) themeHex.value = hex;
+  if (themeColorInput) themeColorInput.value = hex;
+  if (themePreviewSwatch) themePreviewSwatch.style.background = hex;
+  if (themePreviewHex) themePreviewHex.textContent = hex;
+  if (themePreviewName) themePreviewName.textContent = matchedTheme ? matchedTheme.name : "Custom Theme";
+
+  if (themePreset) {
+    themePreset.value = matchedTheme ? hex : "";
+  }
+}
+
+function showOrHideThemeConfig(packageType) {
+  const isPro = String(packageType || "").toLowerCase() === "pro";
+
+  if (themeConfigWrap) {
+    themeConfigWrap.classList.toggle("show", isPro);
+  }
+
+  if (themeColorInput) {
+    themeColorInput.value = isPro ? (normalizeHex(themeHex?.value) || "#FFD700") : "";
+  }
+
+  if (isPro) {
+    syncThemeUi(normalizeHex(themeHex?.value) || "#FFD700");
+    setTimeout(() => {
+      themeConfigWrap?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 120);
+  }
+}
+
 function showMessage(message, type) {
 const cleanMessage = String(message || "");
   formMessage.innerHTML = cleanMessage;
@@ -1003,7 +1269,9 @@ function clearPackageVisualState() {
     card.classList.remove("selected");
     card.classList.remove("expanded");
   });
+  packageTypeInput.value = "";
   updatePaymentSummary("");
+  showOrHideThemeConfig("");
 }
 
   function clearExpandedOnly() {
@@ -1017,6 +1285,7 @@ function selectPackage(card) {
   card.classList.add("selected");
   packageTypeInput.value = card.dataset.package || "";
   updatePaymentSummary(packageTypeInput.value);
+  showOrHideThemeConfig(packageTypeInput.value);
 }
 
 function expandCard(card) {
@@ -1071,6 +1340,35 @@ function expandCard(card) {
   }
 
 packageCards.forEach(bindPackageInteractions);
+
+if (themePreset) {
+  themePreset.addEventListener("change", () => {
+    const selectedHex = normalizeHex(themePreset.value);
+    if (!selectedHex) return;
+    syncThemeUi(selectedHex);
+  });
+}
+
+if (themePicker) {
+  themePicker.addEventListener("input", () => {
+    syncThemeUi(themePicker.value);
+  });
+}
+
+if (themeHex) {
+  themeHex.addEventListener("input", () => {
+    const cleaned = String(themeHex.value || "").replace(/[^#0-9a-fA-F]/g, "").toUpperCase();
+    themeHex.value = cleaned.startsWith("#") ? cleaned.slice(0, 7) : cleaned.slice(0, 6);
+  });
+
+  themeHex.addEventListener("blur", () => {
+    const validHex = normalizeHex(themeHex.value);
+    syncThemeUi(validHex || "#FFD700");
+  });
+}
+
+syncThemeUi("#FFD700");
+showOrHideThemeConfig("");
 
 function getPackageAmount(packageType) {
   const key = String(packageType || "").trim().toLowerCase();
@@ -1199,6 +1497,8 @@ if (applyAnotherBtn) {
     packageTypeInput.value = "";
     clearPackageVisualState();
     updatePaymentSummary("");
+    syncThemeUi("#FFD700");
+    showOrHideThemeConfig("");
     document.getElementById("fullName")?.focus();
   });
 }
@@ -1242,6 +1542,13 @@ submissionRecordId.style.display = "none";
 submissionText.textContent = "Please wait a moment while your application is being saved.";
 
     try {
+      if (packageTypeInput.value === "pro") {
+        const finalThemeColor = normalizeHex(themeColorInput?.value) || "#FFD700";
+        themeColorInput.value = finalThemeColor;
+      } else {
+        themeColorInput.value = "";
+      }
+
       const formData = new FormData(form);
       const payload = {
         fullName: formData.get("fullName"),
@@ -1259,6 +1566,7 @@ submissionText.textContent = "Please wait a moment while your application is bei
         bio: formData.get("bio"),
         address: formData.get("address"),
         packageType: formData.get("packageType"),
+        themeColor: formData.get("themeColor"),
         socialLinks: {},
         workingHours: {}
       };
