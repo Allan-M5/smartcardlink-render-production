@@ -1145,10 +1145,14 @@ async function warmUpApi() {
 
   apiWarmupStarted = true;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+
   try {
     const response = await fetch(MAIN_API + "/health", {
       method: "GET",
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     });
 
     if (response.ok) {
@@ -1158,6 +1162,8 @@ async function warmUpApi() {
     }
   } catch (error) {
     apiWarmupStarted = false;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -1169,9 +1175,17 @@ async function warmUpApi() {
   if (el) el.disabled = false;
 });
 
-setTimeout(() => {
+warmUpApi();
+
+window.addEventListener("load", () => {
   warmUpApi();
-}, 700);
+}, { once: true });
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    warmUpApi();
+  }
+});
 
 form.addEventListener("focusin", () => {
   warmUpApi();
@@ -1180,6 +1194,10 @@ form.addEventListener("focusin", () => {
 form.addEventListener("pointerdown", () => {
   warmUpApi();
 }, { once: true });
+
+window.addEventListener("pageshow", () => {
+  warmUpApi();
+});
 
 const luxuryThemes = [
   { name: "Royal Gold", hex: "#FFD700" },
@@ -1528,7 +1546,6 @@ if (exitPageBtn) {
     formMessage.style.display = "none";
 
 btn.disabled = true;
-const originalText = "Submit Form";
 btn.textContent = "Processing... Please wait";
 formMessage.style.display = "none";
 
@@ -1537,9 +1554,9 @@ submissionOverlay.classList.add("show");
 submissionActions.classList.remove("show");
 submissionStatusCard.className = "submission-status-card processing-state";
 submissionEmoji.innerHTML = '<div class="submission-spinner"></div>';
-submissionTitle.textContent = "Submitting Your Details";
+submissionTitle.textContent = "Sending Your Application";
 submissionRecordId.style.display = "none";
-submissionText.textContent = "Please wait a moment while your application is being saved.";
+submissionText.textContent = "Your details are being delivered securely. This may take a few seconds if the server is waking up.";
 
     try {
       if (packageTypeInput.value === "pro") {
@@ -1581,14 +1598,25 @@ submissionText.textContent = "Please wait a moment while your application is bei
         if (v) payload.workingHours[k] = v;
       });
 
+const submitController = new AbortController();
+const submitTimeoutId = setTimeout(() => submitController.abort(), 20000);
+
 const response = await fetch(MAIN_API + "/api/clients", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   cache: "no-store",
-  body: JSON.stringify(payload)
+  body: JSON.stringify(payload),
+  signal: submitController.signal
 });
 
-      const result = await response.json();
+clearTimeout(submitTimeoutId);
+
+let result = {};
+try {
+  result = await response.json();
+} catch {
+  result = {};
+}
 
       if (!response.ok) {
         throw new Error(result.message || "Server rejected submission");
@@ -1602,7 +1630,15 @@ showSuccessProcessingSequence(recordId, submittedPackageType, btn);
 } catch (err) {
   submissionOverlay.classList.remove("show");
   document.body.classList.remove("overlay-active");
-  showMessage("Error: " + err.message, "error");
+
+  const isTimeout = err.name === "AbortError";
+  showMessage(
+    isTimeout
+      ? "The server took too long to respond. Please try again."
+      : "Error: " + err.message,
+    "error"
+  );
+
   btn.disabled = false;
   btn.textContent = "Submit Form";
 }
