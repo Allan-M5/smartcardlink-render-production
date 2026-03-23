@@ -673,26 +673,26 @@
     border-color: #15803d;
   }
 
-  #copyPochiBtn.submission-action-btn,
-  #copyAmountBtn.submission-action-btn {
-    background: rgba(255,255,255,0.1);
-    border-color: rgba(255,255,255,0.18);
-    color: white;
-  }
+#copyMpesaBtn.submission-action-btn,
+#copyAmountBtn.submission-action-btn {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.18);
+  color: white;
+}
 
-  #copyPochiBtn.submission-action-btn:hover,
-  #copyAmountBtn.submission-action-btn:hover {
-    background: rgba(255,255,255,0.16);
-    border-color: rgba(255,255,255,0.24);
-  }
+#copyMpesaBtn.submission-action-btn:hover,
+#copyAmountBtn.submission-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.24);
+}
 
-  #copyPochiBtn.submission-action-btn:active,
-  #copyAmountBtn.submission-action-btn:active {
-    transform: translateY(2px) scale(0.985);
-    background: #000000;
-    border-color: #000000;
-    color: #ffffff;
-  }
+#copyMpesaBtn.submission-action-btn:active,
+#copyAmountBtn.submission-action-btn:active {
+  transform: translateY(2px) scale(0.985);
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
 
   #payLaterBtn.submission-action-btn {
     border-color: rgba(255,215,0,0.32);
@@ -820,34 +820,43 @@
     <input type="hidden" name="packageType" id="packageType" value="" />
 
     <div class="section-header">Pricing - Packages Section</div>
-    <div class="pricing-grid" id="pricingGrid">
-      <div class="pricing-option standard-option" data-package="standard" tabindex="0">
-        <div class="pricing-option-title">Standard vCard</div>
-        <div class="pricing-option-details">
-          <ul>
-            <li>QR + NFC card</li>
-            <li>Live vCard</li>
-            <li>Default gold theme</li>
-            <li>No custom theme color</li>
-          </ul>
-          <span class="pricing-price">Ksh 1,500</span>
-        </div>
-      </div>
-
-      <div class="pricing-option pro-option" data-package="pro" tabindex="0">
-        <div class="pricing-option-title">PRO vCard</div>
-        <div class="pricing-option-details">
-          <ul>
-            <li>QR + NFC card</li>
-            <li>Live vCard</li>
-            <li>Custom-designed card</li>
-            <li>Choose any preferred theme color</li>
-          </ul>
-          <span class="pricing-price">Ksh 2,500</span>
-        </div>
-      </div>
+<div class="pricing-grid" id="pricingGrid">
+  <div class="pricing-option standard-option" data-package="standard" tabindex="0">
+    <div class="pricing-option-title">Standard vCard</div>
+    <div class="pricing-option-details">
+      <ul>
+        <li>Smart digital business profile</li>
+        <li>QR + NFC instant tap or scan access</li>
+        <li>Live shareable vCard link</li>
+        <li>Call, WhatsApp, email and save-contact actions</li>
+        <li>Business details, bio and social links</li>
+        <li>Working hours and Google Maps direction support</li>
+        <li>Default premium gold theme</li>
+        <li>Easy future upgrade to PRO</li>
+      </ul>
+      <span class="pricing-price">Ksh 1,500</span>
     </div>
-    <div class="pricing-note">Tap once to select your package. Press and hold to preview package details and pricing.</div>
+  </div>
+
+  <div class="pricing-option pro-option" data-package="pro" tabindex="0">
+    <div class="pricing-option-title">PRO vCard</div>
+    <div class="pricing-option-details">
+      <ul>
+        <li>Everything in Standard</li>
+        <li>Custom preferred theme color</li>
+        <li>Professional Resume / CV section</li>
+        <li>Secure 4-digit resume password access</li>
+        <li>Resume view and download control</li>
+        <li>Profile analytics access</li>
+        <li>Contact reminder feature</li>
+        <li>Stronger premium presentation for employers and clients</li>
+        <li>Higher professional credibility and conversion value</li>
+      </ul>
+      <span class="pricing-price">Ksh 2,500</span>
+    </div>
+  </div>
+</div>
+    <div class="pricing-note">Tap once to select your package. Press and hold to reveal full package features and pricing.</div>
 
 
     <div class="disclaimer">
@@ -881,50 +890,51 @@
     <span class="payment-summary-label">Amount</span>
     <span class="payment-summary-value" id="paymentSummaryAmount">--</span>
   </div>
-  <div class="payment-summary-row">
-    <span class="payment-summary-label">Pochi</span>
-    <span class="payment-summary-value" id="paymentSummaryPochi">0702444552</span>
-  </div>
+<div class="payment-summary-row">
+  <span class="payment-summary-label">Mpesa Number</span>
+  <span class="payment-summary-value" id="paymentSummaryMpesa">0702444552</span>
+</div>
 </div>
 
 <div class="submission-actions" id="submissionActions">
-  <button type="button" class="submission-action-btn primary" id="payNowBtn">Pay Now</button>
-  <button type="button" class="submission-action-btn" id="copyPochiBtn">Copy Pochi Number</button>
+<button type="button" class="submission-action-btn" id="copyMpesaBtn">Copy Mpesa Number</button>
   <button type="button" class="submission-action-btn" id="copyAmountBtn">Copy Amount</button>
-  <button type="button" class="submission-action-btn" id="payLaterBtn">Pay Later on Activation</button>
-  <button type="button" class="submission-action-btn" id="stayOnPageBtn">Remain on This Page</button>
-  <button type="button" class="submission-action-btn primary" id="visitWebsiteBtn">Visit vCard Website</button>
+  <button type="button" class="submission-action-btn primary" id="applyAnotherBtn">Apply Another vCard</button>
+  <button type="button" class="submission-action-btn primary" id="visitWebsiteBtn">Visit Website</button>
+  <button type="button" class="submission-action-btn" id="exitPageBtn">Exit Page</button>
 </div>
   </div>
 </div>
 
 <script>
 
-  const MAIN_API = "https://smartcardlink-api.onrender.com";
-  const form = document.getElementById("clientForm");
-  const formMessage = document.getElementById("formMessage");
-  const submissionOverlay = document.getElementById("submissionOverlay");
-  const submissionStatusCard = document.getElementById("submissionStatusCard");
-  const submissionEmoji = document.getElementById("submissionEmoji");
-  const submissionTitle = document.getElementById("submissionTitle");
-  const submissionRecordId = document.getElementById("submissionRecordId");
-  const submissionText = document.getElementById("submissionText");
+const MAIN_API = "https://smartcardlink-api.onrender.com";
+const form = document.getElementById("clientForm");
+const formMessage = document.getElementById("formMessage");
+const submissionOverlay = document.getElementById("submissionOverlay");
+const submissionStatusCard = document.getElementById("submissionStatusCard");
+const submissionEmoji = document.getElementById("submissionEmoji");
+const submissionTitle = document.getElementById("submissionTitle");
+const submissionRecordId = document.getElementById("submissionRecordId");
+const submissionText = document.getElementById("submissionText");
 const submissionActions = document.getElementById("submissionActions");
-const stayOnPageBtn = document.getElementById("stayOnPageBtn");
+
+const applyAnotherBtn = document.getElementById("applyAnotherBtn");
 const visitWebsiteBtn = document.getElementById("visitWebsiteBtn");
+const exitPageBtn = document.getElementById("exitPageBtn");
+
 const packageTypeInput = document.getElementById("packageType");
 const packageCards = document.querySelectorAll(".pricing-option");
-const payNowBtn = document.getElementById("payNowBtn");
-const payLaterBtn = document.getElementById("payLaterBtn");
-const copyPochiBtn = document.getElementById("copyPochiBtn");
+
+const copyMpesaBtn = document.getElementById("copyMpesaBtn");
 const copyAmountBtn = document.getElementById("copyAmountBtn");
+
 const paymentSummaryPackage = document.getElementById("paymentSummaryPackage");
 const paymentSummaryAmount = document.getElementById("paymentSummaryAmount");
-const paymentSummaryPochi = document.getElementById("paymentSummaryPochi");
-
+const paymentSummaryMpesa = document.getElementById("paymentSummaryMpesa");
 
 const paymentConfig = {
-  pochiNumber: "0702444552",
+  mpesaNumber: "0702444552",
   prices: {
     standard: 1500,
     pro: 2500
@@ -1085,54 +1095,24 @@ function updatePaymentSummary(packageType) {
     paymentSummaryAmount.textContent = amount ? "Ksh " + amount : "--";
   }
 
-  if (paymentSummaryPochi) {
-    paymentSummaryPochi.textContent = paymentConfig.pochiNumber;
+  if (paymentSummaryMpesa) {
+    paymentSummaryMpesa.textContent = paymentConfig.mpesaNumber;
   }
 }
 
 function buildMpesaUssdLink(packageType) {
   const amount = getPackageAmount(packageType);
   if (!amount) return "";
-  return "tel:*334*1*" + paymentConfig.pochiNumber + "*" + amount + "%23";
+  return "tel:*334*1*" + paymentConfig.mpesaNumber + "*" + amount + "%23";
 }
 
-if (payNowBtn) {
-  payNowBtn.addEventListener("click", () => {
-    const selectedPackage = packageTypeInput.value;
-
-    if (!selectedPackage) {
-      showMessage("Please select either Standard vCard or PRO vCard before paying.", "error");
-      document.getElementById("pricingGrid")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-
-    const amount = getPackageAmount(selectedPackage);
-    const ussdLink = buildMpesaUssdLink(selectedPackage);
-
-    showMessage(
-      "Opening M-PESA now. If your phone shows a timeout, use Copy Pochi Number and Copy Amount below to pay manually. Your application is already saved.",
-      "info"
-    );
-
-    setTimeout(() => {
-      window.location.href = ussdLink;
-    }, 300);
-  });
-}
-
-if (payLaterBtn) {
-  payLaterBtn.addEventListener("click", () => {
-    showMessage("Payment can be completed later during activation. Your request will remain pending until payment is confirmed.", "info");
-  });
-}
-
-if (copyPochiBtn) {
-  copyPochiBtn.addEventListener("click", async () => {
+if (copyMpesaBtn) {
+  copyMpesaBtn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(paymentConfig.pochiNumber);
-      showMessage("✅ Pochi number copied: " + paymentConfig.pochiNumber, "success");
+      await navigator.clipboard.writeText(paymentConfig.mpesaNumber);
+      showMessage("✅ Mpesa number copied: " + paymentConfig.mpesaNumber, "success");
     } catch (error) {
-      showMessage("Use this Pochi number: " + paymentConfig.pochiNumber, "info");
+      showMessage("Use this Mpesa number: " + paymentConfig.mpesaNumber, "info");
     }
   });
 }
@@ -1178,40 +1158,62 @@ if (copyAmountBtn) {
     }, 420);
   }
 
-function showSuccessProcessingSequence(recordId, btn) {
+function showSuccessProcessingSequence(recordId, packageType, btn) {
+  const amount = getPackageAmount(packageType);
+  const packageLabel = getPackageLabel(packageType);
+
   submissionOverlay.classList.add("show");
   document.body.classList.add("overlay-active");
-  submissionStatus.className = "submission-status success";
-  submissionTitle.textContent = "Saved Successfully";
-  submissionText.textContent = "Your information has been saved successfully. You can now complete payment or choose to pay later on activation.";
-  submissionRecord.textContent = `Success! Your Record ID: ${recordId}`;
+  submissionActions.classList.add("show");
 
-  btn.disabled = false;
-  btn.textContent = originalSubmitText;
+  submissionStatusCard.className = "submission-status-card success-state";
+  submissionEmoji.textContent = "✅";
+  submissionTitle.textContent = "Submission Successful";
+  submissionRecordId.textContent = "MongoDB ID: " + recordId;
+  submissionRecordId.style.display = "inline-block";
+  submissionText.textContent = "Your submission was successful. Wait for your vCard to be processed.";
 
-  const paymentMode = (document.querySelector('input[name="paymentOption"]:checked') || {}).value || "";
-  if (paymentMode === "pay_later") {
-    setTimeout(() => {
-      window.location.href = "https://smartcardlink-public.onrender.com/";
-    }, 1800);
+  if (paymentSummaryPackage) {
+    paymentSummaryPackage.textContent = packageLabel;
   }
+
+  if (paymentSummaryAmount) {
+    paymentSummaryAmount.textContent = amount ? "Ksh " + amount : "--";
+  }
+
+if (paymentSummaryMpesa) {
+  paymentSummaryMpesa.textContent = paymentConfig.mpesaNumber;
 }
 
-stayOnPageBtn.addEventListener("click", () => {
-  submissionOverlay.classList.remove("show");
-  submissionActions.classList.remove("show");
-  formMessage.style.display = "none";
-  document.body.classList.remove("overlay-active");
-  form.reset();
-  packageTypeInput.value = "";
-  clearPackageVisualState();
-  updatePaymentSummary("");
-  document.getElementById("fullName")?.focus();
-});
+  btn.disabled = false;
+  btn.textContent = "Submit Form";
+}
 
+if (applyAnotherBtn) {
+  applyAnotherBtn.addEventListener("click", () => {
+    submissionOverlay.classList.remove("show");
+    submissionActions.classList.remove("show");
+    formMessage.style.display = "none";
+    document.body.classList.remove("overlay-active");
+    form.reset();
+    packageTypeInput.value = "";
+    clearPackageVisualState();
+    updatePaymentSummary("");
+    document.getElementById("fullName")?.focus();
+  });
+}
+
+if (visitWebsiteBtn) {
   visitWebsiteBtn.addEventListener("click", () => {
     window.open("https://smartcardlink-landing.onrender.com/", "_blank");
   });
+}
+
+if (exitPageBtn) {
+  exitPageBtn.addEventListener("click", () => {
+    window.location.href = "about:blank";
+  });
+}
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1287,19 +1289,14 @@ const response = await fetch(MAIN_API + "/api/clients", {
 const recordId = result.data?._id || result.data?.id || result.recordId || "Success";
 const submittedPackageType = packageTypeInput.value;
 
-form.reset();
-clearPackageVisualState();
-packageTypeInput.value = submittedPackageType;
-updatePaymentSummary(submittedPackageType);
-
-showSuccessProcessingSequence(recordId, btn);
+showSuccessProcessingSequence(recordId, submittedPackageType, btn);
 
 } catch (err) {
   submissionOverlay.classList.remove("show");
   document.body.classList.remove("overlay-active");
   showMessage("Error: " + err.message, "error");
   btn.disabled = false;
-  btn.textContent = originalText;
+  btn.textContent = "Submit Form";
 }
 
   });
