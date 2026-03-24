@@ -252,17 +252,6 @@ const getSlugFromUrl = (value) => {
     }
 };
 
-const ensureResumeDefaults = (client) => {
-    const cleanResume = {
-        enabled: false,
-        fileUrl: '',
-        fileName: '',
-        objectKey: '',
-        accessCode: '',
-        passwordHash: '',
-        passwordLastGeneratedAt: null,
-    };
-
 const getCleanResumeState = () => ({
     enabled: false,
     fileUrl: '',
@@ -288,6 +277,9 @@ const repairLegacyResumeField = async (client) => {
 
     return Client.findById(client._id);
 };
+
+const ensureResumeDefaults = (client) => {
+    const cleanResume = getCleanResumeState();
 
     const rawResume = client.get ? client.get('resume') : client.resume;
     const isPlainObject = rawResume && typeof rawResume === 'object' && !Array.isArray(rawResume);
