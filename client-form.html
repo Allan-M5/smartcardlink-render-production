@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>SmartCardLink Client Form</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1512,11 +1515,14 @@ function buildMpesaUssdLink(packageType) {
 
 function bindSummaryCopyActions() {
   if (paymentSummaryAmountBtn) {
-    paymentSummaryAmountBtn.addEventListener("mouseenter", () => {
+    const showAmountHint = () => {
       if (paymentSummaryAmountBtn.dataset.copyValue) {
-        showCopyToast("Copy Amount", "info");
+        showCopyToast("Tap to Copy Amount", "info");
       }
-    });
+    };
+
+    paymentSummaryAmountBtn.addEventListener("mouseenter", showAmountHint);
+    paymentSummaryAmountBtn.addEventListener("touchstart", showAmountHint, { passive: true });
 
     paymentSummaryAmountBtn.addEventListener("click", async () => {
       const amountToCopy = paymentSummaryAmountBtn.dataset.copyValue;
@@ -1536,9 +1542,12 @@ function bindSummaryCopyActions() {
   }
 
   if (paymentSummaryMpesaBtn) {
-    paymentSummaryMpesaBtn.addEventListener("mouseenter", () => {
-      showCopyToast("Copy Mpesa Number", "info");
-    });
+    const showMpesaHint = () => {
+      showCopyToast("Tap to Copy Mpesa Number", "info");
+    };
+
+    paymentSummaryMpesaBtn.addEventListener("mouseenter", showMpesaHint);
+    paymentSummaryMpesaBtn.addEventListener("touchstart", showMpesaHint, { passive: true });
 
     paymentSummaryMpesaBtn.addEventListener("click", async () => {
       const mpesaToCopy = paymentSummaryMpesaBtn.dataset.copyValue || paymentConfig.mpesaNumber;
