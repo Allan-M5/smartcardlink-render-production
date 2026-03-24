@@ -34,9 +34,11 @@
     statDisabled: document.getElementById('statDisabled')
   };
 
-  let allClients = [];
-  let renderedClients = [];
-  let modalState = {
+let allClients = [];
+let renderedClients = [];
+let autoRefreshTimer = null;
+let isFetchingClients = false;
+let modalState = {
     clientId: null,
     nextStatus: null,
     actionLabel: '',
@@ -499,25 +501,44 @@
     updateCounters();
   }
 
-  async function fetchClients() {
-    try {
-      if (els.loadingState) {
-        els.loadingState.style.display = 'block';
-      }
+async function fetchClients(showLoader = true, silent = false) {
+  if (isFetchingClients) return;
+  isFetchingClients = true;
 
-      const json = await callApi('/api/admin/clients');
-      allClients = Array.isArray(json.data) ? json.data : [];
-
-      applyFilters();
-      updateRefreshNote();
-    } catch (error) {
-      showToast('Load failed', error.message || 'Unable to fetch clients.', 'error');
-    } finally {
-      if (els.loadingState) {
-        els.loadingState.style.display = 'none';
-      }
+  try {
+    if (showLoader && els.loadingState) {
+      els.loadingState.style.display = 'block';
     }
+
+    const json = await callApi('/api/admin/clients');
+    allClients = Array.isArray(json.data) ? json.data : [];
+
+    applyFilters();
+    updateRefreshNote();
+  } catch (error) {
+    if (!silent) {
+      showToast('Load failed', error.message || 'Unable to fetch clients.', 'error');
+    }
+  } finally {
+    if (els.loadingState) {
+      els.loadingState.style.display = 'none';
+    }
+    isFetchingClients = false;
   }
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer);
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
+    if (els.modal && els.modal.classList.contains('show')) return;
+
+    fetchClients(false, true);
+  }, 10000);
+}
 
   function exportCsv() {
     const rows = [
@@ -577,9 +598,9 @@
       els.statusFilter.addEventListener('change', applyFilters);
     }
 
-    if (els.refreshBtn) {
-      els.refreshBtn.addEventListener('click', fetchClients);
-    }
+if (els.refreshBtn) {
+  els.refreshBtn.addEventListener('click', () => fetchClients(true, false));
+}
 
     if (els.exportBtn) {
       els.exportBtn.addEventListener('click', exportCsv);
@@ -617,6 +638,7 @@
     });
   }
 
-  wireEvents();
-  fetchClients();
+wireEvents();
+fetchClients(true, false);
+startAutoRefresh();
 })();
