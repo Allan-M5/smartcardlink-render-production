@@ -253,32 +253,44 @@ const getSlugFromUrl = (value) => {
 };
 
 const ensureResumeDefaults = (client) => {
-    if (!client.resume || typeof client.resume !== 'object') {
-        client.resume = {
-            enabled: false,
-            fileUrl: '',
-            fileName: '',
-            objectKey: '',
-            accessCode: '',
-            passwordHash: '',
-            passwordLastGeneratedAt: null,
-        };
+    const cleanResume = {
+        enabled: false,
+        fileUrl: '',
+        fileName: '',
+        objectKey: '',
+        accessCode: '',
+        passwordHash: '',
+        passwordLastGeneratedAt: null,
+    };
+
+    const rawResume = client.get ? client.get('resume') : client.resume;
+    const isPlainObject = rawResume && typeof rawResume === 'object' && !Array.isArray(rawResume);
+
+    if (!isPlainObject) {
+        client.set('resume', cleanResume);
     } else {
-        client.resume.enabled = !!client.resume.enabled;
-        client.resume.fileUrl = String(client.resume.fileUrl || '');
-        client.resume.fileName = String(client.resume.fileName || '');
-        client.resume.objectKey = String(client.resume.objectKey || '');
-        client.resume.accessCode = String(client.resume.accessCode || '');
-        client.resume.passwordHash = String(client.resume.passwordHash || '');
-        client.resume.passwordLastGeneratedAt = client.resume.passwordLastGeneratedAt || null;
+        client.set('resume.enabled', !!rawResume.enabled);
+        client.set('resume.fileUrl', String(rawResume.fileUrl || ''));
+        client.set('resume.fileName', String(rawResume.fileName || ''));
+        client.set('resume.objectKey', String(rawResume.objectKey || ''));
+        client.set('resume.accessCode', String(rawResume.accessCode || ''));
+        client.set('resume.passwordHash', String(rawResume.passwordHash || ''));
+        client.set('resume.passwordLastGeneratedAt', rawResume.passwordLastGeneratedAt || null);
     }
 
-    if (!client.analytics || typeof client.analytics !== 'object') {
-        client.analytics = {
+    const rawAnalytics = client.get ? client.get('analytics') : client.analytics;
+    const analyticsIsObject = rawAnalytics && typeof rawAnalytics === 'object' && !Array.isArray(rawAnalytics);
+
+    if (!analyticsIsObject) {
+        client.set('analytics', {
             profileViews: 0,
             resumeViews: 0,
             resumeDownloads: 0,
-        };
+        });
+    } else {
+        client.set('analytics.profileViews', Number(rawAnalytics.profileViews || 0));
+        client.set('analytics.resumeViews', Number(rawAnalytics.resumeViews || 0));
+        client.set('analytics.resumeDownloads', Number(rawAnalytics.resumeDownloads || 0));
     }
 };
 
@@ -856,6 +868,7 @@ app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'
         }
 
         ensureResumeDefaults(client);
+        client.markModified('resume');
 
         if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
             return respError(res, 'Resume upload is available on PRO profiles only.', 403);
@@ -1242,6 +1255,7 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
         if (!client) return respError(res, 'Client not found.', 404);
 
         ensureResumeDefaults(client);
+        client.markModified('resume');
 
         if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
             return respError(res, 'Resume access is available on PRO profiles only.', 403);
@@ -1286,6 +1300,7 @@ app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (re
         if (!client) return respError(res, 'Client not found.', 404);
 
         ensureResumeDefaults(client);
+        client.markModified('resume');
 
         if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
             return respError(res, 'Resume password regeneration is available on PRO profiles only.', 403);
