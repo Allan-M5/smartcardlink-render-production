@@ -857,6 +857,10 @@ app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'
 
         ensureResumeDefaults(client);
 
+        if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
+            return respError(res, 'Resume upload is available on PRO profiles only.', 403);
+        }
+
         const uploaded = await uploadResumePdfToR2(client.slug, req.file);
 
         client.resume.enabled = true;
@@ -876,7 +880,13 @@ app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'
             resume: client.resume,
         }, 'Resume uploaded successfully.');
     } catch (error) {
-        return respError(res, 'Failed to upload resume.', 500, null, error);
+        return respError(
+            res,
+            error && error.message ? error.message : 'Failed to upload resume.',
+            500,
+            null,
+            error
+        );
     }
 });
 
@@ -1017,7 +1027,10 @@ app.put('/api/clients/:id', publicLimiter, upload.single('photo'), async (req, r
             client.photoUrl = uploaded.secure_url;
         }
 
-        client.status = 'Processed';
+        if (client.status !== 'Active' && client.status !== 'Suspended' && client.status !== 'Deleted') {
+            client.status = 'Processed';
+        }
+
         client.appointmentUrl = buildAppointmentUrl(client.email1, client.appointmentUrl);
         await client.save();
 
@@ -1242,15 +1255,28 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
             return respError(res, 'Incorrect resume password.', 403);
         }
 
+        const fileUrl = String(client.resume.fileUrl || '').trim();
+        const fileName = String(client.resume.fileName || 'resume.pdf').trim() || 'resume.pdf';
+
+        if (!/^https?:\/\//i.test(fileUrl)) {
+            return respError(res, 'Resume file URL is invalid.', 500);
+        }
+
         await incrementClientAnalytics(client._id, mode === 'download' ? 'resumeDownloads' : 'resumeViews');
 
         return respSuccess(res, {
-            fileUrl: client.resume.fileUrl,
-            fileName: client.resume.fileName || 'resume.pdf',
+            fileUrl,
+            fileName,
             mode,
         }, 'Resume access granted.');
     } catch (error) {
-        return respError(res, 'Failed to verify resume access.', 500, null, error);
+        return respError(
+            res,
+            error && error.message ? error.message : 'Failed to verify resume access.',
+            500,
+            null,
+            error
+        );
     }
 });
 
