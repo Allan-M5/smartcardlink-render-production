@@ -1,338 +1,831 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SmartCardLink Admin Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>ðŸ”—</text></svg>">
-    <style>
-        /* --- DESIGN & STYLES (PRESERVED) --- */
-        body {
-            font-family: 'Inter', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 2rem;
-            background: none;
-            position: relative;
-            color: #e2e8f0;
-            transition: all 0.5s ease-in-out;
-        }
-        #bg-video {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            min-width: 100%;
-            min-height: 100%;
-            z-index: -100;
-            filter: brightness(0.4) saturate(1.2);
-            object-fit: cover;
-        }
-        .dashboard-card {
-            background-color: #111;
-            border-radius: 1rem;
-            padding: 2rem;
-            width: 100%;
-            max-width: 1200px;
-            border: 1px solid #333;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
-            overflow: hidden;
-            animation: fadeIn 1s ease-in-out;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        h1.title {
-            color: #FFD700;
-            font-size: 1.75rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 2rem;
-            letter-spacing: 0.05em;
-        }
-        .controls-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        .search-container {
-            display: flex;
-            gap: 0.5rem;
-            flex-grow: 1;
-        }
-        input, select, textarea {
-            flex-grow: 1;
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            border: 1px solid #555;
-            box-sizing: border-box;
-            background-color: #222;
-            color: white;
-            transition: all 0.3s ease;
-        }
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #FFD700;
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-        button {
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.375rem;
-            border: 1px solid #FFD700;
-            background-color: #1a1a1a;
-            color: #FFD700;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            white-space: nowrap;
-        }
-        button:hover {
-            background-color: #FFD700;
-            color: black;
-        }
-        button:disabled {
-            background-color: #444;
-            color: #888;
-            cursor: not-allowed;
-            border-color: #555;
-        }
-        .table-container {
-            overflow-x: auto;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1200px;
-        }
-        th, td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #333;
-        }
-        th {
-            background-color: #222;
-            color: #FFD700;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        td {
-            background-color: #1a1a1a;
-            color: #e2e8f0;
-            font-size: 0.9rem;
-        }
-        tbody tr:hover {
-            background-color: #2d2d2d;
-        }
-        tbody tr.row-success {
-            background-color: #38a1694d !important;
-            transition: background-color 0.5s ease-out;
-        }
-        tbody tr.selected {
-            background-color: #3b3b3b;
-            outline: 2px solid #FFD700;
-        }
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: white;
-            white-space: nowrap;
-        }
-        .status-Pending { background-color: #d69e2e; }
-        .status-Processed { background-color: #4299e1; }
-        .status-Active { background-color: #38a169; }
-        .status-Disabled { background-color: #e53e3e; }
-        .status-Deleted { background-color: #4a5568; }
-        .client-photo {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #555;
-        }
-        .qr-code {
-            width: 50px;
-            height: 50px;
-            object-fit: contain;
-        }
-        .actions-cell {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: nowrap;
-        }
-        .actions-cell button {
-            flex-grow: 1;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.8rem;
-            white-space: nowrap;
-        }
-        .btn-action-process { background-color: #3b82f6; color: white; border-color: #3b82f6;}
-        .btn-action-disable { background-color: #ef4444; color: white; border-color: #ef4444;}
-        .btn-action-reactivate { background-color: #22c55e; color: white; border-color: #22c55e;}
-        .btn-action-delete { background-color: #a8a29e; color: white; border-color: #a8a29e;}
-        .section-header {
-            background-color: #1f2937;
-            color: #FFD700;
-            padding: 0.75rem;
-            text-align: center;
-            border-radius: 0.375rem;
-            font-weight: 600;
-        }
-        /* MODAL CSS */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
-        .modal-content { 
-            background-color: #1a1a1a; 
-            margin: 15% auto; 
-            padding: 20px; 
-            border: 1px solid #555; 
-            width: 80%; 
-            max-width: 400px; 
-            border-radius: 0.5rem; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
-            display: flex; 
-            flex-direction: column;
-            gap: 15px;
-        }
-        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; align-self: flex-end; }
-        .modal-content h2 { color: #FFD700; margin-top: 0; }
-        .modal-content textarea { min-height: 100px; }
-        .modal-content button { width: 100%; margin-top: 5px; }
-        
-        /* TOAST CSS */
-        .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 1000; display: flex; flex-direction: column-reverse; gap: 0.5rem; }
-        .toast { background-color: #333; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 0; transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; transform: translateY(20px); display: flex; justify-content: space-between; align-items: center;}
-        .toast.show { opacity: 1; transform: translateY(0); }
-        .toast.error { background-color: #ef4444; }
-        .toast.success { background-color: #22c55e; }
-    </style>
-<style>
-/* SMARTCARDLINK_ADMIN_DASHBOARD_FIX */
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCardLink | Admin Dashboard</title>
 
-/* Constrain table height for proportional layout */
-.table-container {
-  max-height: 60vh;
-  overflow-y: auto;
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <style>
+    :root {
+      --gold: #ffd700;
+      --bg-dark: #050505;
+      --panel: rgba(15, 15, 15, 0.72);
+      --panel-2: rgba(20, 20, 20, 0.94);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --green: #16a34a;
+      --blue: #2563eb;
+      --orange: #d97706;
+      --red: #dc2626;
+      --gray: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      font-family: "Inter", sans-serif;
+      background: #000;
+      color: var(--text);
+    }
+
+    body {
+      position: relative;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    #bg-video {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+      opacity: 1;
+      filter: brightness(0.68) saturate(1.05);
+      pointer-events: none;
+      background: #000;
+    }
+
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background:
+        radial-gradient(circle at top left, rgba(255, 215, 0, 0.05), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(255, 215, 0, 0.03), transparent 30%),
+        linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.22));
+      pointer-events: none;
+    }
+
+    .dashboard-shell {
+      position: relative;
+      z-index: 2;
+      max-width: 1380px;
+      margin: 0 auto;
+      animation: fadeUp 0.35s ease;
+    }
+
+    .dashboard-card {
+      border-radius: 22px;
+      border: 1.5px solid rgba(255, 215, 0, 0.28);
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      box-shadow:
+        0 0 0 1px rgba(255, 215, 0, 0.08),
+        0 25px 60px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+    }
+
+    .dashboard-header {
+      padding: 24px 24px 18px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,215,0,0.06), rgba(255,215,0,0.01));
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: var(--gold);
+      letter-spacing: 0.2px;
+    }
+
+    .title-wrap p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      max-width: 850px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(22, 163, 74, 0.12);
+      border: 1px solid rgba(22, 163, 74, 0.28);
+      color: #bbf7d0;
+      font-size: 0.86rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+.centered-header {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 
-/* Prevent dashboard from feeling overly tall */
-.dashboard-card {
-  gap: 1rem;
-  padding: 1.5rem;
+.centered-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
-/* Improve mobile usability */
-@media (max-width: 768px) {
-  table {
-    min-width: 900px;
-  }
-
-  th, td {
-    padding: 0.75rem;
-  }
-
-  .actions-cell button {
-    padding: 0.6rem;
-    font-size: 0.75rem;
-  }
+.centered-title h1 {
+  width: 100%;
+  text-align: center;
 }
 
-/* Make rows more touch-friendly */
-tbody tr {
-  cursor: pointer;
+.centered-title p {
+  max-width: 820px;
+  text-align: center;
 }
-</style>
 
+.centered-badge {
+  align-self: center;
+}
+
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      animation: pulse 1.6s infinite;
+    }
+
+    .top-stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px 24px 10px;
+    }
+
+    .stat-card {
+      min-height: 90px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      padding: 16px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .dashboard-body {
+      padding: 20px 24px 24px;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .toolbar-left,
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .input-wrap,
+    .select-wrap {
+      position: relative;
+    }
+
+    .input-wrap i,
+    .select-wrap i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #7c8798;
+      pointer-events: none;
+    }
+
+    .input-wrap input,
+    .select-wrap select {
+      min-height: 46px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background: rgba(18,18,18,0.95);
+      color: #fff;
+      font-size: 0.94rem;
+      outline: none;
+      transition: 0.2s ease;
+    }
+
+    .input-wrap input {
+      width: 330px;
+      padding: 0 14px 0 40px;
+    }
+
+    .select-wrap select {
+      min-width: 190px;
+      padding: 0 40px 0 40px;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .input-wrap input:focus,
+    .select-wrap select:focus,
+    .modal-body textarea:focus {
+      border-color: rgba(255,215,0,0.46);
+      box-shadow: 0 0 0 4px rgba(255,215,0,0.08);
+    }
+
+    .btn {
+      min-height: 46px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 215, 0, 0.34);
+      background: rgba(255, 215, 0, 0.08);
+      color: var(--gold);
+      padding: 0 16px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      transition: 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 215, 0, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .btn.secondary {
+      border-color: rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+    }
+
+    .btn.secondary:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .refresh-note {
+      color: var(--muted);
+      font-size: 0.83rem;
+      margin-bottom: 14px;
+    }
+
+    .table-shell {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(12, 12, 12, 0.72);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 68vh;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: rgba(20,20,20,0.98);
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      transition: background 0.2s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(255,255,255,0.03);
+    }
+
+    tbody td {
+      padding: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.015);
+      font-size: 0.92rem;
+      vertical-align: middle;
+    }
+
+    .client-name {
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .client-sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .package-badge,
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+
+    .package-standard {
+      color: #dbeafe;
+      background: rgba(37, 99, 235, 0.16);
+      border-color: rgba(37, 99, 235, 0.26);
+    }
+
+    .package-pro {
+      color: #fde68a;
+      background: rgba(217, 119, 6, 0.16);
+      border-color: rgba(217, 119, 6, 0.26);
+    }
+
+    .status-pending {
+      color: #fde68a;
+      background: rgba(217, 119, 6, 0.16);
+      border-color: rgba(217, 119, 6, 0.28);
+    }
+
+    .status-processed {
+      color: #bfdbfe;
+      background: rgba(37, 99, 235, 0.16);
+      border-color: rgba(37, 99, 235, 0.28);
+    }
+
+    .status-active {
+      color: #bbf7d0;
+      background: rgba(22, 163, 74, 0.16);
+      border-color: rgba(22, 163, 74, 0.28);
+    }
+
+    .status-disabled,
+    .status-suspended {
+      color: #fecaca;
+      background: rgba(220, 38, 38, 0.16);
+      border-color: rgba(220, 38, 38, 0.28);
+    }
+
+    .status-deleted {
+      color: #cbd5e1;
+      background: rgba(100, 116, 139, 0.16);
+      border-color: rgba(100, 116, 139, 0.28);
+    }
+
+    .created-cell {
+      color: #fff;
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    .menu-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    .menu-btn {
+      min-width: 46px;
+      min-height: 42px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .menu-btn:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .action-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 230px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(18,18,18,0.98);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+      overflow: hidden;
+      display: none;
+      z-index: 30;
+    }
+
+    .action-menu.show {
+      display: block;
+    }
+
+    .action-menu button {
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: transparent;
+      color: #fff;
+      text-align: left;
+      padding: 13px 14px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .action-menu button:last-child {
+      border-bottom: none;
+    }
+
+    .action-menu button:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .action-menu .danger {
+      color: #fecaca;
+    }
+
+    .loading-panel,
+    .empty-panel {
+      text-align: center;
+      color: var(--muted);
+      padding: 34px 16px;
+      display: none;
+    }
+
+    .loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(255,255,255,0.14);
+      border-top: 3px solid var(--gold);
+      border-radius: 50%;
+      margin: 0 auto 14px;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 100;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 520px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--panel-2);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      color: var(--gold);
+      font-size: 1.15rem;
+    }
+
+    .modal-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .modal-body {
+      padding: 18px 22px 22px;
+    }
+
+    .modal-body label {
+      display: inline-block;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .modal-body textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      color: #fff;
+      padding: 14px;
+      font: inherit;
+      outline: none;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 300;
+    }
+
+    .toast {
+      min-width: 290px;
+      max-width: 390px;
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: white;
+      box-shadow: 0 14px 32px rgba(0,0,0,0.35);
+      transform: translateX(40px);
+      opacity: 0;
+      transition: 0.22s ease;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(20,20,20,0.95);
+    }
+
+    .toast.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .toast.success { border-left: 4px solid #16a34a; }
+    .toast.error { border-left: 4px solid #dc2626; }
+    .toast.info { border-left: 4px solid #2563eb; }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 9px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1100px) {
+      .top-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
+
+      .dashboard-header,
+      .dashboard-body {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .top-stats {
+        grid-template-columns: 1fr;
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .toolbar-left,
+      .toolbar-right {
+        width: 100%;
+      }
+
+      .input-wrap,
+      .select-wrap,
+      .btn {
+        width: 100%;
+      }
+
+      .input-wrap input,
+      .select-wrap select,
+      .btn {
+        width: 100%;
+      }
+
+      .title-wrap h1 {
+        font-size: 1.35rem;
+      }
+
+      table {
+        min-width: 860px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <video autoplay muted loop playsinline id="bg-video">
-        <source src="https://res.cloudinary.com/dicvwaud3/video/upload/v1754439276/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
-    </video>
+  <video autoplay muted loop playsinline webkit-playsinline preload="auto" id="bg-video" poster="https://res.cloudinary.com/dicvwaud3/video/upload/so_0/oyvgam7oizwizgwxaxge.jpg" aria-hidden="true">
+    <source src="https://res.cloudinary.com/dicvwaud3/video/upload/f_mp4,q_auto:good,vc_auto/oyvgam7oizwizgwxaxge.mp4" type="video/mp4" />
+  </video>
+  <div class="bg-overlay"></div>
 
-    <div id="dashboardContainer" class="dashboard-card" style="display: block;"> 
-        <h1 class="title">SmartCardLink Admin Dashboard</h1>
-        
-        <div class="controls-container">
-            <div class="search-container">
-                <input type="text" id="filterInput" placeholder="Search clients by name, email, phone or company" />
-                <button id="searchBtn">Search</button>
+  <div class="dashboard-shell">
+    <div class="dashboard-card">
+<div class="dashboard-header">
+  <div class="title-row centered-header">
+    <div class="title-wrap centered-title">
+      <h1>SmartCardLink Admin Dashboard</h1>
+      <p>
+        Successfully submitted applications appear in this module after being sent by clients through the Client Form.
+        From here, each application can be processed through the Admin Form or deleted.
+      </p>
+    </div>
+
+    <div class="live-badge centered-badge">
+      <span class="live-dot"></span>
+      <span>Live Admin Dashboard</span>
+    </div>
+  </div>
+</div>
+
+      <div class="top-stats">
+        <div class="stat-card">
+          <div class="stat-label">Visible Clients</div>
+          <div class="stat-value" id="statVisible">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value" id="statPending">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Processed</div>
+          <div class="stat-value" id="statProcessed">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active</div>
+          <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Disabled / Deleted</div>
+          <div class="stat-value" id="statDisabled">0</div>
+        </div>
+      </div>
+
+      <div class="dashboard-body">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="input-wrap">
+              <i class="fas fa-search"></i>
+              <input type="text" id="searchInput" placeholder="Search name, company, email or phone..." />
             </div>
-            <select id="statusFilter">
-                <option value="">All Statuses</option>
+
+            <div class="select-wrap">
+              <i class="fas fa-filter"></i>
+              <select id="statusFilter">
+                <option value="all">All Open Clients</option>
                 <option value="Pending">Pending</option>
                 <option value="Processed">Processed</option>
                 <option value="Active">Active</option>
                 <option value="Disabled">Disabled</option>
+                <option value="Suspended">Suspended</option>
                 <option value="Deleted">Deleted</option>
-            </select>
-            <button id="refreshBtn" onclick="fetchAllClients()">
-                <i class="fas fa-sync-alt"></i> Re-fetch
-            </button>
-            <button id="exportBtn" onclick="exportToCsv()">
-                <i class="fas fa-file-export"></i> Export CSV
-            </button>
-        </div>
-        
-        <div id="totals" class="section-header" style="display: none;"></div>
-        
-        <div class="table-container">
-            <table>
-                <thead>
-<tr>
-  <th>Select</th>
-  <th>Photo</th>
-  <th>Full Name</th>
-  <th>Title</th>
-  <th>Phone</th>
-  <th>Email</th>
-  <th>Package</th>
-  <th>Status</th>
-  <th>QR</th>
-  <th>Created</th>
-  <th>Actions</th>
-</tr>
-                </thead>
-                <tbody id="clientTableBody">
-                    <tr><td colspan="9" style="text-align:center;">Loading client data...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <div id="noResults" style="text-align:center; color: #aaa; padding: 20px; display: none;">No results found matching your criteria.</div>
-    </div>
-    
-    <div id="notesModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2 id="modalTitle">Reason for Action</h2>
-            <textarea id="modalTextarea" placeholder="Please provide a reason for this action."></textarea>
-            <button id="modalConfirmBtn">Confirm</button>
-        </div>
-    </div>
-    <div class="toast-container" id="toast-container"></div>
+              </select>
+            </div>
+          </div>
 
-   <script>
-    // CRITICAL FIX: Directs all API calls to the live Render Backend URL.
-    window.SCL_CONFIG = { 
-        API_ROOT: "https://smartcardlink-api.onrender.com/api", 
-        ADMIN_FORM_URL: "admin-form.html"
-    };
-</script>
-    
-    <script src="adminDashboard.js"></script>
+          <div class="toolbar-right">
+            <button class="btn secondary" id="refreshBtn" type="button">
+              <i class="fas fa-rotate-right"></i>
+              <span>Refresh</span>
+            </button>
+
+            <button class="btn secondary" id="resetBtn" type="button">
+              <i class="fas fa-rotate-left"></i>
+              <span>Reset</span>
+            </button>
+
+            <button class="btn" id="exportBtn" type="button">
+              <i class="fas fa-file-export"></i>
+              <span>Export CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="refresh-note" id="refreshNote">Last sync: --</div>
+
+        <div class="table-shell">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Company</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Package</th>
+                  <th>Created</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="clientsTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="loading-panel" id="loadingState">
+            <div class="loading-spinner"></div>
+            <div>Syncing clients from database...</div>
+          </div>
+
+          <div class="empty-panel" id="emptyState">
+            No matching client records found.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="actionModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modalTitle">Confirm Action</h2>
+        <p id="modalSubtext">Please review and confirm this account action.</p>
+      </div>
+
+      <div class="modal-body">
+        <label for="actionReason">Admin Note</label>
+        <textarea id="actionReason" placeholder="Enter payment confirmation or reason for this action..."></textarea>
+
+        <div class="modal-actions">
+          <button class="btn secondary" id="modalCancelBtn" type="button">Cancel</button>
+          <button class="btn" id="modalConfirmBtn" type="button">Confirm Action</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/adminDashboard.js"></script>
 </body>
 </html>
-
