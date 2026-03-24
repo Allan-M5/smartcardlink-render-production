@@ -715,6 +715,53 @@
     word-break: break-word;
   }
 
+    .payment-summary-copy-btn {
+    appearance: none;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 800;
+    text-align: right;
+    border-radius: 999px;
+    padding: 0.42rem 0.82rem;
+    cursor: pointer;
+    width: auto;
+    margin: 0;
+    line-height: 1.1;
+    transition:
+      transform 0.16s ease,
+      background 0.22s ease,
+      border-color 0.22s ease,
+      box-shadow 0.22s ease,
+      color 0.22s ease;
+    box-shadow:
+      0 6px 14px rgba(0,0,0,0.14),
+      inset 0 0 0 1px rgba(255,255,255,0.03);
+  }
+
+  .payment-summary-copy-btn:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.24);
+    color: #FFD700;
+    transform: translateY(-1px);
+  }
+
+  .payment-summary-copy-btn:active {
+    transform: translateY(1px) scale(0.985);
+    background: #000;
+    border-color: #000;
+    color: #fff;
+  }
+
+  .payment-summary-copy-btn.amount-btn:hover {
+    color: #FFD700;
+  }
+
+  .payment-summary-copy-btn.mpesa-btn:hover {
+    color: #86efac;
+  }
+
   .submission-spinner {
     width: 38px;
     height: 38px;
@@ -843,26 +890,6 @@
     border-color: #15803d;
   }
 
-#copyMpesaBtn.submission-action-btn,
-#copyAmountBtn.submission-action-btn {
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.18);
-  color: white;
-}
-
-#copyMpesaBtn.submission-action-btn:hover,
-#copyAmountBtn.submission-action-btn:hover {
-  background: rgba(255,255,255,0.16);
-  border-color: rgba(255,255,255,0.24);
-}
-
-#copyMpesaBtn.submission-action-btn:active,
-#copyAmountBtn.submission-action-btn:active {
-  transform: translateY(2px) scale(0.985);
-  background: #000000;
-  border-color: #000000;
-  color: #ffffff;
-}
 
   #payLaterBtn.submission-action-btn {
     border-color: rgba(255,215,0,0.32);
@@ -1106,7 +1133,7 @@
   <div class="submission-status-card success-state" id="submissionStatusCard">
     <div class="submission-emoji" id="submissionEmoji">😎👍</div>
     <h2 class="submission-title" id="submissionTitle">Details Successfully Submitted</h2>
-<div class="submission-id" id="submissionRecordId">ID: --</div>
+<div class="submission-id" id="submissionRecordId">Submission ID: --</div>
 <p class="submission-text" id="submissionText">Your information has been received successfully.</p>
 
 <div class="payment-summary-card" id="paymentSummaryCard">
@@ -1114,20 +1141,19 @@
     <span class="payment-summary-label">Package</span>
     <span class="payment-summary-value" id="paymentSummaryPackage">--</span>
   </div>
-  <div class="payment-summary-row">
-    <span class="payment-summary-label">Amount</span>
-    <span class="payment-summary-value" id="paymentSummaryAmount">--</span>
-  </div>
+<div class="payment-summary-row">
+  <span class="payment-summary-label">Amount</span>
+  <button type="button" class="payment-summary-copy-btn amount-btn" id="paymentSummaryAmountBtn">--</button>
+</div>
 <div class="payment-summary-row">
   <span class="payment-summary-label">Mpesa Number</span>
-  <span class="payment-summary-value" id="paymentSummaryMpesa">0702444552</span>
+  <button type="button" class="payment-summary-copy-btn mpesa-btn" id="paymentSummaryMpesaBtn">0702444552</button>
 </div>
 </div>
 
 <div class="copy-toast" id="copyToast"></div>
+
 <div class="submission-actions" id="submissionActions">
-<button type="button" class="submission-action-btn" id="copyMpesaBtn">Copy Mpesa Number</button>
-  <button type="button" class="submission-action-btn" id="copyAmountBtn">Copy Amount</button>
   <button type="button" class="submission-action-btn primary" id="applyAnotherBtn">Apply Another vCard</button>
   <button type="button" class="submission-action-btn primary" id="visitWebsiteBtn">Visit Website</button>
   <button type="button" class="submission-action-btn" id="exitPageBtn">Exit Page</button>
@@ -1164,12 +1190,9 @@ const themePreviewSwatch = document.getElementById("themePreviewSwatch");
 const themePreviewName = document.getElementById("themePreviewName");
 const themePreviewHex = document.getElementById("themePreviewHex");
 
-const copyMpesaBtn = document.getElementById("copyMpesaBtn");
-const copyAmountBtn = document.getElementById("copyAmountBtn");
-
 const paymentSummaryPackage = document.getElementById("paymentSummaryPackage");
-const paymentSummaryAmount = document.getElementById("paymentSummaryAmount");
-const paymentSummaryMpesa = document.getElementById("paymentSummaryMpesa");
+const paymentSummaryAmountBtn = document.getElementById("paymentSummaryAmountBtn");
+const paymentSummaryMpesaBtn = document.getElementById("paymentSummaryMpesaBtn");
 
 const paymentConfig = {
   mpesaNumber: "0702444552",
@@ -1305,17 +1328,8 @@ function showOrHideThemeConfig(packageType) {
 
   if (isPro) {
     syncThemeUi(normalizeHex(themeHex?.value) || "#FFD700");
-    setTimeout(() => {
-      themeConfigWrap?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 120);
   }
 }
-
-function showMessage(message, type) {
-const cleanMessage = String(message || "");
-  formMessage.innerHTML = cleanMessage;
-  formMessage.className = "form-message " + type;
-  formMessage.style.display = "block";
 
 let copyToastTimer = null;
 
@@ -1339,6 +1353,12 @@ function showCopyToast(message, type = "success") {
     }, 220);
   }, 1800);
 }
+
+function showMessage(message, type) {
+  const cleanMessage = String(message || "");
+  formMessage.innerHTML = cleanMessage;
+  formMessage.className = "form-message " + type;
+  formMessage.style.display = "block";
 
   if (type === "success" || type === "info" || type === "error") {
     setTimeout(() => {
@@ -1452,6 +1472,7 @@ if (themeHex) {
 
 syncThemeUi("#FFD700");
 showOrHideThemeConfig("");
+bindSummaryCopyActions();
 
 function getPackageAmount(packageType) {
   const key = String(packageType || "").trim().toLowerCase();
@@ -1472,12 +1493,14 @@ function updatePaymentSummary(packageType) {
     paymentSummaryPackage.textContent = packageLabel;
   }
 
-  if (paymentSummaryAmount) {
-    paymentSummaryAmount.textContent = amount ? "Ksh " + amount : "--";
+  if (paymentSummaryAmountBtn) {
+    paymentSummaryAmountBtn.textContent = amount ? "Ksh " + amount.toLocaleString() : "--";
+    paymentSummaryAmountBtn.dataset.copyValue = amount ? String(amount) : "";
   }
 
-  if (paymentSummaryMpesa) {
-    paymentSummaryMpesa.textContent = paymentConfig.mpesaNumber;
+  if (paymentSummaryMpesaBtn) {
+    paymentSummaryMpesaBtn.textContent = paymentConfig.mpesaNumber;
+    paymentSummaryMpesaBtn.dataset.copyValue = paymentConfig.mpesaNumber;
   }
 }
 
@@ -1487,62 +1510,72 @@ function buildMpesaUssdLink(packageType) {
   return "tel:*334*1*" + paymentConfig.mpesaNumber + "*" + amount + "%23";
 }
 
-if (copyMpesaBtn) {
-  copyMpesaBtn.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(paymentConfig.mpesaNumber);
-      showCopyToast("✅ Mpesa number copied", "success");
-    } catch (error) {
-      showCopyToast("Use this Mpesa number: " + paymentConfig.mpesaNumber, "info");
-    }
-  });
-}
+function bindSummaryCopyActions() {
+  if (paymentSummaryAmountBtn) {
+    paymentSummaryAmountBtn.addEventListener("mouseenter", () => {
+      if (paymentSummaryAmountBtn.dataset.copyValue) {
+        showCopyToast("Copy Amount", "info");
+      }
+    });
 
-if (copyAmountBtn) {
-  copyAmountBtn.addEventListener("click", async () => {
-    const selectedPackage = packageTypeInput.value;
-    const amount = getPackageAmount(selectedPackage);
+    paymentSummaryAmountBtn.addEventListener("click", async () => {
+      const amountToCopy = paymentSummaryAmountBtn.dataset.copyValue;
 
-    if (!amount) {
-      showCopyToast("Please select a package first.", "error");
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(String(amount));
-      showCopyToast("✅ Amount copied", "success");
-    } catch (error) {
-      showCopyToast("Use this amount: Ksh " + amount, "info");
-    }
-  });
-}
-
-  function transitionCardState(nextClass, emojiHtml, title, text, showId, recordIdValue) {
-    submissionStatusCard.classList.add("slide-out-down");
-
-    setTimeout(() => {
-      submissionStatusCard.className = "submission-status-card " + nextClass + " slide-in-up";
-      submissionEmoji.innerHTML = emojiHtml;
-      submissionTitle.textContent = title;
-      submissionText.textContent = text;
-
-      if (showId) {
-        submissionRecordId.textContent = "ID: " + recordIdValue;
-        submissionRecordId.style.display = "inline-block";
-      } else {
-        submissionRecordId.style.display = "none";
+      if (!amountToCopy) {
+        showCopyToast("No amount available yet.", "error");
+        return;
       }
 
-      requestAnimationFrame(() => {
-        submissionStatusCard.classList.remove("slide-in-up");
-      });
-    }, 420);
+      try {
+        await navigator.clipboard.writeText(amountToCopy);
+        showCopyToast("Amount Copied", "success");
+      } catch (error) {
+        showCopyToast("Use this amount: Ksh " + Number(amountToCopy).toLocaleString(), "info");
+      }
+    });
   }
 
-function showSuccessProcessingSequence(recordId, packageType, btn) {
-  const amount = getPackageAmount(packageType);
-  const packageLabel = getPackageLabel(packageType);
+  if (paymentSummaryMpesaBtn) {
+    paymentSummaryMpesaBtn.addEventListener("mouseenter", () => {
+      showCopyToast("Copy Mpesa Number", "info");
+    });
 
+    paymentSummaryMpesaBtn.addEventListener("click", async () => {
+      const mpesaToCopy = paymentSummaryMpesaBtn.dataset.copyValue || paymentConfig.mpesaNumber;
+
+      try {
+        await navigator.clipboard.writeText(mpesaToCopy);
+        showCopyToast("Mpesa Number Copied", "success");
+      } catch (error) {
+        showCopyToast("Use this Mpesa number: " + mpesaToCopy, "info");
+      }
+    });
+  }
+}
+
+function transitionCardState(nextClass, emojiHtml, title, text, showId, recordIdValue) {
+  submissionStatusCard.classList.add("slide-out-down");
+
+  setTimeout(() => {
+    submissionStatusCard.className = "submission-status-card " + nextClass + " slide-in-up";
+    submissionEmoji.innerHTML = emojiHtml;
+    submissionTitle.textContent = title;
+    submissionText.textContent = text;
+
+    if (showId) {
+      submissionRecordId.textContent = "Submission ID: " + recordIdValue;
+      submissionRecordId.style.display = "inline-block";
+    } else {
+      submissionRecordId.style.display = "none";
+    }
+
+    requestAnimationFrame(() => {
+      submissionStatusCard.classList.remove("slide-in-up");
+    });
+  }, 420);
+}
+
+function showSuccessProcessingSequence(recordId, packageType, btn) {
   submissionOverlay.classList.add("show");
   document.body.classList.add("overlay-active");
   submissionActions.classList.add("show");
@@ -1550,21 +1583,11 @@ function showSuccessProcessingSequence(recordId, packageType, btn) {
   submissionStatusCard.className = "submission-status-card success-state";
   submissionEmoji.textContent = "✅";
   submissionTitle.textContent = "Submission Successful";
-  submissionRecordId.textContent = "MongoDB ID: " + recordId;
+  submissionRecordId.textContent = "Submission ID: " + recordId;
   submissionRecordId.style.display = "inline-block";
-  submissionText.textContent = "Your submission was successful. Wait for your vCard to be processed.";
+  submissionText.textContent = "Your details were received successfully. Complete payment using the buttons below, then wait for your vCard to be processed.";
 
-  if (paymentSummaryPackage) {
-    paymentSummaryPackage.textContent = packageLabel;
-  }
-
-  if (paymentSummaryAmount) {
-    paymentSummaryAmount.textContent = amount ? "Ksh " + amount : "--";
-  }
-
-if (paymentSummaryMpesa) {
-  paymentSummaryMpesa.textContent = paymentConfig.mpesaNumber;
-}
+  updatePaymentSummary(packageType);
 
   btn.disabled = false;
   btn.textContent = "Submit Form";
