@@ -263,6 +263,32 @@ const ensureResumeDefaults = (client) => {
         passwordLastGeneratedAt: null,
     };
 
+const getCleanResumeState = () => ({
+    enabled: false,
+    fileUrl: '',
+    fileName: '',
+    objectKey: '',
+    accessCode: '',
+    passwordHash: '',
+    passwordLastGeneratedAt: null,
+});
+
+const repairLegacyResumeField = async (client) => {
+    const rawResume = client && client.get ? client.get('resume') : client.resume;
+    const isPlainObject = rawResume && typeof rawResume === 'object' && !Array.isArray(rawResume);
+
+    if (isPlainObject) {
+        return client;
+    }
+
+    await Client.updateOne(
+        { _id: client._id },
+        { $set: { resume: getCleanResumeState() } }
+    );
+
+    return Client.findById(client._id);
+};
+
     const rawResume = client.get ? client.get('resume') : client.resume;
     const isPlainObject = rawResume && typeof rawResume === 'object' && !Array.isArray(rawResume);
 
@@ -858,9 +884,12 @@ app.post('/api/vcard/:slug/analytics-access', publicLimiter, async (req, res) =>
 
 app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'), async (req, res) => {
     try {
-        const client = await Client.findById(req.params.id);
+        let client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
         if (!req.file) return respError(res, 'No resume PDF provided.', 400);
+
+        client = await repairLegacyResumeField(client);
+        if (!client) return respError(res, 'Client not found after resume repair.', 404);
 
         const mimeType = String(req.file.mimetype || '').toLowerCase();
         if (mimeType !== 'application/pdf') {
@@ -1251,8 +1280,11 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
         if (!password) return respError(res, 'Resume password is required.', 400);
         if (!['view', 'download'].includes(mode)) return respError(res, 'Invalid resume access mode.', 400);
 
-        const client = await Client.findOne({ slug, status: 'Active' });
+        let client = await Client.findOne({ slug, status: 'Active' });
         if (!client) return respError(res, 'Client not found.', 404);
+
+        client = await repairLegacyResumeField(client);
+        if (!client) return respError(res, 'Client not found after resume repair.', 404);
 
         ensureResumeDefaults(client);
         client.markModified('resume');
@@ -1296,8 +1328,11 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
 
 app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (req, res) => {
     try {
-        const client = await Client.findById(req.params.id);
+        let client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
+
+        client = await repairLegacyResumeField(client);
+        if (!client) return respError(res, 'Client not found after resume repair.', 404);
 
         ensureResumeDefaults(client);
         client.markModified('resume');
