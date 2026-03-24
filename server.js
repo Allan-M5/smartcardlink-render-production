@@ -10,6 +10,7 @@ const qrcode = require('qrcode');
 const vCardJS = require('vcards-js');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
 require('dotenv').config();
@@ -42,6 +43,12 @@ const PACKAGE_PRICES = {
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || '';
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '';
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || '';
+
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || '';
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || '';
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || '';
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || '';
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL || '';
 
 const staticPath = path.join(__dirname, 'public');
 const rootStaticFiles = {
@@ -78,6 +85,7 @@ const resumeSchema = new mongoose.Schema({
     enabled: { type: Boolean, default: false },
     fileUrl: { type: String, trim: true, default: '' },
     fileName: { type: String, trim: true, default: '' },
+    objectKey: { type: String, trim: true, default: '' },
     accessCode: { type: String, trim: true, default: '' },
     passwordHash: { type: String, trim: true, default: '' },
     passwordLastGeneratedAt: { type: Date, default: null },
@@ -250,10 +258,19 @@ const ensureResumeDefaults = (client) => {
             enabled: false,
             fileUrl: '',
             fileName: '',
+            objectKey: '',
             accessCode: '',
             passwordHash: '',
             passwordLastGeneratedAt: null,
         };
+    } else {
+        client.resume.enabled = !!client.resume.enabled;
+        client.resume.fileUrl = String(client.resume.fileUrl || '');
+        client.resume.fileName = String(client.resume.fileName || '');
+        client.resume.objectKey = String(client.resume.objectKey || '');
+        client.resume.accessCode = String(client.resume.accessCode || '');
+        client.resume.passwordHash = String(client.resume.passwordHash || '');
+        client.resume.passwordLastGeneratedAt = client.resume.passwordLastGeneratedAt || null;
     }
 
     if (!client.analytics || typeof client.analytics !== 'object') {
@@ -277,27 +294,33 @@ const incrementClientAnalytics = async (clientId, fieldName) => {
     }
 };
 
-const uploadResumePdfToCloudinary = async (slug, file) => {
-    if (!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET)) {
-        throw new Error('Cloudinary is not configured.');
+const uploadResumePdfToR2 = async (slug, file) => {
+    if (!(r2 && R2_BUCKET_NAME && R2_PUBLIC_BASE_URL)) {
+        throw new Error('R2 is not configured.');
     }
 
     const originalName = String(file.originalname || 'resume.pdf').trim() || 'resume.pdf';
-    const safeBaseName = originalName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]+/g, '-').toLowerCase() || 'resume';
+    const normalizedFileName = originalName.toLowerCase().endsWith('.pdf') ? originalName : (originalName + '.pdf');
+    const safeBaseName = normalizedFileName
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^a-zA-Z0-9-_]+/g, '-')
+        .toLowerCase() || 'resume';
 
-const result = await cloudinary.uploader.upload(
-    'data:' + file.mimetype + ';base64,' + file.buffer.toString('base64'),
-    {
-        folder: 'smartcardlink_resumes',
-        resource_type: 'auto',
-        public_id: `${slug}_${safeBaseName}`,
-        overwrite: true,
-    }
-);
+    const objectKey = `resumes/${slug}_${Date.now()}_${safeBaseName}.pdf`;
+
+    await r2.send(new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: objectKey,
+        Body: file.buffer,
+        ContentType: 'application/pdf',
+    }));
+
+    const publicBase = String(R2_PUBLIC_BASE_URL).replace(/\/+$/, '');
 
     return {
-        fileUrl: result.secure_url,
-        fileName: originalName.endsWith('.pdf') ? originalName : (originalName + '.pdf'),
+        fileUrl: `${publicBase}/${objectKey}`,
+        fileName: normalizedFileName,
+        objectKey,
     };
 };
 
@@ -642,6 +665,17 @@ if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
     });
 }
 
+const r2 = (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY)
+    ? new S3Client({
+        region: 'auto',
+        endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+            accessKeyId: R2_ACCESS_KEY_ID,
+            secretAccessKey: R2_SECRET_ACCESS_KEY,
+        },
+    })
+    : null;
+
 const transporter = (SMTP_HOST && SMTP_USER && SMTP_PASS)
     ? nodemailer.createTransport({
         host: SMTP_HOST,
@@ -823,16 +857,17 @@ app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'
 
         ensureResumeDefaults(client);
 
-        const uploaded = await uploadResumePdfToCloudinary(client.slug, req.file);
+        const uploaded = await uploadResumePdfToR2(client.slug, req.file);
 
         client.resume.enabled = true;
         client.resume.fileUrl = uploaded.fileUrl;
         client.resume.fileName = uploaded.fileName;
+        client.resume.objectKey = uploaded.objectKey;
 
         client.history.push({
             action: 'RESUME_UPLOAD',
             actor: 'admin',
-            notes: 'Resume PDF uploaded for client profile',
+            notes: 'Resume PDF uploaded to R2 for client profile',
         });
 
         await client.save();
@@ -1155,6 +1190,7 @@ client.resume = {
     enabled: false,
     fileUrl: '',
     fileName: '',
+    objectKey: '',
     accessCode: '',
     passwordHash: '',
     passwordLastGeneratedAt: null,
