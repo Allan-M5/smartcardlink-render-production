@@ -544,6 +544,13 @@ const respError = (res, message = 'Internal server error', statusCode = 500, dat
     return res.status(statusCode).json({ status: 'error', message, data });
 };
 
+const ensureDatabaseReady = (res) => {
+    if (mongoose.connection.readyState !== 1) {
+        return respError(res, 'Database is temporarily unavailable. Please try again shortly.', 503);
+    }
+    return true;
+};
+
 const mapClientForResponse = (clientDoc) => {
     const client = clientDoc && clientDoc.toObject ? clientDoc.toObject() : clientDoc;
     if (!client) return null;
@@ -863,7 +870,7 @@ app.use(helmet({
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-mongoose.connect(MONGO_URI, {
+const mongoOptions = {
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
     connectTimeoutMS: 10000,
@@ -871,24 +878,56 @@ mongoose.connect(MONGO_URI, {
     maxPoolSize: 10,
     minPoolSize: 1,
     autoIndex: false,
-})
-    .then(() => logger.info('DB Connected'))
-    .catch((error) => {
-        logger.fatal({ err: error }, 'MongoDB connection failed');
-        process.exit(1);
-    });
+};
+
+let mongoInitialConnectAttempted = false;
+let mongoReconnectTimer = null;
+
+const scheduleMongoReconnect = () => {
+    if (mongoReconnectTimer) return;
+
+    mongoReconnectTimer = setTimeout(async () => {
+        mongoReconnectTimer = null;
+        try {
+            logger.warn('Retrying MongoDB connection...');
+            await mongoose.connect(MONGO_URI, mongoOptions);
+            logger.info('MongoDB reconnect attempt succeeded');
+        } catch (error) {
+            logger.error({ err: error }, 'MongoDB reconnect attempt failed');
+            scheduleMongoReconnect();
+        }
+    }, 10000);
+};
+
+const connectMongo = async () => {
+    try {
+        await mongoose.connect(MONGO_URI, mongoOptions);
+        mongoInitialConnectAttempted = true;
+        logger.info('DB Connected');
+    } catch (error) {
+        mongoInitialConnectAttempted = true;
+        logger.error({ err: error }, 'Initial MongoDB connection failed; server will stay up and retry');
+        scheduleMongoReconnect();
+    }
+};
 
 mongoose.connection.on('connected', () => logger.info('MongoDB ready'));
-mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
+mongoose.connection.on('disconnected', () => {
+    logger.warn('MongoDB disconnected');
+    scheduleMongoReconnect();
+});
 mongoose.connection.on('reconnected', () => logger.info('MongoDB reconnected'));
 mongoose.connection.on('error', (error) => logger.error({ err: error }, 'MongoDB runtime error'));
 
+connectMongo();
+
 app.get('/health', (req, res) => {
-    const dbStatus = mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED';
-    return res.status(dbStatus === 'CONNECTED' ? 200 : 503).json({
+    const dbConnected = mongoose.connection.readyState === 1;
+    return res.status(200).json({
         uptime: process.uptime(),
-        database: dbStatus,
+        database: dbConnected ? 'CONNECTED' : 'DISCONNECTED',
         service: 'SmartCardLink-API',
+        startup: mongoInitialConnectAttempted ? 'COMPLETED' : 'PENDING',
     });
 });
 
@@ -905,6 +944,7 @@ app.get('/api/payment-config', publicLimiter, (req, res) => {
 
 app.get('/api/admin/clients', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const search = String(req.query.q || '').trim();
         const requestedStatus = String(req.query.status || '').trim();
         const filter = {};
@@ -934,6 +974,7 @@ app.get('/api/admin/clients', publicLimiter, async (req, res) => {
 
 app.get('/api/clients/:id', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
         return respSuccess(res, mapClientForResponse(client), 'Client loaded successfully');
@@ -944,6 +985,7 @@ app.get('/api/clients/:id', publicLimiter, async (req, res) => {
 
 app.post('/api/vcard/:slug/analytics-access', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const slug = String(req.params.slug || '').trim();
         const accessToken = String(req.body && req.body.accessToken || '').trim();
 
@@ -981,6 +1023,7 @@ app.post('/api/vcard/:slug/analytics-access', publicLimiter, async (req, res) =>
 
 app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'), async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         let client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
         if (!req.file) return respError(res, 'No resume PDF provided.', 400);
@@ -1031,6 +1074,7 @@ app.post('/api/clients/:id/resume-upload', publicLimiter, upload.single('resume'
 
 app.post('/api/clients', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const payload = req.body || {};
         const fullName = String(payload.fullName || '').trim();
         const phone1 = String(payload.phone1 || '').trim();
@@ -1146,6 +1190,7 @@ app.post('/api/upload-photo', publicLimiter, upload.single('photo'), async (req,
 
 app.put('/api/clients/:id', publicLimiter, upload.single('photo'), async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
 
@@ -1181,6 +1226,7 @@ app.put('/api/clients/:id', publicLimiter, upload.single('photo'), async (req, r
 
 app.put('/api/clients/:id/status/:newStatus', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
 
@@ -1223,6 +1269,7 @@ app.put('/api/clients/:id/status/:newStatus', publicLimiter, async (req, res) =>
 
 app.delete('/api/clients/:id', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
 
@@ -1245,6 +1292,7 @@ app.delete('/api/clients/:id', publicLimiter, async (req, res) => {
 
 app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
         if (!client.email1) return respError(res, 'Primary client email is required before deployment.', 400);
@@ -1432,6 +1480,7 @@ app.get('/api/vcard/:slug', publicLimiter, async (req, res) => {
 
 app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         const slug = String(req.params.slug || '').trim();
         const password = String(req.body && req.body.password || '').trim();
         const mode = String(req.body && req.body.mode || 'view').trim().toLowerCase();
@@ -1487,6 +1536,7 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
 
 app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (req, res) => {
     try {
+        if (!ensureDatabaseReady(res)) return;
         let client = await Client.findById(req.params.id);
         if (!client) return respError(res, 'Client not found.', 404);
 
@@ -1566,4 +1616,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, HOST, () => {
     logger.info('Server on ' + PORT);
 });
+
 
