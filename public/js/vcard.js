@@ -3,7 +3,7 @@
 
   const API_ROOT = document.documentElement.getAttribute('data-api-root') || 'https://smartcardlink-api.onrender.com';
   const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
-  const APPLY_VCARD_URL = 'https://smartcardlink-dashboard-frontend.onrender.com/client-form.html';
+  const APPLY_VCARD_URL = 'https://smartcardlink-public.onrender.com/client-form.html';
   const PRO_ONLY_MESSAGE = 'Available to PRO users';
 
   const el = (id) => document.getElementById(id);
@@ -410,6 +410,19 @@ function forceClick(selector, handler) {
       img.addEventListener('touchstart', () => startPress(src()), { passive: true });
       img.addEventListener('touchend', cancelPress, { passive: true });
     });
+  }
+
+  function refreshPopup1Layout() {
+    if (!popup1) return;
+    popup1.style.height = 'auto';
+    popup1.style.overflow = 'visible';
+
+    const inner = qs('.card-inner', popup1);
+    if (!inner) return;
+
+    const brandHeight = brandHeader ? brandHeader.offsetHeight : 0;
+    const targetHeight = inner.scrollHeight + brandHeight + 32;
+    popup1.style.minHeight = ${targetHeight}px;
   }
 
   function setupActions(client) {
