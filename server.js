@@ -22,6 +22,8 @@ const logger = pino({
 });
 
 const app = express();
+app.disable('x-powered-by');
+mongoose.set('bufferCommands', false);
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = '0.0.0.0';
@@ -55,6 +57,96 @@ const rootStaticFiles = {
     '/client-form.html': path.join(__dirname, 'client-form.html'),
     '/admin-form.html': path.join(__dirname, 'admin-form.html'),
 };
+
+const PUBLIC_VCARD_CACHE_TTL_MS = Number(process.env.PUBLIC_VCARD_CACHE_TTL_MS || 300000);
+const PUBLIC_VCARD_CACHE_MAX_ITEMS = Number(process.env.PUBLIC_VCARD_CACHE_MAX_ITEMS || 500);
+const publicVcardCache = new Map();
+
+const PUBLIC_VCARD_PROJECTION = {
+    fullName: 1,
+    title: 1,
+    slug: 1,
+    phone1: 1,
+    phone2: 1,
+    phone3: 1,
+    email1: 1,
+    email2: 1,
+    email3: 1,
+    company: 1,
+    businessWebsite: 1,
+    portfolioWebsite: 1,
+    locationMap: 1,
+    address: 1,
+    bio: 1,
+    photoUrl: 1,
+    appointmentUrl: 1,
+    themeColor: 1,
+    packageType: 1,
+    themeName: 1,
+    status: 1,
+    vcardAssetUrl: 1,
+    vcardUrl: 1,
+    qrCodeUrl: 1,
+    vcardCreatedDate: 1,
+    subscriptionLastPaidDate: 1,
+    subscriptionRenewalNote: 1,
+    resume: 1,
+    analytics: 1,
+    socialLinks: 1,
+    workingHours: 1,
+    history: 1,
+    createdAt: 1,
+    updatedAt: 1,
+};
+
+const prunePublicVcardCache = () => {
+    const now = Date.now();
+
+    for (const [slug, entry] of publicVcardCache.entries()) {
+        if (!entry || (now - entry.cachedAt) > PUBLIC_VCARD_CACHE_TTL_MS) {
+            publicVcardCache.delete(slug);
+        }
+    }
+
+    while (publicVcardCache.size > PUBLIC_VCARD_CACHE_MAX_ITEMS) {
+        const oldestKey = publicVcardCache.keys().next().value;
+        if (!oldestKey) break;
+        publicVcardCache.delete(oldestKey);
+    }
+};
+
+const getCachedPublicVcard = (slug) => {
+    const key = String(slug || '').trim().toLowerCase();
+    if (!key) return null;
+
+    const entry = publicVcardCache.get(key);
+    if (!entry) return null;
+
+    const ageMs = Date.now() - entry.cachedAt;
+    if (ageMs > PUBLIC_VCARD_CACHE_TTL_MS) {
+        publicVcardCache.delete(key);
+        return null;
+    }
+
+    return {
+        payload: entry.payload,
+        ageMs,
+    };
+};
+
+const setCachedPublicVcard = (slug, payload) => {
+    const key = String(slug || '').trim().toLowerCase();
+    if (!key || !payload) return;
+
+    publicVcardCache.set(key, {
+        payload,
+        cachedAt: Date.now(),
+    });
+
+    prunePublicVcardCache();
+};
+
+setInterval(prunePublicVcardCache, 60 * 1000).unref();
 
 const historySchema = new mongoose.Schema({
     action: { type: String, required: true },
@@ -771,12 +863,25 @@ app.use(helmet({
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-mongoose.connect(MONGO_URI)
+mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 10000,
+    family: 4,
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    autoIndex: false,
+})
     .then(() => logger.info('DB Connected'))
     .catch((error) => {
         logger.fatal({ err: error }, 'MongoDB connection failed');
         process.exit(1);
     });
+
+mongoose.connection.on('connected', () => logger.info('MongoDB ready'));
+mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
+mongoose.connection.on('reconnected', () => logger.info('MongoDB reconnected'));
+mongoose.connection.on('error', (error) => logger.error({ err: error }, 'MongoDB runtime error'));
 
 app.get('/health', (req, res) => {
     const dbStatus = mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED';
@@ -1222,26 +1327,77 @@ app.post('/api/clients/:id/vcard', publicLimiter, async (req, res) => {
 
 app.get('/api/vcard/:slug', publicLimiter, async (req, res) => {
     try {
-        const slug = String(req.params.slug || '').trim();
+        const slug = String(req.params.slug || '').trim().toLowerCase();
+        if (!slug) {
+            return respError(res, 'VCard identifier is required.', 400);
+        }
+
+        const cached = getCachedPublicVcard(slug);
+        if (cached && cached.payload) {
+            res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+            respSuccess(res, cached.payload, 'Profile loaded successfully (cached).');
+
+            setImmediate(async () => {
+                try {
+                    await incrementClientAnalytics(cached.payload._id, 'profileViews');
+
+                    if (mongoose.connection.readyState === 1) {
+                        const freshClient = await Client.findOne(
+                            { slug, status: 'Active' },
+                            PUBLIC_VCARD_PROJECTION
+                        ).lean().maxTimeMS(4000);
+
+                        if (freshClient) {
+                            if (!freshClient.resume || typeof freshClient.resume !== 'object') {
+                                freshClient.resume = {
+                                    enabled: false,
+                                    fileUrl: '',
+                                    fileName: '',
+                                    objectKey: '',
+                                    accessCode: '',
+                                    passwordHash: '',
+                                    passwordLastGeneratedAt: null,
+                                };
+                            }
+
+                            if (!freshClient.analytics || typeof freshClient.analytics !== 'object') {
+                                freshClient.analytics = {
+                                    profileViews: 0,
+                                    resumeViews: 0,
+                                    resumeDownloads: 0,
+                                };
+                            }
+
+                            setCachedPublicVcard(slug, mapClientForResponse(freshClient));
+                        }
+                    }
+                } catch (cacheRefreshError) {
+                    logger.warn({ err: cacheRefreshError, slug }, 'Background public vCard refresh failed');
+                }
+            });
+
+            return;
+        }
 
         const client = await Client.findOne(
-            { slug, status: 'Active' }
-        ).lean();
+            { slug, status: 'Active' },
+            PUBLIC_VCARD_PROJECTION
+        ).lean().maxTimeMS(4000);
 
         if (!client) {
             return respError(res, 'Card profile is currently inactive or missing.', 404);
         }
 
         if (!client.resume || typeof client.resume !== 'object') {
-client.resume = {
-    enabled: false,
-    fileUrl: '',
-    fileName: '',
-    objectKey: '',
-    accessCode: '',
-    passwordHash: '',
-    passwordLastGeneratedAt: null,
-};
+            client.resume = {
+                enabled: false,
+                fileUrl: '',
+                fileName: '',
+                objectKey: '',
+                accessCode: '',
+                passwordHash: '',
+                passwordLastGeneratedAt: null,
+            };
         }
 
         if (!client.analytics || typeof client.analytics !== 'object') {
@@ -1252,14 +1408,25 @@ client.resume = {
             };
         }
 
-        // Respond first, then increment in background
-        respSuccess(res, mapClientForResponse(client), 'Profile loaded successfully.');
+        const payload = mapClientForResponse(client);
+        setCachedPublicVcard(slug, payload);
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        respSuccess(res, payload, 'Profile loaded successfully.');
 
         setImmediate(() => {
             incrementClientAnalytics(client._id, 'profileViews');
         });
     } catch (error) {
-        return respError(res, 'Failed to load public vCard.', 500, null, error);
+        const slug = String(req.params.slug || '').trim().toLowerCase();
+        const cached = getCachedPublicVcard(slug);
+
+        if (cached && cached.payload) {
+            logger.warn({ err: error, slug }, 'Serving stale public vCard cache after database failure');
+            res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
+            return respSuccess(res, cached.payload, 'Profile loaded successfully (stale cache).');
+        }
+
+        return respError(res, 'Failed to load public vCard.', 503, null, error);
     }
 });
 
@@ -1367,7 +1534,24 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use(express.static(staticPath, {
     extensions: ['html'],
-    maxAge: '1h',
+    etag: true,
+    lastModified: true,
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            return;
+        }
+
+        if (/\.(js|css)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+            return;
+        }
+
+        if (/\.(png|jpe?g|gif|svg|webp|ico)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+        }
+    },
 }));
 
 app.all('/api/*', (req, res) => respError(res, 'Requested API resource does not exist.', 404));
