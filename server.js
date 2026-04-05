@@ -1735,3 +1735,51 @@ app.listen(PORT, HOST, () => {
 
 
 
+
+
+
+// ===============================
+// SMARTCARD BACKUP EXPORT ROUTE
+// ===============================
+app.get('/api/admin/export-backup', async (req, res) => {
+  try {
+    const clients = await Client.find({}).lean();
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      totalClients: clients.length,
+      clients
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="smartcardlink-backup.json"');
+
+    return res.status(200).send(JSON.stringify(payload, null, 2));
+  } catch (err) {
+    return res.status(500).json({ error: 'Backup failed', details: err.message });
+  }
+});
+
+
+
+// ===============================
+// SMARTCARD BACKUP EXPORT ROUTE
+// ===============================
+app.get('/api/admin/export-backup', async (req, res) => {
+  try {
+    const clients = await Client.find({}).lean();
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      totalClients: clients.length,
+      clients
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="smartcardlink-backup.json"');
+
+    return res.status(200).send(JSON.stringify(payload, null, 2));
+  } catch (err) {
+    return res.status(500).json({ error: 'Backup failed', details: err.message });
+  }
+});
