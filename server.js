@@ -1736,50 +1736,31 @@ app.listen(PORT, HOST, () => {
 
 
 
-
-
-// ===============================
 // SMARTCARD BACKUP EXPORT ROUTE
 // ===============================
 app.get('/api/admin/export-backup', async (req, res) => {
-  try {
-    const clients = await Client.find({}).lean();
+    try {
+        if (!ensureDatabaseReady(res)) return;
 
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      totalClients: clients.length,
-      clients
-    };
+        const clients = await Client.find({}).lean();
 
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename="smartcardlink-backup.json"');
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            totalClients: clients.length,
+            clients
+        };
 
-    return res.status(200).send(JSON.stringify(payload, null, 2));
-  } catch (err) {
-    return res.status(500).json({ error: 'Backup failed', details: err.message });
-  }
-});
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="smartcardlink-backup.json"');
+        res.setHeader('Cache-Control', 'no-store');
 
-
-
-// ===============================
-// SMARTCARD BACKUP EXPORT ROUTE
-// ===============================
-app.get('/api/admin/export-backup', async (req, res) => {
-  try {
-    const clients = await Client.find({}).lean();
-
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      totalClients: clients.length,
-      clients
-    };
-
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename="smartcardlink-backup.json"');
-
-    return res.status(200).send(JSON.stringify(payload, null, 2));
-  } catch (err) {
-    return res.status(500).json({ error: 'Backup failed', details: err.message });
-  }
+        return res.status(200).send(JSON.stringify(payload, null, 2));
+    } catch (error) {
+        return res.status(500).json({
+            status: 'error',
+            message: 'Backup export failed.',
+            data: null,
+            error: error.message
+        });
+    }
 });
