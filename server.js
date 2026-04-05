@@ -1549,12 +1549,13 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
             return respError(res, 'Resume file URL is invalid.', 500);
         }
 
-        await incrementClientAnalytics(client._id, mode === 'download' ? 'resumeDownloads' : 'resumeViews');
+        await incrementClientAnalytics(client._id, mode === 'download' ? 'resumeDownloads' : 'resumeViews');        const downloadUrl = `${APP_BASE_URL}/api/vcard/${encodeURIComponent(slug)}/resume-download?password=${encodeURIComponent(password)}`;
 
         return respSuccess(res, {
             fileUrl,
             fileName,
             mode,
+            downloadUrl,
         }, 'Resume access granted.');
     } catch (error) {
         return respError(
@@ -1697,6 +1698,10 @@ app.get('*', (req, res) => {
 app.listen(PORT, HOST, () => {
     logger.info('Server on ' + PORT);
 });
+
+
+
+
 
 
 
