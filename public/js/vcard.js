@@ -422,7 +422,7 @@ function forceClick(selector, handler) {
 
     const brandHeight = brandHeader ? brandHeader.offsetHeight : 0;
     const targetHeight = inner.scrollHeight + brandHeight + 32;
-    popup1.style.minHeight = ${targetHeight}px;
+    popup1.style.minHeight = `${targetHeight}px`;
   }
 
   function refreshPopup1Layout() {
@@ -435,7 +435,7 @@ function forceClick(selector, handler) {
 
     const brandHeight = brandHeader ? brandHeader.offsetHeight : 0;
     const targetHeight = inner.scrollHeight + brandHeight + 32;
-    popup1.style.minHeight = ${targetHeight}px;
+    popup1.style.minHeight = `${targetHeight}px`;
   }
 
   function setupActions(client) {
@@ -1058,5 +1058,6 @@ qsa('#bookAppointmentBtn').forEach((node) => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
