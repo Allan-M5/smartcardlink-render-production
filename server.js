@@ -254,6 +254,19 @@ const ensureColor = (value) => {
     return /^#[0-9A-Fa-f]{6}$/.test(color) ? color.toUpperCase() : '#FFD700';
 };
 
+const normalizeWorkingHours = (hours = {}) => {
+    const clean = (value) => String(value || '').trim();
+
+    return {
+        monFriStart: clean(hours.monFriStart) || '08:00',
+        monFriEnd: clean(hours.monFriEnd) || '17:00',
+        satStart: clean(hours.satStart) || '09:00',
+        satEnd: clean(hours.satEnd) || '12:00',
+        sunStart: clean(hours.sunStart),
+        sunEnd: clean(hours.sunEnd),
+    };
+};
+
 const normalizeStatus = (value) => {
     const map = {
         pending: 'Pending',
@@ -341,6 +354,16 @@ const getSlugFromUrl = (value) => {
         return String(parsed.searchParams.get('slug') || '').trim();
     } catch (error) {
         return '';
+    }
+};
+
+const normalizeComparableUrl = (value) => {
+    try {
+        const parsed = new URL(String(value || '').trim());
+        parsed.hash = '';
+        return parsed.toString().replace(/\/+$/, '');
+    } catch (error) {
+        return String(value || '').trim().replace(/\/+$/, '');
     }
 };
 
@@ -680,13 +703,21 @@ const applyPayloadToClient = async (client, payload, actor, notes) => {
     client.socialLinks.tiktok = sanitizeUrl(socialLinks.tiktok || incoming.tiktok || '');
     client.socialLinks.youtube = sanitizeUrl(socialLinks.youtube || incoming.youtube || '');
 
-    const hours = incoming.workingHours || {};
-    client.workingHours.monFriStart = String(hours.monFriStart || incoming.monFriStart || '').trim();
-    client.workingHours.monFriEnd = String(hours.monFriEnd || incoming.monFriEnd || '').trim();
-    client.workingHours.satStart = String(hours.satStart || incoming.satStart || '').trim();
-    client.workingHours.satEnd = String(hours.satEnd || incoming.satEnd || '').trim();
-    client.workingHours.sunStart = String(hours.sunStart || incoming.sunStart || '').trim();
-    client.workingHours.sunEnd = String(hours.sunEnd || incoming.sunEnd || '').trim();
+    const hours = normalizeWorkingHours({
+        monFriStart: incoming.workingHours && incoming.workingHours.monFriStart || incoming.monFriStart || '',
+        monFriEnd: incoming.workingHours && incoming.workingHours.monFriEnd || incoming.monFriEnd || '',
+        satStart: incoming.workingHours && incoming.workingHours.satStart || incoming.satStart || '',
+        satEnd: incoming.workingHours && incoming.workingHours.satEnd || incoming.satEnd || '',
+        sunStart: incoming.workingHours && incoming.workingHours.sunStart || incoming.sunStart || '',
+        sunEnd: incoming.workingHours && incoming.workingHours.sunEnd || incoming.sunEnd || ''
+    });
+
+    client.workingHours.monFriStart = hours.monFriStart;
+    client.workingHours.monFriEnd = hours.monFriEnd;
+    client.workingHours.satStart = hours.satStart;
+    client.workingHours.satEnd = hours.satEnd;
+    client.workingHours.sunStart = hours.sunStart;
+    client.workingHours.sunEnd = hours.sunEnd;
 
     if (incoming.photoUrl) {
         client.photoUrl = sanitizeUrl(incoming.photoUrl);
@@ -1005,8 +1036,10 @@ app.post('/api/vcard/:slug/analytics-access', publicLimiter, async (req, res) =>
         const client = await Client.findOne({ slug, status: 'Active' });
         if (!client) return respError(res, 'Client not found.', 404);
 
-        const expectedUrl = String(client.vcardUrl || '').trim();
-        if (!expectedUrl || accessToken !== expectedUrl) {
+        const expectedUrl = normalizeComparableUrl(client.vcardUrl || '');
+        const suppliedUrl = normalizeComparableUrl(accessToken);
+
+        if (!expectedUrl || suppliedUrl !== expectedUrl) {
             return respError(res, 'Access token does not match this profile.', 403);
         }
 
@@ -1113,14 +1146,14 @@ app.post('/api/clients', publicLimiter, async (req, res) => {
                 tiktok: sanitizeUrl(payload.socialLinks && payload.socialLinks.tiktok),
                 youtube: sanitizeUrl(payload.socialLinks && payload.socialLinks.youtube),
             },
-            workingHours: {
-                monFriStart: String(payload.workingHours && payload.workingHours.monFriStart || '').trim(),
-                monFriEnd: String(payload.workingHours && payload.workingHours.monFriEnd || '').trim(),
-                satStart: String(payload.workingHours && payload.workingHours.satStart || '').trim(),
-                satEnd: String(payload.workingHours && payload.workingHours.satEnd || '').trim(),
-                sunStart: String(payload.workingHours && payload.workingHours.sunStart || '').trim(),
-                sunEnd: String(payload.workingHours && payload.workingHours.sunEnd || '').trim(),
-            },
+            workingHours: normalizeWorkingHours({
+                monFriStart: payload.workingHours && payload.workingHours.monFriStart || '',
+                monFriEnd: payload.workingHours && payload.workingHours.monFriEnd || '',
+                satStart: payload.workingHours && payload.workingHours.satStart || '',
+                satEnd: payload.workingHours && payload.workingHours.satEnd || '',
+                sunStart: payload.workingHours && payload.workingHours.sunStart || '',
+                sunEnd: payload.workingHours && payload.workingHours.sunEnd || '',
+            }),
             status: 'Pending',
             history: [{
                 action: 'CLIENT_ONBOARDING',
@@ -1534,6 +1567,54 @@ app.post('/api/vcard/:slug/resume-access', publicLimiter, async (req, res) => {
     }
 });
 
+app.get('/api/vcard/:slug/resume-download', publicLimiter, async (req, res) => {
+    try {
+        if (!ensureDatabaseReady(res)) return;
+
+        const slug = String(req.params.slug || '').trim();
+        const password = String(req.query && req.query.password || '').trim();
+
+        if (!password) return respError(res, 'Resume password is required.', 400);
+
+        let client = await Client.findOne({ slug, status: 'Active' });
+        if (!client) return respError(res, 'Client not found.', 404);
+
+        client = await repairLegacyResumeField(client);
+        if (!client) return respError(res, 'Client not found after resume repair.', 404);
+
+        ensureResumeDefaults(client);
+
+        if (String(client.packageType || 'standard').toLowerCase() !== 'pro') {
+            return respError(res, 'Resume access is available on PRO profiles only.', 403);
+        }
+
+        if (!client.resume.enabled || !client.resume.fileUrl || !client.resume.passwordHash) {
+            return respError(res, 'Resume is not configured for this profile.', 404);
+        }
+
+        if (!verifySecret(password, client.resume.passwordHash)) {
+            return respError(res, 'Incorrect resume password.', 403);
+        }
+
+        const fileUrl = String(client.resume.fileUrl || '').trim();
+        const fileName = String(client.resume.fileName || 'resume.pdf').trim() || 'resume.pdf';
+
+        const upstream = await fetch(fileUrl);
+        if (!upstream.ok) {
+            return respError(res, 'Failed to fetch resume file.', 502);
+        }
+
+        await incrementClientAnalytics(client._id, 'resumeDownloads');
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/"/g, '')}"`);
+        res.setHeader('Cache-Control', 'no-store');
+
+        upstream.body.pipe(res);
+    } catch (error) {
+        return respError(res, 'Failed to download resume.', 500, null, error);
+    }
+});
 app.post('/api/clients/:id/resume-regenerate-password', publicLimiter, async (req, res) => {
     try {
         if (!ensureDatabaseReady(res)) return;
@@ -1616,5 +1697,17 @@ app.get('*', (req, res) => {
 app.listen(PORT, HOST, () => {
     logger.info('Server on ' + PORT);
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 
