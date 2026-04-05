@@ -425,6 +425,19 @@ function forceClick(selector, handler) {
     popup1.style.minHeight = ${targetHeight}px;
   }
 
+  function refreshPopup1Layout() {
+    if (!popup1) return;
+    popup1.style.height = 'auto';
+    popup1.style.overflow = 'visible';
+
+    const inner = qs('.card-inner', popup1);
+    if (!inner) return;
+
+    const brandHeight = brandHeader ? brandHeader.offsetHeight : 0;
+    const targetHeight = inner.scrollHeight + brandHeight + 32;
+    popup1.style.minHeight = ${targetHeight}px;
+  }
+
   function setupActions(client) {
     const phone = String(client.phone1 || '').trim();
     const email = String(client.email1 || '').trim();
@@ -1045,3 +1058,4 @@ qsa('#bookAppointmentBtn').forEach((node) => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
