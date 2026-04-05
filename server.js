@@ -1600,18 +1600,36 @@ app.get('/api/vcard/:slug/resume-download', publicLimiter, async (req, res) => {
         const fileUrl = String(client.resume.fileUrl || '').trim();
         const fileName = String(client.resume.fileName || 'resume.pdf').trim() || 'resume.pdf';
 
+        if (!/^https?:\/\//i.test(fileUrl)) {
+            return respError(res, 'Resume file URL is invalid.', 500);
+        }
+
         const upstream = await fetch(fileUrl);
         if (!upstream.ok) {
             return respError(res, 'Failed to fetch resume file.', 502);
         }
 
+        const arrayBuffer = await upstream.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        if (!buffer.length) {
+            return respError(res, 'Resume file is empty.', 502);
+        }
+
         await incrementClientAnalytics(client._id, 'resumeDownloads');
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/"/g, '')}"`);
-        res.setHeader('Cache-Control', 'no-store');
+        const upstreamType = String(upstream.headers.get('content-type') || '').trim();
+        const contentType = upstreamType || 'application/pdf';
+        const safeFileName = fileName.replace(/"/g, '');
 
-        upstream.body.pipe(res);
+        res.status(200);
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+        res.setHeader('Content-Length', String(buffer.length));
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+
+        return res.end(buffer);
     } catch (error) {
         return respError(res, 'Failed to download resume.', 500, null, error);
     }
@@ -1698,6 +1716,7 @@ app.get('*', (req, res) => {
 app.listen(PORT, HOST, () => {
     logger.info('Server on ' + PORT);
 });
+
 
 
 
