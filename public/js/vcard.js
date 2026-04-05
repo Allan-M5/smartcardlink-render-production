@@ -1059,3 +1059,4 @@ qsa('#bookAppointmentBtn').forEach((node) => {
   document.addEventListener('DOMContentLoaded', init);
 })();
 
+
